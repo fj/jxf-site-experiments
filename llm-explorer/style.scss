@@ -30,14 +30,8 @@ $llmx-muted-dark: #9aa0a6;
 .llmx {
   margin: 2rem 0 1rem;
   font-size: 0.95rem;
-  // The host theme sets body { line-height: 1.8em }, which cascades as a fixed
-  // length into every line here. Reset to a compact, unitless value so the
-  // controls and labels scale from their own font-size.
-  line-height: 1.4;
-
-  *,
-  *::before,
-  *::after { box-sizing: border-box; }
+  // The typographic baseline (line-height reset, box-sizing) is provided once by
+  // the host's shared `.experiment` wrapper, so experiments don't each re-fix it.
 }
 
 .llmx-noscript { color: $llmx-muted; }

@@ -1,0 +1,32 @@
+# Manifest for the Quote Card experiment.
+#
+# The host (jxf-site) reads this to assemble the page: it compiles the styles,
+# fetches the declared third-party dependencies at build time and serves them
+# self-hosted, and loads the local scripts. The experiment is the source of
+# truth for its own composition and dependencies — the host hardcodes nothing.
+
+name: quote-card
+
+# id of the element the app builds itself into (app.js owns the same id).
+mount: experiment-ext-qcard
+
+# Stylesheets (relative to this dir). .scss is compiled to CSS by the host.
+styles:
+  - style.scss
+
+# No build-time font pins: every preset face is a Google Fonts webfont the
+# app loads at runtime (app.js injects the fonts.googleapis.com stylesheet
+# from config.js and prefetches every variant behind a loading spinner before
+# it builds the UI).
+
+# Local scripts (relative to this dir), loaded after dependencies, in
+# dependency order (each attaches a module to the window.QCard namespace;
+# app.js wires them together and comes last).
+scripts:
+  - config.js
+  - csskit.js
+  - markdown.js
+  - layout.js
+  - render.js
+  - advanced.js
+  - app.js

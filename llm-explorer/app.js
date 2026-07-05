@@ -1,7 +1,7 @@
 /*
  * LLM Explorer — an interactive scatter plot comparing language models.
  *
- * Data is a vendored snapshot embedded in the page as JSON (#llmx-data); see
+ * Data is a vendored snapshot shipped as a plain JS file (data.js); see
  * tools/build-llm-explorer-dataset.py. This script (d3 v7) wires up the
  * controls and draws/updates the chart. No network calls at runtime.
  */
@@ -9,7 +9,7 @@
   "use strict";
 
   var d3 = window.d3;
-  var root = document.getElementById("llmx");
+  var root = document.getElementById("experiment-ext-llmx");
   // Data ships as a plain JS file (data.js) that sets this global — no JSON
   // parsing and no host-page templating pipeline.
   var DATA = (window.JXF_EXP_DATA || {})["llm-explorer"];
@@ -190,11 +190,11 @@
   function els(sel, ctx) { return Array.prototype.slice.call((ctx || root).querySelectorAll(sel)); }
 
   function buildScenarioButtons() {
-    var row = el(".llmx-scenario-row");
+    var row = el(".experiment-ext-llmx-scenario-row");
     SCENARIOS.forEach(function (s) {
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "llmx-scenario";
+      b.className = "experiment-ext-llmx-scenario";
       b.textContent = s.label;
       b.title = s.blurb;
       b.setAttribute("data-scenario", s.id);
@@ -214,14 +214,14 @@
   }
   function clampRaw(v, max) { return Math.max(0, Math.min(max, v)); }
   function refreshScenarioActive() {
-    els(".llmx-scenario").forEach(function (b) {
+    els(".experiment-ext-llmx-scenario").forEach(function (b) {
       b.classList.toggle("is-active", b.getAttribute("data-scenario") === state.scenario);
     });
   }
 
   function buildAxisSelects() {
     ["x", "y"].forEach(function (axis) {
-      var sel = el('.llmx-select[data-axis="' + axis + '"]');
+      var sel = el('.experiment-ext-llmx-select[data-axis="' + axis + '"]');
       DIM_ORDER.forEach(function (key) {
         var o = document.createElement("option");
         o.value = key;
@@ -237,15 +237,15 @@
   }
 
   function buildModelDropdown() {
-    var list = el(".llmx-model-list");
+    var list = el(".experiment-ext-llmx-model-list");
     var byBrand = d3.group(MODELS, function (m) { return m.brand; });
     Array.from(byBrand.keys()).sort().forEach(function (brand) {
       var group = document.createElement("div");
-      group.className = "llmx-model-group";
+      group.className = "experiment-ext-llmx-model-group";
       var h = document.createElement("div");
-      h.className = "llmx-model-brand";
+      h.className = "experiment-ext-llmx-model-brand";
       var dot = document.createElement("span");
-      dot.className = "llmx-dot";
+      dot.className = "experiment-ext-llmx-dot";
       dot.style.background = brandColor(brand);
       h.appendChild(dot);
       h.appendChild(document.createTextNode(brand));
@@ -253,7 +253,7 @@
 
       byBrand.get(brand).forEach(function (m) {
         var lbl = document.createElement("label");
-        lbl.className = "llmx-model-item";
+        lbl.className = "experiment-ext-llmx-model-item";
         var cb = document.createElement("input");
         cb.type = "checkbox";
         cb.value = m.id;
@@ -272,7 +272,7 @@
       list.appendChild(group);
     });
 
-    els(".llmx-dropdown-actions button").forEach(function (b) {
+    els(".experiment-ext-llmx-dropdown-actions button").forEach(function (b) {
       b.addEventListener("click", function () {
         var mode = b.getAttribute("data-select");
         state.selected = new Set(
@@ -280,7 +280,7 @@
             return mode === "all" || (mode === "featured" && m.featured);
           }).map(function (m) { return m.id; })
         );
-        els('.llmx-model-list input[type="checkbox"]').forEach(function (cb) {
+        els('.experiment-ext-llmx-model-list input[type="checkbox"]').forEach(function (cb) {
           cb.checked = state.selected.has(cb.value);
         });
         updateDropdownLabel();
@@ -289,8 +289,8 @@
     });
 
     var dd = el("[data-dropdown]");
-    var toggle = el(".llmx-dropdown-toggle", dd);
-    var menu = el(".llmx-dropdown-menu", dd);
+    var toggle = el(".experiment-ext-llmx-dropdown-toggle", dd);
+    var menu = el(".experiment-ext-llmx-dropdown-menu", dd);
     toggle.addEventListener("click", function () {
       var open = menu.hasAttribute("hidden");
       if (open) { menu.removeAttribute("hidden"); } else { menu.setAttribute("hidden", ""); }
@@ -305,7 +305,7 @@
     updateDropdownLabel();
   }
   function updateDropdownLabel() {
-    el(".llmx-dropdown-label").textContent = state.selected.size + " model" + (state.selected.size === 1 ? "" : "s");
+    el(".experiment-ext-llmx-dropdown-label").textContent = state.selected.size + " model" + (state.selected.size === 1 ? "" : "s");
   }
 
   function buildSliders() {
@@ -314,7 +314,7 @@
     bindRange("cache", function (raw) { state.cacheRaw = raw; });
   }
   function bindRange(name, set) {
-    var input = el('.llmx-range[data-range="' + name + '"]');
+    var input = el('.experiment-ext-llmx-range[data-range="' + name + '"]');
     input.addEventListener("input", function () {
       set(+input.value);
       state.scenario = null;       // manual edits leave "no preset" state
@@ -323,9 +323,9 @@
     });
   }
   function syncRangeInputs() {
-    el('.llmx-range[data-range="ratio"]').value = state.ratioRaw;
-    el('.llmx-range[data-range="inputSize"]').value = state.inputRaw;
-    el('.llmx-range[data-range="cache"]').value = state.cacheRaw;
+    el('.experiment-ext-llmx-range[data-range="ratio"]').value = state.ratioRaw;
+    el('.experiment-ext-llmx-range[data-range="inputSize"]').value = state.inputRaw;
+    el('.experiment-ext-llmx-range[data-range="cache"]').value = state.cacheRaw;
   }
 
   function updateReadouts(W) {
@@ -353,7 +353,7 @@
     p.appendChild(link(s.throughput.url, s.throughput.name));
     p.appendChild(document.createTextNode(" · snapshot " + DATA.generated + ". "));
     var note = document.createElement("span");
-    note.className = "llmx-provenance-note";
+    note.className = "experiment-ext-llmx-provenance-note";
     note.textContent = s.throughput.note;
     p.appendChild(note);
   }
@@ -366,22 +366,22 @@
   // ===========================================================================
   // Chart
   // ===========================================================================
-  var svg = d3.select(el(".llmx-chart"));
-  var holder = el(".llmx-chart-holder");
-  var tooltip = d3.select(el(".llmx-tooltip"));
+  var svg = d3.select(el(".experiment-ext-llmx-chart"));
+  var holder = el(".experiment-ext-llmx-chart-holder");
+  var tooltip = d3.select(el(".experiment-ext-llmx-tooltip"));
   var margin = { top: 18, right: 26, bottom: 56, left: 70 };
 
   var gGridX, gGridY, gAxisX, gAxisY, gPoints, xTitle, yTitle;
   function initChart() {
-    var g = svg.append("g").attr("class", "llmx-plot");
-    gGridX = g.append("g").attr("class", "llmx-grid llmx-grid-x");
-    gGridY = g.append("g").attr("class", "llmx-grid llmx-grid-y");
-    gAxisX = g.append("g").attr("class", "llmx-axis llmx-axis-x");
-    gAxisY = g.append("g").attr("class", "llmx-axis llmx-axis-y");
-    gPoints = g.append("g").attr("class", "llmx-points");
-    xTitle = g.append("text").attr("class", "llmx-axis-title llmx-axis-title-x").attr("text-anchor", "middle");
-    yTitle = g.append("text").attr("class", "llmx-axis-title llmx-axis-title-y").attr("text-anchor", "middle");
-    svg.select(".llmx-plot").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    var g = svg.append("g").attr("class", "experiment-ext-llmx-plot");
+    gGridX = g.append("g").attr("class", "experiment-ext-llmx-grid experiment-ext-llmx-grid-x");
+    gGridY = g.append("g").attr("class", "experiment-ext-llmx-grid experiment-ext-llmx-grid-y");
+    gAxisX = g.append("g").attr("class", "experiment-ext-llmx-axis experiment-ext-llmx-axis-x");
+    gAxisY = g.append("g").attr("class", "experiment-ext-llmx-axis experiment-ext-llmx-axis-y");
+    gPoints = g.append("g").attr("class", "experiment-ext-llmx-points");
+    xTitle = g.append("text").attr("class", "experiment-ext-llmx-axis-title experiment-ext-llmx-axis-title-x").attr("text-anchor", "middle");
+    yTitle = g.append("text").attr("class", "experiment-ext-llmx-axis-title experiment-ext-llmx-axis-title-y").attr("text-anchor", "middle");
+    svg.select(".experiment-ext-llmx-plot").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
 
   function makeScale(dim, values, range) {
@@ -447,14 +447,14 @@
       .text(yDim.label + (yDim.unit ? "  (" + yDim.unit + ")" : ""));
 
     // Points (join keyed by model id)
-    var groups = gPoints.selectAll("g.llmx-pt").data(pts, function (p) { return p.m.id; });
+    var groups = gPoints.selectAll("g.experiment-ext-llmx-pt").data(pts, function (p) { return p.m.id; });
 
     var enter = groups.enter().append("g")
-      .attr("class", "llmx-pt")
+      .attr("class", "experiment-ext-llmx-pt")
       .attr("transform", function (p) { return "translate(" + x(p.xv) + "," + y(p.yv) + ")"; })
       .style("opacity", 0);
     enter.append("circle").attr("r", 0).attr("fill", function (p) { return brandColor(p.m.brand); });
-    enter.append("text").attr("class", "llmx-pt-label").attr("x", 9).attr("dy", "0.32em")
+    enter.append("text").attr("class", "experiment-ext-llmx-pt-label").attr("x", 9).attr("dy", "0.32em")
       .text(function (p) { return p.m.name; });
 
     enter.on("mousemove", function (event, p) { showTip(event, p, W); })
@@ -474,10 +474,10 @@
   }
 
   function renderEmpty(isEmpty) {
-    var existing = el(".llmx-empty");
+    var existing = el(".experiment-ext-llmx-empty");
     if (isEmpty && !existing) {
       var d = document.createElement("p");
-      d.className = "llmx-empty";
+      d.className = "experiment-ext-llmx-empty";
       d.textContent = "No models to plot. Pick some from the Models menu, or check the axes.";
       holder.appendChild(d);
     } else if (!isEmpty && existing) {
@@ -507,10 +507,10 @@
     ].join("");
     var sub = m.brand + (m.host ? " · via " + m.host : "") + (m.release ? " · " + m.release : "");
     tooltip.html(
-      '<div class="llmx-tip-title"><span class="llmx-dot" style="background:' + brandColor(m.brand) + '"></span>' +
+      '<div class="experiment-ext-llmx-tip-title"><span class="experiment-ext-llmx-dot" style="background:' + brandColor(m.brand) + '"></span>' +
       esc(m.name) + "</div>" +
-      '<div class="llmx-tip-sub">' + esc(sub) + "</div>" +
-      '<dl class="llmx-tip-grid">' + rows + "</dl>"
+      '<div class="experiment-ext-llmx-tip-sub">' + esc(sub) + "</div>" +
+      '<dl class="experiment-ext-llmx-tip-grid">' + rows + "</dl>"
     ).attr("hidden", null);
 
     var pt = d3.pointer(event, holder);
@@ -526,105 +526,105 @@
 
   // ---- Legend (also toggles brand visibility) --------------------------------
   function renderLegend(visible) {
-    var legend = d3.select(el(".llmx-legend"));
+    var legend = d3.select(el(".experiment-ext-llmx-legend"));
     var brands = Array.from(new Set(
       MODELS.filter(function (m) { return state.selected.has(m.id); }).map(function (m) { return m.brand; })
     )).sort();
 
-    var items = legend.selectAll("button.llmx-legend-item").data(brands, function (b) { return b; });
+    var items = legend.selectAll("button.experiment-ext-llmx-legend-item").data(brands, function (b) { return b; });
     items.exit().remove();
     var enter = items.enter().append("button")
       .attr("type", "button")
-      .attr("class", "llmx-legend-item")
+      .attr("class", "experiment-ext-llmx-legend-item")
       .on("click", function (event, b) {
         if (state.hiddenBrands.has(b)) state.hiddenBrands.delete(b); else state.hiddenBrands.add(b);
         update(true);
       });
-    enter.append("span").attr("class", "llmx-dot");
-    enter.append("span").attr("class", "llmx-legend-label");
+    enter.append("span").attr("class", "experiment-ext-llmx-dot");
+    enter.append("span").attr("class", "experiment-ext-llmx-legend-label");
     var merged = enter.merge(items);
     merged.classed("is-off", function (b) { return state.hiddenBrands.has(b); });
-    merged.select(".llmx-dot").style("background", function (b) { return brandColor(b); });
-    merged.select(".llmx-legend-label").text(function (b) { return b; });
+    merged.select(".experiment-ext-llmx-dot").style("background", function (b) { return brandColor(b); });
+    merged.select(".experiment-ext-llmx-legend-label").text(function (b) { return b; });
   }
 
   // Build the full control + chart skeleton inside the mount element, so the
-  // host page only needs an empty <div id="llmx">.
+  // host page only needs an empty <div id="experiment-ext-llmx">.
   function buildSkeleton(mount) {
-    mount.innerHTML = `<div class="llmx-panel">
-  <div class="llmx-field llmx-scenarios">
-    <span class="llmx-field-label">Scenario</span>
-    <div class="llmx-scenario-row" role="group" aria-label="Scenario presets"></div>
+    mount.innerHTML = `<div class="experiment-ext-llmx-panel">
+  <div class="experiment-ext-llmx-field experiment-ext-llmx-scenarios">
+    <span class="experiment-ext-llmx-field-label">Scenario</span>
+    <div class="experiment-ext-llmx-scenario-row" role="group" aria-label="Scenario presets"></div>
   </div>
-  <div class="llmx-axes">
-    <label class="llmx-field">
-      <span class="llmx-field-label">Horizontal axis</span>
-      <select class="llmx-select" data-axis="x"></select>
+  <div class="experiment-ext-llmx-axes">
+    <label class="experiment-ext-llmx-field">
+      <span class="experiment-ext-llmx-field-label">Horizontal axis</span>
+      <select class="experiment-ext-llmx-select" data-axis="x"></select>
     </label>
-    <label class="llmx-field">
-      <span class="llmx-field-label">Vertical axis</span>
-      <select class="llmx-select" data-axis="y"></select>
+    <label class="experiment-ext-llmx-field">
+      <span class="experiment-ext-llmx-field-label">Vertical axis</span>
+      <select class="experiment-ext-llmx-select" data-axis="y"></select>
     </label>
-    <div class="llmx-field">
-      <span class="llmx-field-label">Models</span>
-      <div class="llmx-dropdown" data-dropdown>
-        <button type="button" class="llmx-dropdown-toggle" aria-expanded="false" aria-haspopup="true">
-          <span class="llmx-dropdown-label">Models</span>
-          <span class="llmx-caret" aria-hidden="true">&#9662;</span>
+    <div class="experiment-ext-llmx-field">
+      <span class="experiment-ext-llmx-field-label">Models</span>
+      <div class="experiment-ext-llmx-dropdown" data-dropdown>
+        <button type="button" class="experiment-ext-llmx-dropdown-toggle" aria-expanded="false" aria-haspopup="true">
+          <span class="experiment-ext-llmx-dropdown-label">Models</span>
+          <span class="experiment-ext-llmx-caret" aria-hidden="true">&#9662;</span>
         </button>
-        <div class="llmx-dropdown-menu" hidden>
-          <div class="llmx-dropdown-actions">
+        <div class="experiment-ext-llmx-dropdown-menu" hidden>
+          <div class="experiment-ext-llmx-dropdown-actions">
             <button type="button" data-select="featured">Featured</button>
             <button type="button" data-select="all">All</button>
             <button type="button" data-select="none">None</button>
           </div>
-          <div class="llmx-model-list"></div>
+          <div class="experiment-ext-llmx-model-list"></div>
         </div>
       </div>
     </div>
   </div>
-  <details class="llmx-advanced">
+  <details class="experiment-ext-llmx-advanced">
     <summary>
-      <span class="llmx-summary-label">Advanced assumptions</span>
-      <span class="llmx-summary-hint">workload mix, request size, cache</span>
+      <span class="experiment-ext-llmx-summary-label">Advanced assumptions</span>
+      <span class="experiment-ext-llmx-summary-hint">workload mix, request size, cache</span>
     </summary>
-    <div class="llmx-advanced-body">
-      <div class="llmx-control" data-control="ratio">
-        <div class="llmx-control-head">
-          <label for="llmx-ratio">Token mix</label>
-          <span class="llmx-control-value" data-value="ratio"></span>
+    <div class="experiment-ext-llmx-advanced-body">
+      <div class="experiment-ext-llmx-control" data-control="ratio">
+        <div class="experiment-ext-llmx-control-head">
+          <label for="experiment-ext-llmx-ratio">Token mix</label>
+          <span class="experiment-ext-llmx-control-value" data-value="ratio"></span>
         </div>
-        <input type="range" id="llmx-ratio" class="llmx-range" data-range="ratio" min="0" max="1000" value="500" aria-describedby="llmx-ratio-hint">
-        <div class="llmx-scale-labels"><span>5000&times; output</span><span>balanced</span><span>5000&times; input</span></div>
-        <div class="llmx-control-hint" id="llmx-ratio-hint">Output-heavy work (drafting) sits left; input-heavy work (summarizing) sits right.</div>
+        <input type="range" id="experiment-ext-llmx-ratio" class="experiment-ext-llmx-range" data-range="ratio" min="0" max="1000" value="500" aria-describedby="experiment-ext-llmx-ratio-hint">
+        <div class="experiment-ext-llmx-scale-labels"><span>5000&times; output</span><span>balanced</span><span>5000&times; input</span></div>
+        <div class="experiment-ext-llmx-control-hint" id="experiment-ext-llmx-ratio-hint">Output-heavy work (drafting) sits left; input-heavy work (summarizing) sits right.</div>
       </div>
-      <div class="llmx-control" data-control="inputSize">
-        <div class="llmx-control-head">
-          <label for="llmx-input">Input size</label>
-          <span class="llmx-control-value" data-value="inputSize"></span>
+      <div class="experiment-ext-llmx-control" data-control="inputSize">
+        <div class="experiment-ext-llmx-control-head">
+          <label for="experiment-ext-llmx-input">Input size</label>
+          <span class="experiment-ext-llmx-control-value" data-value="inputSize"></span>
         </div>
-        <input type="range" id="llmx-input" class="llmx-range" data-range="inputSize" min="0" max="1000" value="500" aria-describedby="llmx-input-hint">
-        <div class="llmx-control-hint" id="llmx-input-hint">Input tokens per request. Output tokens follow from the token mix above.</div>
+        <input type="range" id="experiment-ext-llmx-input" class="experiment-ext-llmx-range" data-range="inputSize" min="0" max="1000" value="500" aria-describedby="experiment-ext-llmx-input-hint">
+        <div class="experiment-ext-llmx-control-hint" id="experiment-ext-llmx-input-hint">Input tokens per request. Output tokens follow from the token mix above.</div>
       </div>
-      <div class="llmx-control" data-control="cache">
-        <div class="llmx-control-head">
-          <label for="llmx-cache">Cached input</label>
-          <span class="llmx-control-value" data-value="cache"></span>
+      <div class="experiment-ext-llmx-control" data-control="cache">
+        <div class="experiment-ext-llmx-control-head">
+          <label for="experiment-ext-llmx-cache">Cached input</label>
+          <span class="experiment-ext-llmx-control-value" data-value="cache"></span>
         </div>
-        <input type="range" id="llmx-cache" class="llmx-range" data-range="cache" min="0" max="100" value="0" aria-describedby="llmx-cache-hint">
-        <div class="llmx-control-hint" id="llmx-cache-hint">Share of input served from cache, billed at each model's cache-read price.</div>
+        <input type="range" id="experiment-ext-llmx-cache" class="experiment-ext-llmx-range" data-range="cache" min="0" max="100" value="0" aria-describedby="experiment-ext-llmx-cache-hint">
+        <div class="experiment-ext-llmx-control-hint" id="experiment-ext-llmx-cache-hint">Share of input served from cache, billed at each model's cache-read price.</div>
       </div>
-      <p class="llmx-workload-readout" data-readout="workload" aria-live="polite"></p>
+      <p class="experiment-ext-llmx-workload-readout" data-readout="workload" aria-live="polite"></p>
     </div>
   </details>
 </div>
-<figure class="llmx-figure">
-  <div class="llmx-chart-holder">
-    <svg class="llmx-chart" role="img" aria-label="Scatter plot comparing language models on the selected dimensions"></svg>
-    <div class="llmx-tooltip" role="status" hidden></div>
+<figure class="experiment-ext-llmx-figure">
+  <div class="experiment-ext-llmx-chart-holder">
+    <svg class="experiment-ext-llmx-chart" role="img" aria-label="Scatter plot comparing language models on the selected dimensions"></svg>
+    <div class="experiment-ext-llmx-tooltip" role="status" hidden></div>
   </div>
-  <div class="llmx-legend" aria-label="Brands"></div>
-  <figcaption class="llmx-provenance" data-readout="provenance"></figcaption>
+  <div class="experiment-ext-llmx-legend" aria-label="Brands"></div>
+  <figcaption class="experiment-ext-llmx-provenance" data-readout="provenance"></figcaption>
 </figure>`;
   }
 

@@ -8,7 +8,7 @@
 name: llm-explorer
 
 # id of the element the app builds itself into (app.js owns the same id).
-mount: llmx
+mount: experiment-ext-llmx
 
 # Stylesheets (relative to this dir). .scss is compiled to CSS by the host.
 styles:

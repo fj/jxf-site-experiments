@@ -27,18 +27,16 @@ $llmx-surface-dark: #333333;
 $llmx-muted: #6b7280;
 $llmx-muted-dark: #9aa0a6;
 
-.llmx {
+.experiment-ext-llmx {
   // The mount's outer box (margins, width, centering) and the typographic
   // baseline (line-height, box-sizing) are owned by the host's .experiment-embed
   // wrapper — the experiment only styles what's inside the mount.
 }
 
-.llmx-noscript { color: $llmx-muted; }
-
 // ---------------------------------------------------------------------------
 // Controls panel
 // ---------------------------------------------------------------------------
-.llmx-panel {
+.experiment-ext-llmx-panel {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -53,7 +51,7 @@ $llmx-muted-dark: #9aa0a6;
   }
 }
 
-.llmx-field-label {
+.experiment-ext-llmx-field-label {
   display: block;
   font-family: $mono-font-family;
   font-size: 0.72em;
@@ -66,13 +64,13 @@ $llmx-muted-dark: #9aa0a6;
 }
 
 // Scenarios -----------------------------------------------------------------
-.llmx-scenario-row {
+.experiment-ext-llmx-scenario-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.llmx-scenario {
+.experiment-ext-llmx-scenario {
   appearance: none;
   cursor: pointer;
   font: inherit;
@@ -101,7 +99,7 @@ $llmx-muted-dark: #9aa0a6;
 }
 
 // Axes + model picker -------------------------------------------------------
-.llmx-axes {
+.experiment-ext-llmx-axes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
@@ -109,7 +107,7 @@ $llmx-muted-dark: #9aa0a6;
   @include mobile { grid-template-columns: 1fr; }
 }
 
-.llmx-select {
+.experiment-ext-llmx-select {
   appearance: none;
   width: 100%;
   font: inherit;
@@ -133,9 +131,9 @@ $llmx-muted-dark: #9aa0a6;
 }
 
 // Model dropdown ------------------------------------------------------------
-.llmx-dropdown { position: relative; }
+.experiment-ext-llmx-dropdown { position: relative; }
 
-.llmx-dropdown-toggle {
+.experiment-ext-llmx-dropdown-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -152,9 +150,9 @@ $llmx-muted-dark: #9aa0a6;
 
   @include dark-mode { background: $llmx-surface-dark; border-color: $border-color-dark; }
 }
-.llmx-caret { color: $llmx-muted; font-size: 0.7em; }
+.experiment-ext-llmx-caret { color: $llmx-muted; font-size: 0.7em; }
 
-.llmx-dropdown-menu {
+.experiment-ext-llmx-dropdown-menu {
   position: absolute;
   z-index: 20;
   top: calc(100% + 0.35rem);
@@ -175,7 +173,7 @@ $llmx-muted-dark: #9aa0a6;
   }
 }
 
-.llmx-dropdown-actions {
+.experiment-ext-llmx-dropdown-actions {
   display: flex;
   gap: 0.4rem;
   padding-bottom: 0.55rem;
@@ -201,7 +199,7 @@ $llmx-muted-dark: #9aa0a6;
   }
 }
 
-.llmx-model-brand {
+.experiment-ext-llmx-model-brand {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -214,9 +212,9 @@ $llmx-muted-dark: #9aa0a6;
 
   @include dark-mode { color: $llmx-muted-dark; }
 }
-.llmx-model-group:first-child .llmx-model-brand { margin-top: 0; }
+.experiment-ext-llmx-model-group:first-child .experiment-ext-llmx-model-brand { margin-top: 0; }
 
-.llmx-model-item {
+.experiment-ext-llmx-model-item {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -231,7 +229,7 @@ $llmx-muted-dark: #9aa0a6;
   @include dark-mode { &:hover { background: rgba(255, 255, 255, 0.06); } }
 }
 
-.llmx-dot {
+.experiment-ext-llmx-dot {
   display: inline-block;
   width: 0.7rem;
   height: 0.7rem;
@@ -240,7 +238,7 @@ $llmx-muted-dark: #9aa0a6;
 }
 
 // Advanced ------------------------------------------------------------------
-.llmx-advanced {
+.experiment-ext-llmx-advanced {
   border-top: 1px solid $border-color;
   padding-top: 0.5rem;
 
@@ -264,14 +262,14 @@ $llmx-muted-dark: #9aa0a6;
   }
   &[open] summary::before { transform: rotate(90deg); }
 }
-.llmx-summary-hint {
+.experiment-ext-llmx-summary-hint {
   font-weight: 400;
   font-size: 0.8em;
   color: $llmx-muted;
   @include dark-mode { color: $llmx-muted-dark; }
 }
 
-.llmx-advanced-body {
+.experiment-ext-llmx-advanced-body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.1rem 1.6rem;
@@ -279,7 +277,7 @@ $llmx-muted-dark: #9aa0a6;
 
   @include mobile { grid-template-columns: 1fr; }
 }
-.llmx-workload-readout {
+.experiment-ext-llmx-workload-readout {
   grid-column: 1 / -1;
   margin: 0;
   font-family: $mono-font-family;
@@ -288,7 +286,7 @@ $llmx-muted-dark: #9aa0a6;
   @include dark-mode { color: $llmx-muted-dark; }
 }
 
-.llmx-control-head {
+.experiment-ext-llmx-control-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -297,20 +295,20 @@ $llmx-muted-dark: #9aa0a6;
 
   label { font-weight: 700; font-size: 0.9em; }
 }
-.llmx-control-value {
+.experiment-ext-llmx-control-value {
   font-family: $mono-font-family;
   font-size: 0.82em;
   color: $llmx-link;
   @include dark-mode { color: $llmx-link-dark; }
 }
-.llmx-control-hint {
+.experiment-ext-llmx-control-hint {
   margin-top: 0.4rem;
   font-size: 0.78em;
   line-height: 1.4;
   color: $llmx-muted;
   @include dark-mode { color: $llmx-muted-dark; }
 }
-.llmx-scale-labels {
+.experiment-ext-llmx-scale-labels {
   display: flex;
   justify-content: space-between;
   font-size: 0.68em;
@@ -320,7 +318,7 @@ $llmx-muted-dark: #9aa0a6;
 }
 
 // Range inputs
-.llmx-range {
+.experiment-ext-llmx-range {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -356,16 +354,16 @@ $llmx-muted-dark: #9aa0a6;
 // ---------------------------------------------------------------------------
 // Chart
 // ---------------------------------------------------------------------------
-.llmx-figure {
+.experiment-ext-llmx-figure {
   margin: 1.5rem 0 0;
 }
 
-.llmx-chart-holder {
+.experiment-ext-llmx-chart-holder {
   position: relative;
   width: 100%;
 }
 
-.llmx-chart {
+.experiment-ext-llmx-chart {
   display: block;
   width: 100%;
   height: auto;
@@ -373,7 +371,7 @@ $llmx-muted-dark: #9aa0a6;
 
   text { font-family: $mono-font-family; }
 
-  .llmx-axis {
+  .experiment-ext-llmx-axis {
     text { font-size: 0.72em; fill: $llmx-muted; }
     path.domain,
     line { stroke: $border-color; }
@@ -383,19 +381,19 @@ $llmx-muted-dark: #9aa0a6;
     }
   }
 
-  .llmx-grid {
+  .experiment-ext-llmx-grid {
     line { stroke: $border-color; stroke-opacity: 0.45; }
     path { display: none; }
     @include dark-mode { line { stroke: $border-color-dark; stroke-opacity: 0.5; } }
   }
 
-  .llmx-axis-title {
+  .experiment-ext-llmx-axis-title {
     font-size: 0.78em;
     font-weight: 700;
     fill: currentColor;
   }
 
-  .llmx-pt {
+  .experiment-ext-llmx-pt {
     circle {
       stroke: $llmx-surface;
       stroke-width: 1.5;
@@ -405,7 +403,7 @@ $llmx-muted-dark: #9aa0a6;
     &.is-hover circle { r: 8.5; }
   }
 
-  .llmx-pt-label {
+  .experiment-ext-llmx-pt-label {
     font-size: 0.7em;
     fill: currentColor;
     paint-order: stroke;
@@ -418,7 +416,7 @@ $llmx-muted-dark: #9aa0a6;
 }
 
 // Tooltip
-.llmx-tooltip {
+.experiment-ext-llmx-tooltip {
   position: absolute;
   z-index: 30;
   pointer-events: none;
@@ -439,19 +437,19 @@ $llmx-muted-dark: #9aa0a6;
     box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
   }
 }
-.llmx-tip-title {
+.experiment-ext-llmx-tip-title {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   font-weight: 700;
 }
-.llmx-tip-sub {
+.experiment-ext-llmx-tip-sub {
   font-size: 0.72em;
   color: $llmx-muted;
   margin: 0.1rem 0 0.5rem;
   @include dark-mode { color: $llmx-muted-dark; }
 }
-.llmx-tip-grid {
+.experiment-ext-llmx-tip-grid {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.12rem 0.8rem;
@@ -462,14 +460,14 @@ $llmx-muted-dark: #9aa0a6;
 }
 
 // Legend
-.llmx-legend {
+.experiment-ext-llmx-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem 0.9rem;
   margin-top: 1rem;
   justify-content: center;
 }
-.llmx-legend-item {
+.experiment-ext-llmx-legend-item {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -483,11 +481,11 @@ $llmx-muted-dark: #9aa0a6;
   border-radius: 0.3rem;
 
   &.is-off { opacity: 0.38; }
-  &.is-off .llmx-dot { filter: grayscale(1); }
+  &.is-off .experiment-ext-llmx-dot { filter: grayscale(1); }
   &:hover { text-decoration: underline; }
 }
 
-.llmx-provenance {
+.experiment-ext-llmx-provenance {
   margin-top: 1.1rem;
   font-size: 0.74em;
   line-height: 1.5;
@@ -497,9 +495,9 @@ $llmx-muted-dark: #9aa0a6;
   a { color: inherit; text-decoration: underline; }
   @include dark-mode { color: $llmx-muted-dark; }
 }
-.llmx-provenance-note { display: block; margin-top: 0.2rem; opacity: 0.9; }
+.experiment-ext-llmx-provenance-note { display: block; margin-top: 0.2rem; opacity: 0.9; }
 
-.llmx-empty {
+.experiment-ext-llmx-empty {
   position: absolute;
   top: 50%;
   left: 50%;

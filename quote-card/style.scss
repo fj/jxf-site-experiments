@@ -1,218 +1,13 @@
-// Self-contained styles for the Quote Card experiment. These mirror the few
-// hugo-coder primitives the experiment relies on (mono font, hairline border,
-// mobile breakpoint, dark-mode toggle) so this file compiles on its own — the
-// host site only runs it through Hugo's SCSS->CSS step. The dark variants key
-// off body.colorscheme-dark, the class the site's theme toggle sets.
-$mono-font-family: "Fantasque Sans Mono", monospace;
-$border-color: #ddd;
-$border-color-dark: #444;
+// Styles for the Quote Card experiment.
+//
+// The panel, groups, fields, sliders, font pickers, preview figure and
+// download button all come from the shared control kit; what's left here is
+// the one thing only this experiment has — advanced mode, where a group's CSS
+// becomes the source of truth for how that part of the card is drawn.
 
-@mixin mobile {
-  @media only screen and (max-width: "767px") { @content; }
-}
-@mixin dark-mode {
-  @at-root body.colorscheme-dark & { @content; }
-  @at-root body.colorscheme-auto & {
-    @media (prefers-color-scheme: dark) { @content; }
-  }
-}
+@import "../shared/controls";
 
-$qcard-link: #1565c0;
-$qcard-link-dark: #42a5f5;
-$qcard-panel: #f6f7f9;
-$qcard-panel-dark: #2b2b2b;
-$qcard-surface: #ffffff;
-$qcard-surface-dark: #333333;
-$qcard-muted: #6b7280;
-$qcard-muted-dark: #9aa0a6;
-$qcard-error: #c62828;
-$qcard-error-dark: #ef5350;
-$qcard-warning: #b26a00;
-$qcard-warning-dark: #ffb74d;
-
-.experiment-ext-qcard {
-  // The mount's outer box (margins, width, centering) and the typographic
-  // baseline (line-height, box-sizing) are owned by the host's .experiment-embed
-  // wrapper — the experiment only styles what's inside the mount.
-}
-
-// ---------------------------------------------------------------------------
-// Layout: controls beside the live preview; stacked on mobile.
-// ---------------------------------------------------------------------------
-.experiment-ext-qcard-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 1.5rem;
-  align-items: start;
-
-  @include mobile { grid-template-columns: 1fr; }
-}
-
-// ---------------------------------------------------------------------------
-// Controls panel
-// ---------------------------------------------------------------------------
-.experiment-ext-qcard-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1.25rem 1.4rem;
-  background: $qcard-panel;
-  border: 1px solid $border-color;
-  border-radius: 0.7rem;
-
-  @include dark-mode {
-    background: $qcard-panel-dark;
-    border-color: $border-color-dark;
-  }
-}
-
-.experiment-ext-qcard-field { display: block; min-width: 0; }
-
-.experiment-ext-qcard-field-label {
-  display: block;
-  font-family: $mono-font-family;
-  font-size: 0.72em;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: $qcard-muted;
-  margin-bottom: 0.45rem;
-
-  @include dark-mode { color: $qcard-muted-dark; }
-
-  code { font-size: inherit; }
-}
-
-.experiment-ext-qcard-textarea,
-.experiment-ext-qcard-input,
-.experiment-ext-qcard-select {
-  appearance: none;
-  width: 100%;
-  font: inherit;
-  font-size: 0.9em;
-  color: inherit;
-  padding: 0.5rem 0.7rem;
-  border-radius: 0.45rem;
-  border: 1px solid $border-color;
-  background-color: $qcard-surface;
-
-  &:focus-visible {
-    outline: 2px solid $qcard-link;
-    outline-offset: 1px;
-  }
-
-  @include dark-mode {
-    background-color: $qcard-surface-dark;
-    border-color: $border-color-dark;
-    &:focus-visible { outline-color: $qcard-link-dark; }
-  }
-}
-
-.experiment-ext-qcard-textarea {
-  resize: vertical;
-  min-height: 6em;
-  font-family: $mono-font-family;
-}
-
-.experiment-ext-qcard-select {
-  padding-right: 2rem;
-  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.7rem center;
-  cursor: pointer;
-}
-
-// Custom font pickers: a button + listbox stand-in for <select>, so every
-// entry (and the closed button) can render in its own face — native option
-// popups ignore per-option fonts. Markup in app.js (fontPickHtml).
-.experiment-ext-qcard-fontpick { position: relative; }
-
-.experiment-ext-qcard-fontpick-btn {
-  display: block;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  &:disabled { opacity: 0.55; cursor: default; }
-}
-
-.experiment-ext-qcard-fontpick-list {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 0.3rem);
-  left: 0;
-  right: 0;
-  margin: 0;
-  padding: 0.3rem;
-  list-style: none;
-  background: $qcard-surface;
-  border: 1px solid $border-color;
-  border-radius: 0.45rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-  max-height: 16rem;
-  overflow: auto;
-
-  > li {
-    padding: 0.45rem 0.65rem;
-    border-radius: 0.3rem;
-    font-size: 0.95em;
-    cursor: pointer;
-
-    &:hover { background: $qcard-panel; }
-    &[aria-selected="true"] { background: rgba($qcard-link, 0.14); }
-  }
-
-  @include dark-mode {
-    background: $qcard-surface-dark;
-    border-color: $border-color-dark;
-
-    > li:hover { background: $qcard-panel-dark; }
-    > li[aria-selected="true"] { background: rgba($qcard-link-dark, 0.24); }
-  }
-}
-
-// Grouped sections (Text / Frame / Output) ------------------------------------
-.experiment-ext-qcard-group {
-  border: 1px solid $border-color;
-  border-radius: 0.55rem;
-  background: $qcard-surface;
-  // No overflow: hidden — the font pickers' listboxes drop past the group's
-  // bottom edge. Nothing inside reaches the rounded corners anyway (the
-  // summary and body carry their own padding).
-
-  > summary {
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.85rem;
-    font-family: $mono-font-family;
-    font-size: 0.78em;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: $qcard-muted;
-    list-style: none;
-
-    // display: flex suppresses the native ::marker; provide our own.
-    &::-webkit-details-marker { display: none; }
-    &::before { content: "\25B8"; font-size: 0.9em; line-height: 1; }
-    > span { flex: 1; }
-
-    &:hover { color: inherit; }
-  }
-
-  &[open] > summary::before { content: "\25BE"; }
-
-  @include dark-mode {
-    background: $qcard-surface-dark;
-    border-color: $border-color-dark;
-    > summary { color: $qcard-muted-dark; &:hover { color: inherit; } }
-  }
-}
-
-// Advanced mode: the 🧑‍💻 toggle in each group summary reveals a CSS editor
-// for that portion of the card.
+// The 🧑‍💻 toggle in a group's summary bar reveals that group's CSS editor.
 .experiment-ext-qcard-adv-toggle {
   appearance: none;
   border: 1px solid transparent;
@@ -231,14 +26,14 @@ $qcard-warning-dark: #ffb74d;
   &.is-active {
     opacity: 1;
     filter: none;
-    border-color: $qcard-link;
-    background: rgba(21, 101, 192, 0.12);
+    border-color: $exp-link;
+    background: rgba($exp-link, 0.12);
   }
 
-  @include dark-mode {
+  @include exp-dark {
     &.is-active {
-      border-color: $qcard-link-dark;
-      background: rgba(66, 165, 245, 0.18);
+      border-color: $exp-link-dark;
+      background: rgba($exp-link-dark, 0.18);
     }
   }
 }
@@ -248,42 +43,26 @@ $qcard-warning-dark: #ffb74d;
   flex-direction: column;
   gap: 0.45rem;
   padding-top: 0.55rem;
-  border-top: 1px dashed $border-color;
-  @include dark-mode { border-top-color: $border-color-dark; }
+  border-top: 1px dashed $exp-border;
+  @include exp-dark { border-top-color: $exp-border-dark; }
 
   &[hidden] { display: none; }
 }
 
+// Sits on top of the kit's textarea styling: denser, and able to show that
+// what's typed doesn't parse.
 .experiment-ext-qcard-adv-css {
-  width: 100%;
-  font-family: $mono-font-family;
   font-size: 0.8em;
   line-height: 1.5;
   min-height: 9em;
-  resize: vertical;
-  color: inherit;
-  padding: 0.5rem 0.7rem;
-  border-radius: 0.45rem;
-  border: 1px solid $border-color;
-  background: $qcard-surface;
-
-  &:focus-visible {
-    outline: 2px solid $qcard-link;
-    outline-offset: 1px;
-  }
 
   &.experiment-ext-qcard-adv-invalid {
-    border-color: $qcard-error;
-    &:focus-visible { outline-color: $qcard-error; }
-  }
+    border-color: $exp-error;
+    &:focus-visible { outline-color: $exp-error; }
 
-  @include dark-mode {
-    background: $qcard-surface-dark;
-    border-color: $border-color-dark;
-    &:focus-visible { outline-color: $qcard-link-dark; }
-    &.experiment-ext-qcard-adv-invalid {
-      border-color: $qcard-error-dark;
-      &:focus-visible { outline-color: $qcard-error-dark; }
+    @include exp-dark {
+      border-color: $exp-error-dark;
+      &:focus-visible { outline-color: $exp-error-dark; }
     }
   }
 }
@@ -292,224 +71,23 @@ $qcard-warning-dark: #ffb74d;
   margin: 0;
   padding-left: 1.2em;
   font-size: 0.8em;
-  color: $qcard-error;
-  @include dark-mode { color: $qcard-error-dark; }
+  color: $exp-error;
+  @include exp-dark { color: $exp-error-dark; }
 
   li + li { margin-top: 0.25em; }
 
   // Valid CSS the PNG renderer can't honor (e.g. animation) — reported but
   // non-blocking, unlike errors.
   li.is-warning {
-    color: $qcard-warning;
-    @include dark-mode { color: $qcard-warning-dark; }
+    color: $exp-warning;
+    @include exp-dark { color: $exp-warning-dark; }
   }
 }
 
 // While a group's advanced mode is on its CSS is authoritative: the basic
 // controls are disabled (in JS) and dimmed, but keep mirroring the values.
-.experiment-ext-qcard-group.experiment-ext-qcard-adv-on .experiment-ext-qcard-group-body > :not(.experiment-ext-qcard-adv) {
+.experiment-ext-ui-group.experiment-ext-qcard-adv-on
+  .experiment-ext-ui-group-body > :not(.experiment-ext-qcard-adv) {
   opacity: 0.45;
   pointer-events: none;
-}
-
-.experiment-ext-qcard-group-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.35rem 0.85rem 0.9rem;
-}
-
-.experiment-ext-qcard-grid2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  align-items: end;
-}
-
-// Checkboxes and color wells ---------------------------------------------------
-.experiment-ext-qcard-check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9em;
-  cursor: pointer;
-  user-select: none;
-
-  input { accent-color: $qcard-link; }
-  @include dark-mode { input { accent-color: $qcard-link-dark; } }
-}
-
-.experiment-ext-qcard-color {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9em;
-  cursor: pointer;
-
-  input[type="color"] {
-    appearance: none;
-    width: 2.1rem;
-    height: 1.5rem;
-    padding: 0.1rem;
-    border: 1px solid $border-color;
-    border-radius: 0.35rem;
-    background: $qcard-surface;
-    cursor: pointer;
-
-    @include dark-mode {
-      background: $qcard-surface-dark;
-      border-color: $border-color-dark;
-    }
-  }
-}
-
-// Sliders with a label on the left and live value on the right ------------------
-.experiment-ext-qcard-range-row {
-  display: grid;
-  grid-template-columns: 6.5em minmax(0, 1fr) 3.8em;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.85em;
-
-  label { color: inherit; }
-
-  input[type="range"] {
-    width: 100%;
-    accent-color: $qcard-link;
-    @include dark-mode { accent-color: $qcard-link-dark; }
-    &:disabled { opacity: 0.4; }
-  }
-}
-
-.experiment-ext-qcard-range-val {
-  text-align: right;
-  font-family: $mono-font-family;
-  font-size: 0.9em;
-  color: $qcard-muted;
-  @include dark-mode { color: $qcard-muted-dark; }
-}
-
-.experiment-ext-qcard-shadow-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding-left: 0.4rem;
-  border-left: 2px solid $border-color;
-  @include dark-mode { border-left-color: $border-color-dark; }
-
-  &[hidden] { display: none; }
-}
-
-// Output dimensions --------------------------------------------------------------
-.experiment-ext-qcard-dims {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: end;
-  gap: 0.5rem;
-
-  input[type="number"] { font-family: $mono-font-family; }
-  input[type="number"]:read-only { opacity: 0.6; }
-}
-
-.experiment-ext-qcard-dims-x {
-  padding-bottom: 0.5rem;
-  color: $qcard-muted;
-  @include dark-mode { color: $qcard-muted-dark; }
-}
-
-// ---------------------------------------------------------------------------
-// Preview
-// ---------------------------------------------------------------------------
-.experiment-ext-qcard-figure {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-
-  // Keep the preview in view while scrolling long controls on wide screens.
-  position: sticky;
-  top: 1rem;
-  @include mobile { position: static; }
-}
-
-.experiment-ext-qcard-preview {
-  border: 1px solid $border-color;
-  border-radius: 0.55rem;
-  padding: 0.5rem;
-  background:
-    repeating-conic-gradient(#00000010 0% 25%, transparent 0% 50%)
-    50% / 1.25rem 1.25rem;
-
-  @include dark-mode { border-color: $border-color-dark; }
-}
-
-.experiment-ext-qcard-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: 0.25rem;
-}
-
-.experiment-ext-qcard-caption {
-  font-family: $mono-font-family;
-  font-size: 0.75em;
-  text-align: center;
-  color: $qcard-muted;
-  @include dark-mode { color: $qcard-muted-dark; }
-}
-
-// ---------------------------------------------------------------------------
-// Boot: shown in the mount while the webfonts prefetch, replaced by the app.
-// ---------------------------------------------------------------------------
-.experiment-ext-qcard-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  padding: 3rem 1rem;
-  color: $qcard-muted;
-  @include dark-mode { color: $qcard-muted-dark; }
-}
-
-.experiment-ext-qcard-spinner {
-  width: 1.1rem;
-  height: 1.1rem;
-  flex: none;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: experiment-ext-qcard-spin 0.8s linear infinite;
-}
-
-@keyframes experiment-ext-qcard-spin {
-  to { transform: rotate(360deg); }
-}
-
-.experiment-ext-qcard-download {
-  appearance: none;
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  cursor: pointer;
-
-  > svg { flex: none; }
-  font: inherit;
-  font-size: 0.92em;
-  font-weight: 600;
-  padding: 0.55rem 1.6rem;
-  border-radius: 999px;
-  border: 1px solid $qcard-link;
-  background: $qcard-link;
-  color: #fff;
-  transition: filter 0.15s ease;
-
-  &:hover:not(:disabled) { filter: brightness(1.1); }
-  &:disabled { opacity: 0.6; cursor: wait; }
-
-  @include dark-mode {
-    background: $qcard-link-dark;
-    border-color: $qcard-link-dark;
-    color: #10243a;
-  }
 }

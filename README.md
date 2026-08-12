@@ -99,8 +99,8 @@ unclamped sizes, alpha colors, transforms), the disabled controls mirror the
 CSS best-effort, errors show red, and valid-but-unrenderable properties (e.g.
 animation) show as warnings. The preview canvas holds the actual output
 bitmap, so the Download button just serializes it — nothing leaves the
-browser. Fira Code, the default face, is declared in `manifest.yaml` as a
-pinned font dependency the host fetches and self-hosts. The implementation is
-modular: `config.js`, `csskit.js`, `markdown.js`, `layout.js`, `render.js`,
-`advanced.js`, and `app.js` each attach one module to the `QCard` namespace,
-loaded in manifest order.
+browser. Every preset face is a Google Fonts webfont the app prefetches at
+runtime. The implementation is modular: `config.js`, `csskit.js`,
+`markdown.js`, `layout.js`, `render.js`, `advanced.js`, and `app.js` each
+attach one module to the `QCard` namespace, loaded in manifest order, on top of
+the shared control kit.

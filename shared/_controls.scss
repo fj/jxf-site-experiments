@@ -1,0 +1,483 @@
+// Styles for the shared control kit (shared/ui.js builds the matching markup).
+//
+// Every class here is namespaced `experiment-ext-ui-`: `ui` is the reserved
+// discriminator for kit-owned names, alongside each experiment's own (`qcard`,
+// `dndc`, …). An experiment imports this once and then only writes rules for
+// the parts that are genuinely its own.
+//
+// Two knobs an experiment can set on its mount without forking anything:
+//   --exp-ui-cols     grid-template-columns for .experiment-ext-ui-layout
+//   --exp-ui-checkerboard  the preview backdrop behind a transparent canvas
+
+@import "theme";
+
+// ---------------------------------------------------------------------------
+// Layout: controls beside the live preview; stacked on mobile.
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-layout {
+  display: grid;
+  grid-template-columns: var(--exp-ui-cols, minmax(0, 5fr) minmax(0, 7fr));
+  gap: 1.5rem;
+  align-items: start;
+
+  @include exp-mobile { grid-template-columns: 1fr; }
+}
+
+.experiment-ext-ui-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.4rem;
+  background: $exp-panel;
+  border: 1px solid $exp-border;
+  border-radius: 0.7rem;
+
+  @include exp-dark {
+    background: $exp-panel-dark;
+    border-color: $exp-border-dark;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fields
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-field { display: block; min-width: 0; }
+
+.experiment-ext-ui-field-label {
+  display: block;
+  font-family: $exp-mono-font-family;
+  font-size: 0.72em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $exp-muted;
+  margin-bottom: 0.45rem;
+
+  @include exp-dark { color: $exp-muted-dark; }
+
+  code { font-size: inherit; }
+}
+
+.experiment-ext-ui-textarea,
+.experiment-ext-ui-input,
+.experiment-ext-ui-select {
+  appearance: none;
+  width: 100%;
+  font: inherit;
+  font-size: 0.9em;
+  color: inherit;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.45rem;
+  border: 1px solid $exp-border;
+  background-color: $exp-surface;
+
+  &:focus-visible {
+    outline: 2px solid $exp-link;
+    outline-offset: 1px;
+  }
+
+  &:disabled { opacity: 0.55; }
+
+  @include exp-dark {
+    background-color: $exp-surface-dark;
+    border-color: $exp-border-dark;
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
+.experiment-ext-ui-textarea {
+  resize: vertical;
+  min-height: 6em;
+  font-family: $exp-mono-font-family;
+}
+
+.experiment-ext-ui-select {
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  cursor: pointer;
+}
+
+// A text input backed by a <datalist>: the official values are one keystroke
+// away, but anything else is still accepted (homebrew, custom presets).
+.experiment-ext-ui-combo {
+  &::-webkit-calendar-picker-indicator {
+    opacity: 0.45;
+    cursor: pointer;
+    &:hover { opacity: 1; }
+  }
+
+  @include exp-dark {
+    &::-webkit-calendar-picker-indicator { filter: invert(1); }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Grouped sections: a <details> per group of controls.
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-group {
+  border: 1px solid $exp-border;
+  border-radius: 0.55rem;
+  background: $exp-surface;
+  // No overflow: hidden — pop-ups (font pickers) drop past the bottom edge.
+  // Nothing inside reaches the rounded corners anyway; the summary and body
+  // carry their own padding.
+
+  > summary {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    font-family: $exp-mono-font-family;
+    font-size: 0.78em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: $exp-muted;
+    list-style: none;
+
+    // display: flex suppresses the native ::marker; provide our own.
+    &::-webkit-details-marker { display: none; }
+    &::before { content: "\25B8"; font-size: 0.9em; line-height: 1; }
+    > span { flex: 1; }
+
+    &:hover { color: inherit; }
+  }
+
+  &[open] > summary::before { content: "\25BE"; }
+
+  @include exp-dark {
+    background: $exp-surface-dark;
+    border-color: $exp-border-dark;
+    > summary { color: $exp-muted-dark; &:hover { color: inherit; } }
+  }
+}
+
+.experiment-ext-ui-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.35rem 0.85rem 0.9rem;
+}
+
+.experiment-ext-ui-grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+// A run of controls indented under the checkbox that reveals them.
+.experiment-ext-ui-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-left: 0.4rem;
+  border-left: 2px solid $exp-border;
+  @include exp-dark { border-left-color: $exp-border-dark; }
+
+  &[hidden] { display: none; }
+}
+
+// ---------------------------------------------------------------------------
+// Checkboxes and color wells
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9em;
+  cursor: pointer;
+  user-select: none;
+
+  input { accent-color: $exp-link; }
+  @include exp-dark { input { accent-color: $exp-link-dark; } }
+}
+
+.experiment-ext-ui-color {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9em;
+  cursor: pointer;
+
+  input[type="color"] {
+    appearance: none;
+    flex: none;
+    width: 2.1rem;
+    height: 1.5rem;
+    padding: 0.1rem;
+    border: 1px solid $exp-border;
+    border-radius: 0.35rem;
+    background: $exp-surface;
+    cursor: pointer;
+
+    @include exp-dark {
+      background: $exp-surface-dark;
+      border-color: $exp-border-dark;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sliders: label on the left, live value on the right.
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-range-row {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr) 3.8em;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85em;
+
+  label { color: inherit; }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: $exp-link;
+    @include exp-dark { accent-color: $exp-link-dark; }
+    &:disabled { opacity: 0.4; }
+  }
+}
+
+.experiment-ext-ui-range-val {
+  text-align: right;
+  font-family: $exp-mono-font-family;
+  font-size: 0.9em;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+// ---------------------------------------------------------------------------
+// Output dimensions: width × height.
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-dims {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 0.5rem;
+
+  input[type="number"] { font-family: $exp-mono-font-family; }
+  input[type="number"]:read-only { opacity: 0.6; }
+}
+
+.experiment-ext-ui-dims-x {
+  padding-bottom: 0.5rem;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+// ---------------------------------------------------------------------------
+// Font pickers: a button + listbox stand-in for <select>, so every entry (and
+// the closed button) renders in its own face — native option popups ignore
+// per-option fonts. Markup and behavior in shared/ui.js.
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-fontpick { position: relative; }
+
+.experiment-ext-ui-fontpick-btn {
+  display: block;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &:disabled { opacity: 0.55; cursor: default; }
+}
+
+.experiment-ext-ui-fontpick-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  background: $exp-surface;
+  border: 1px solid $exp-border;
+  border-radius: 0.45rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  max-height: 16rem;
+  overflow: auto;
+
+  > li {
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.3rem;
+    font-size: 0.95em;
+    cursor: pointer;
+
+    &:hover { background: $exp-panel; }
+    &[aria-selected="true"] { background: rgba($exp-link, 0.14); }
+  }
+
+  @include exp-dark {
+    background: $exp-surface-dark;
+    border-color: $exp-border-dark;
+
+    > li:hover { background: $exp-panel-dark; }
+    > li[aria-selected="true"] { background: rgba($exp-link-dark, 0.24); }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Preview: the canvas holds the output bitmap; CSS only scales it to fit.
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  // Keep the preview in view while scrolling long controls on wide screens.
+  position: sticky;
+  top: 1rem;
+  @include exp-mobile { position: static; }
+}
+
+.experiment-ext-ui-preview {
+  border: 1px solid $exp-border;
+  border-radius: 0.55rem;
+  padding: 0.5rem;
+  background: var(
+    --exp-ui-checkerboard,
+    repeating-conic-gradient(#00000010 0% 25%, transparent 0% 50%) 50% / 1.25rem 1.25rem
+  );
+
+  @include exp-dark { border-color: $exp-border-dark; }
+
+  // Set by ui.js while a file is dragged over a drop target.
+  &.experiment-ext-ui-dropping {
+    border-color: $exp-link;
+    box-shadow: inset 0 0 0 2px rgba($exp-link, 0.35);
+    @include exp-dark {
+      border-color: $exp-link-dark;
+      box-shadow: inset 0 0 0 2px rgba($exp-link-dark, 0.35);
+    }
+  }
+}
+
+.experiment-ext-ui-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.25rem;
+}
+
+.experiment-ext-ui-caption {
+  font-family: $exp-mono-font-family;
+  font-size: 0.75em;
+  text-align: center;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+.experiment-ext-ui-download {
+  appearance: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+
+  > svg { flex: none; }
+  font: inherit;
+  font-size: 0.92em;
+  font-weight: 600;
+  padding: 0.55rem 1.6rem;
+  border-radius: 999px;
+  border: 1px solid $exp-link;
+  background: $exp-link;
+  color: #fff;
+  transition: filter 0.15s ease;
+
+  &:hover:not(:disabled) { filter: brightness(1.1); }
+  &:disabled { opacity: 0.6; cursor: wait; }
+
+  @include exp-dark {
+    background: $exp-link-dark;
+    border-color: $exp-link-dark;
+    color: #10243a;
+  }
+}
+
+// A thin progress track under the download button. Determinate when a fraction
+// is known, indeterminate (a sliding sliver) while an opaque step runs.
+.experiment-ext-ui-progress {
+  align-self: stretch;
+  height: 0.25rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.09);
+  @include exp-dark { background: rgba(255, 255, 255, 0.12); }
+
+  &[hidden] { display: none; }
+
+  > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: $exp-link;
+    transition: width 0.12s linear;
+    @include exp-dark { background: $exp-link-dark; }
+  }
+
+  &.experiment-ext-ui-progress-indeterminate > span {
+    width: 35%;
+    transition: none;
+    animation: experiment-ext-ui-slide 1s ease-in-out infinite;
+  }
+}
+
+@keyframes experiment-ext-ui-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(340%); }
+}
+
+// ---------------------------------------------------------------------------
+// Status and messages
+// ---------------------------------------------------------------------------
+// A reserved line, so a message appearing after a download doesn't shift the
+// button underneath it. The margin reset matters: this is a <p>, and the host
+// theme gives those a paragraph's worth of space.
+.experiment-ext-ui-status {
+  margin: 0;
+  font-family: $exp-mono-font-family;
+  font-size: 0.75em;
+  text-align: center;
+  min-height: 1.4em;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+
+  &.experiment-ext-ui-status-error {
+    color: $exp-error;
+    @include exp-dark { color: $exp-error-dark; }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Boot: shown in the mount while webfonts prefetch, replaced by the app.
+// ---------------------------------------------------------------------------
+.experiment-ext-ui-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1rem;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+.experiment-ext-ui-spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: experiment-ext-ui-spin 0.8s linear infinite;
+}
+
+@keyframes experiment-ext-ui-spin {
+  to { transform: rotate(360deg); }
+}

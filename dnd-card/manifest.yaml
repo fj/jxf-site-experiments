@@ -1,0 +1,38 @@
+# Manifest for the Player Card experiment.
+#
+# The host (jxf-site) reads this to assemble the page: it compiles the styles,
+# fetches the declared third-party dependencies at build time and serves them
+# self-hosted, and loads the local scripts. The experiment is the source of
+# truth for its own composition and dependencies — the host hardcodes nothing.
+
+name: dnd-card
+
+# id of the element the app builds itself into (app.js owns the same id).
+mount: experiment-ext-dndc
+
+# Stylesheets (relative to this dir). .scss is compiled to CSS by the host;
+# style.scss imports ../shared/_controls.scss for the control kit's styles.
+styles:
+  - style.scss
+
+# No build-time font pins: every face is a Google Fonts webfont the app loads
+# at runtime (ExpFonts prefetches each variant behind a loading spinner before
+# it builds the UI, because canvas text has to be measured against the real
+# faces).
+
+# Local scripts (relative to this dir; ".." reaches sibling experiments),
+# loaded after dependencies, in dependency order. The shared control kit comes
+# first, then each module that attaches itself to the window.DndCard namespace;
+# app.js wires them together and comes last.
+scripts:
+  - ../shared/ui.js
+  - ../shared/fonts.js
+  - ../shared/png.js
+  - config.js
+  - data.js
+  - rules.js
+  - dice.js
+  - draw.js
+  - portrait.js
+  - card.js
+  - app.js

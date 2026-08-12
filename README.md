@@ -104,3 +104,41 @@ runtime. The implementation is modular: `config.js`, `csskit.js`,
 `markdown.js`, `layout.js`, `render.js`, `advanced.js`, and `app.js` each
 attach one module to the `QCard` namespace, loaded in manifest order, on top of
 the shared control kit.
+
+### `dnd-card/`
+
+A client-side player card generator for D&D 5.5E. A character — name, species,
+class, subclass, background, level; hit points, temporary hit points and hit
+dice; death saves and heroic inspiration; the six abilities with their saving
+throws; all eighteen skills at none / proficient / expertise — is laid out on a
+`<canvas>` beside a portrait that fills the card's left third, and downloaded
+as a PNG that prints at 152 × 101 mm (1795 × 1193 px at 300 dpi, also
+offered at 150 and 600). The card is landscape, so the controls sit under the
+preview rather than beside it. Everything derivable is derived: modifiers from
+scores, the proficiency bonus from the level, initiative from Dexterity, saves
+and skill totals from both. What isn't derived is what changes during play:
+hit points, temporary hit points and hit dice are write-in boxes rather than
+printed numbers — their controls accept a blank, which prints an empty box —
+and they band together with the death saves and inspiration above the ability
+blocks, each label to the left of its box so the box keeps the width. The hit
+die is chosen, not inferred from the class, and `dice.js` holds each solid's
+outline once in a unit circle, rendering it either onto the canvas beside the
+hit dice or as an `<svg>` beside the picker. The top right corner carries three
+badges, each a shape drawn by `draw.js`: the proficiency bonus in a diamond,
+armor class (typed, since it comes off what you're wearing) in a shield, and
+initiative in a right-pointing triangle. Every other diamond on the card is
+empty, because it is there to be filled in — one on a saving throw, two on a
+skill so expertise has a box of its own — while circles stay for the tallies
+kept during play. Each skill row centers on its stripe — the two diamonds and the
+name on the middle, the total and the ability it comes off stacked as a pair
+that straddles it — and type is set in three independently chosen faces: one for the name, one for
+headings and numbers, one for everything read as words. The 2024 Player's
+Handbook lists are `<datalist>` suggestions rather than closed menus, so
+homebrew types straight in. The
+downloaded PNG carries a `pHYs` chunk declaring its resolution, so print
+dialogs size it correctly rather than assuming screen dpi. The picture is read
+locally; a picture given by URL is fetched with CORS requested, so a host that
+forbids cross-origin reads fails with an explanation instead of silently
+tainting the canvas. Modules on the `DndCard` namespace: `config.js`,
+`data.js`, `rules.js`, `dice.js`, `draw.js`, `portrait.js`, `card.js`,
+`app.js`.

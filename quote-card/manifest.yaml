@@ -10,19 +10,23 @@ name: quote-card
 # id of the element the app builds itself into (app.js owns the same id).
 mount: experiment-ext-qcard
 
-# Stylesheets (relative to this dir). .scss is compiled to CSS by the host.
+# Stylesheets (relative to this dir). .scss is compiled to CSS by the host;
+# style.scss imports ../shared/_controls.scss for the control kit's styles.
 styles:
   - style.scss
 
 # No build-time font pins: every preset face is a Google Fonts webfont the
-# app loads at runtime (app.js injects the fonts.googleapis.com stylesheet
-# from config.js and prefetches every variant behind a loading spinner before
-# it builds the UI).
+# app loads at runtime (ExpFonts prefetches every variant behind a loading
+# spinner before it builds the UI).
 
-# Local scripts (relative to this dir), loaded after dependencies, in
-# dependency order (each attaches a module to the window.QCard namespace;
-# app.js wires them together and comes last).
+# Local scripts (relative to this dir; ".." reaches sibling experiments),
+# loaded after dependencies, in dependency order. The shared control kit comes
+# first, then each module that attaches itself to the window.QCard namespace;
+# app.js wires them together and comes last.
 scripts:
+  - ../shared/ui.js
+  - ../shared/fonts.js
+  - ../shared/png.js
   - config.js
   - csskit.js
   - markdown.js

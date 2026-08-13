@@ -1,0 +1,41 @@
+// Design tokens and mixins shared by every experiment's stylesheet.
+//
+// These mirror the few hugo-coder primitives an experiment relies on (mono
+// font, hairline border, mobile breakpoint, dark-mode toggle) plus the accent
+// and status colors the control kit paints with, so an experiment's style.scss
+// compiles on its own — the host only runs it through Hugo's SCSS->CSS step.
+// The dark variants key off body.colorscheme-dark, the class the site theme's
+// toggle sets.
+//
+// Variables and mixins only, no rules: importing this twice (directly and via
+// _controls.scss) must not duplicate any output.
+
+$exp-mono-font-family: "Fantasque Sans Mono", monospace;
+
+$exp-border: #ddd;
+$exp-border-dark: #444;
+$exp-link: #1565c0;
+$exp-link-dark: #42a5f5;
+$exp-panel: #f6f7f9;
+$exp-panel-dark: #2b2b2b;
+$exp-surface: #ffffff;
+$exp-surface-dark: #333333;
+// Muted is for captions, hints and derived numbers — small text that still has
+// to be read, so it stays nearer the body color than the background.
+$exp-muted: #5c6370;
+$exp-muted-dark: #9aa0a6;
+$exp-error: #c62828;
+$exp-error-dark: #ef5350;
+$exp-warning: #b26a00;
+$exp-warning-dark: #ffb74d;
+
+@mixin exp-mobile {
+  @media only screen and (max-width: "767px") { @content; }
+}
+
+@mixin exp-dark {
+  @at-root body.colorscheme-dark & { @content; }
+  @at-root body.colorscheme-auto & {
+    @media (prefers-color-scheme: dark) { @content; }
+  }
+}

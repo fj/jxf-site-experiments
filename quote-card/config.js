@@ -15,9 +15,9 @@
   // (output width / 1200), so a card re-rendered at @2x looks identical.
   Q.REF_W = 1200;
 
-  // Every preset face is a Google Fonts webfont, loaded at runtime (app.js
-  // injects FONTS_CSS_URL and prefetches every variant before building the
-  // UI), so the canvas renders identically everywhere; system faces in each
+  // Every preset face is a Google Fonts webfont, loaded at runtime (ExpFonts
+  // injects FONTS_CSS_URL and prefetches every variant before the UI is
+  // built), so the canvas renders identically everywhere; system faces in each
   // stack are fallbacks only. Gelasio, Arimo, and Tinos stand in for Georgia,
   // Helvetica, and Times (their metric-compatible Google equivalents);
   // EB Garamond takes Palatino's old-style-serif slot.

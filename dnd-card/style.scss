@@ -1,0 +1,340 @@
+// Styles for the Player Card experiment.
+//
+// The panel, groups, fields, sliders, font pickers, preview figure and
+// download button come from the shared control kit. What's here is what a
+// character sheet needs and nothing else does: the ability and skill rows,
+// the diamond proficiency markers, and a card-above-controls layout in place
+// of the kit's side-by-side split.
+
+@import "../shared/controls";
+
+$dndc-prof-expertise: #7b4bb8;
+$dndc-prof-expertise-dark: #b794f4;
+
+// Where the preview stops growing. In px, not rem: this caps how large a
+// bitmap is displayed, which has nothing to do with the reader's text size.
+// The height cap is what usually binds on a laptop, and keeping it under a
+// screenful means the card and its download button are visible together.
+$dndc-preview-max-width: 960px;
+$dndc-preview-max-height: 66vh;
+
+// A panel track, sized in rem because what has to fit in it is text. The
+// widest row any group holds is an ability's name, score, modifier, save
+// checkbox and save total, and the four numeric columns are fixed, so a
+// narrower track crushes the name to an ellipsis. The `min()` keeps a track
+// from outgrowing the panel on a phone, and is interpolated because Sass
+// would otherwise evaluate it as its own function.
+$dndc-group-track: #{"minmax(min(100%, 34rem), 1fr)"};
+
+// The card prints its skills in three columns; the panel matches so the two
+// lists read in the same order. A count and a width together mean "three,
+// unless a column would be too narrow for the longest skill name".
+$dndc-skill-columns: 3;
+$dndc-skill-column-width: 24rem;
+
+// The marker's footprint. Its diamond is drawn inside by a rotated pseudo-
+// element, whose diagonal is what has to fit.
+$dndc-prof-size: 2rem;
+$dndc-prof-diamond: 1.35rem;
+
+.experiment-ext-dndc {
+  // The card is landscape, so it takes the full width and the controls go
+  // underneath rather than alongside.
+  --exp-ui-cols: 1fr;
+
+  .experiment-ext-ui-figure {
+    // There is nothing beside the preview to scroll past.
+    position: static;
+  }
+
+  .experiment-ext-ui-preview {
+    width: 100%;
+    max-width: $dndc-preview-max-width;
+    margin: 0 auto;
+  }
+
+  // The canvas is the print bitmap (1795 px wide at 300 dpi). Leaving both
+  // axes auto and constraining with maximums lets the browser scale it down
+  // while keeping the aspect exactly.
+  .experiment-ext-ui-canvas {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: $dndc-preview-max-height;
+    margin: 0 auto;
+  }
+
+  // One column of controls across the full width would be a very long line;
+  // tile the groups instead.
+  .experiment-ext-ui-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, $dndc-group-track);
+    align-items: start;
+    gap: 1rem 1.4rem;
+  }
+
+  // The skill list has columns of its own, so it takes the whole row.
+  .experiment-ext-ui-group[data-group="skills"] { grid-column: 1 / -1; }
+}
+
+// ---------------------------------------------------------------------------
+// Explanatory lines under a group's controls
+// ---------------------------------------------------------------------------
+.experiment-ext-dndc-note {
+  margin: 0;
+  font-size: 0.78em;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+
+  &.experiment-ext-dndc-note-error {
+    color: $exp-error;
+    @include exp-dark { color: $exp-error-dark; }
+  }
+}
+
+// A derived number the player doesn't type: a modifier, a save, a skill total.
+.experiment-ext-dndc-derived {
+  font-family: $exp-mono-font-family;
+  font-size: 0.85em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+// ---------------------------------------------------------------------------
+// Abilities: name, score, modifier, save proficiency, save
+// ---------------------------------------------------------------------------
+// One grid for the header and all six rows rather than a grid each: columns
+// only line up when they are the same columns. Sizing them per row leaves the
+// header free to resolve `auto` against nothing and `em` against its own
+// smaller type, which is exactly what it did.
+.experiment-ext-dndc-abilities {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.4em 2.8em auto 2.8em;
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.75rem;
+  font-size: 0.85em;
+
+  input[type="number"] {
+    padding: 0.35rem 0.4rem;
+    text-align: center;
+    font-family: $exp-mono-font-family;
+  }
+
+  // Five columns don't fit a phone; give the ability's full name a row of its
+  // own and let the numbers share the next. An ability is then two rows, so
+  // the air belongs between abilities rather than inside one.
+  @include exp-mobile {
+    grid-template-columns: minmax(0, 1fr) 2.6em auto 2.6em;
+    row-gap: 0.4rem;
+
+    .experiment-ext-dndc-ability-name { grid-column: 1 / -1; }
+    .experiment-ext-dndc-ability + .experiment-ext-dndc-ability
+      .experiment-ext-dndc-ability-name { margin-top: 0.5rem; }
+  }
+}
+
+// The header and each row are wrappers for grouping, not boxes: their cells
+// belong to the grid above.
+.experiment-ext-dndc-ability,
+.experiment-ext-dndc-ability-head { display: contents; }
+
+.experiment-ext-dndc-ability-head {
+  font-family: $exp-mono-font-family;
+  font-size: 0.68em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+
+  // Over the score input, then over each derived number — both of which are
+  // right-aligned in their column.
+  > span { text-align: center; }
+  > span:nth-child(3),
+  > span:last-child { text-align: right; }
+
+  @include exp-mobile { display: none; }
+}
+
+.experiment-ext-dndc-ability-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+// ---------------------------------------------------------------------------
+// Skills: columns of rows, each with two proficiency markers
+// ---------------------------------------------------------------------------
+// Columns rather than a grid: this flows top-to-bottom then over, which is the
+// order the card itself prints the skills in, and it doesn't need a row count
+// wired to how many skills there are.
+.experiment-ext-dndc-skills {
+  column-count: $dndc-skill-columns;
+  column-width: $dndc-skill-column-width;
+  column-gap: 1.4rem;
+}
+
+.experiment-ext-dndc-skill {
+  display: grid;
+  grid-template-columns: $dndc-prof-size $dndc-prof-size minmax(0, 1fr) 2.4em 2.6em;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85em;
+  padding: 0.1rem 0;
+  break-inside: avoid;
+}
+
+.experiment-ext-dndc-skill-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.experiment-ext-dndc-skill-ability {
+  font-family: $exp-mono-font-family;
+  font-size: 0.8em;
+  letter-spacing: 0.05em;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+// A proficiency marker, mirroring the card: a diamond showing the bonus that
+// filling it is worth, filled when it applies. Two per skill — the second is
+// expertise. The diamond is a rotated pseudo-element so the number inside can
+// stay upright, and the button's own box keeps the footprint the rotation
+// needs. aria-pressed carries the state for anyone not seeing the fill.
+.experiment-ext-dndc-prof {
+  appearance: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: $dndc-prof-size;
+  height: $dndc-prof-size;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-family: $exp-mono-font-family;
+  font-size: 0.62em;
+  line-height: 1;
+  color: $exp-muted;
+  cursor: pointer;
+
+  &::before {
+    content: "";
+    position: absolute;
+    width: $dndc-prof-diamond;
+    height: $dndc-prof-diamond;
+    border-radius: 0.12rem;
+    border: 1px solid $exp-border;
+    background: $exp-surface;
+    transform: rotate(45deg);
+  }
+
+  > span { position: relative; }
+
+  &:hover::before { border-color: $exp-link; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: -2px; border-radius: 0.3rem; }
+
+  &[data-on="true"] {
+    color: $exp-surface;
+    &::before { border-color: $exp-link; background: $exp-link; }
+  }
+  &[data-step="2"][data-on="true"]::before {
+    border-color: $dndc-prof-expertise;
+    background: $dndc-prof-expertise;
+  }
+
+  @include exp-dark {
+    color: $exp-muted-dark;
+    &::before { border-color: $exp-border-dark; background: $exp-surface-dark; }
+    &:hover::before { border-color: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+
+    &[data-on="true"] {
+      color: $exp-panel-dark;
+      &::before { border-color: $exp-link-dark; background: $exp-link-dark; }
+    }
+    &[data-step="2"][data-on="true"]::before {
+      border-color: $dndc-prof-expertise-dark;
+      background: $dndc-prof-expertise-dark;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hit die: the picker with the die's own shape beside it
+// ---------------------------------------------------------------------------
+.experiment-ext-dndc-die {
+  display: flex;
+  align-items: end;
+  gap: 0.6rem;
+
+  > .experiment-ext-ui-field { flex: 1; min-width: 0; }
+}
+
+// The SVG strokes in currentColor, so muting the box is all dark mode needs.
+.experiment-ext-dndc-die-icon {
+  display: flex;
+  padding-bottom: 0.5rem;
+  color: $exp-muted;
+
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+// ---------------------------------------------------------------------------
+// Portrait controls
+// ---------------------------------------------------------------------------
+.experiment-ext-dndc-file {
+  width: 100%;
+  font: inherit;
+  font-size: 0.82em;
+  color: inherit;
+
+  &::file-selector-button {
+    font: inherit;
+    font-size: inherit;
+    margin-right: 0.6rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 0.4rem;
+    border: 1px solid $exp-border;
+    background: $exp-surface;
+    color: inherit;
+    cursor: pointer;
+
+    &:hover { border-color: $exp-link; }
+  }
+
+  @include exp-dark {
+    &::file-selector-button {
+      border-color: $exp-border-dark;
+      background: $exp-surface-dark;
+      &:hover { border-color: $exp-link-dark; }
+    }
+  }
+}
+
+.experiment-ext-dndc-clear {
+  appearance: none;
+  align-self: start;
+  font: inherit;
+  font-size: 0.82em;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid $exp-border;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover { border-color: $exp-error; color: $exp-error; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    &:hover { border-color: $exp-error-dark; color: $exp-error-dark; }
+  }
+}

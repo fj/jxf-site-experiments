@@ -7,7 +7,9 @@
  * registers what it is here: how to make a blank page of it, how to draw one,
  * and what controls edit it. Nothing else has to be told a kind exists — the
  * panel builds its tabs, its "add a card" buttons and its controls out of this
- * registry, so a new kind is a new file and a line in the manifest.
+ * registry, so a new kind is a new file, a line in the manifest, and whatever
+ * styles its own controls need in style.scss, which is the one place a kind
+ * still has to reach outside itself.
  *
  * A page itself is plain data: its `kind` and whatever that kind's `create()`
  * put on it. Nothing here holds the set — that is the app's `state.pages`, an

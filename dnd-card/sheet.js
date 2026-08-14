@@ -409,7 +409,10 @@
   // name, and a kind that asks for badges gets those instead.
   function render(ctx, output, page, identity, look, label) {
     var definition = D.pages.definition(page.kind);
-    var opts = definition.frameOptions ? definition.frameOptions(page, identity) : {};
+    var asked = definition.frameOptions ? definition.frameOptions(page, identity) : {};
+    // Copied rather than filled in, so what a kind asked for is never written
+    // back to whatever it handed over.
+    var opts = { portrait: asked.portrait, badges: asked.badges, label: asked.label };
     if (!opts.badges && !opts.label) {
       opts.label = String(label || definition.label).toUpperCase();
     }

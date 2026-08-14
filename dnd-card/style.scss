@@ -65,8 +65,8 @@ $dndc-prof-diamond: 1.35rem;
   }
 
   // One column of controls across the full width would be a very long line;
-  // tile the groups instead.
-  .experiment-ext-ui-panel {
+  // tile the groups inside each region instead.
+  .experiment-ext-dndc-region-body {
     display: grid;
     grid-template-columns: repeat(auto-fit, $dndc-group-track);
     align-items: start;
@@ -75,6 +75,181 @@ $dndc-prof-diamond: 1.35rem;
 
   // The skill list has columns of its own, so it takes the whole row.
   .experiment-ext-ui-group[data-group="skills"] { grid-column: 1 / -1; }
+}
+
+// ---------------------------------------------------------------------------
+// The panel's three regions: what every card shares, the strip of cards, and
+// the one being edited
+// ---------------------------------------------------------------------------
+// The shared block gets a surface of its own, because "the character's name"
+// and "this card's hit points" are different kinds of thing and a panel that
+// runs them together invites editing one for the other.
+.experiment-ext-dndc-every {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid rgba($exp-link, 0.3);
+  border-radius: 0.6rem;
+  background: rgba($exp-link, 0.05);
+
+  @include exp-dark {
+    border-color: rgba($exp-link-dark, 0.35);
+    background: rgba($exp-link-dark, 0.08);
+  }
+
+  @include exp-mobile { padding: 0.7rem 0.75rem 0.85rem; }
+}
+
+// A region's own name, set like the group summaries under it. The heading's
+// own margins would put it half a line away from what it names.
+.experiment-ext-dndc-region-title {
+  margin: 0;
+  font-family: $exp-mono-font-family;
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $exp-muted;
+
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+.experiment-ext-dndc-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+// One tab per card, with a stepper at each end for a set grown too wide to
+// point at comfortably.
+.experiment-ext-dndc-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.experiment-ext-dndc-tablist {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.experiment-ext-dndc-tab {
+  appearance: none;
+  font: inherit;
+  font-size: 0.82em;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid $exp-border;
+  background: $exp-surface;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover { border-color: $exp-link; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
+
+  &[aria-selected="true"] {
+    border-color: $exp-link;
+    background: $exp-link;
+    color: $exp-surface;
+    font-weight: 600;
+  }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+
+    &:hover { border-color: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+
+    &[aria-selected="true"] {
+      border-color: $exp-link-dark;
+      background: $exp-link-dark;
+      color: $exp-panel-dark;
+    }
+  }
+}
+
+// ‹ and ›, which have nowhere to go while the set is one card long.
+.experiment-ext-dndc-step {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  font: inherit;
+  font-size: 1.1em;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid $exp-border;
+  background: $exp-surface;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { border-color: $exp-link; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
+  &:disabled { opacity: 0.4; cursor: default; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+
+    &:hover:not(:disabled) { border-color: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
+// The kinds a reader may add, dashed because each makes a card that isn't
+// there yet. The row is absent entirely when nothing is addable.
+.experiment-ext-dndc-add {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.experiment-ext-dndc-add-label {
+  margin-right: 0.2rem;
+  font-family: $exp-mono-font-family;
+  font-size: 0.72em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $exp-muted;
+
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+.experiment-ext-dndc-add-card {
+  appearance: none;
+  font: inherit;
+  font-size: 0.8em;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px dashed $exp-border;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover { border-color: $exp-link; color: $exp-link; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    &:hover { border-color: $exp-link-dark; color: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
+// Removing a card is the last thing its controls offer, and the only one that
+// isn't an edit.
+.experiment-ext-dndc-page-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
 }
 
 // ---------------------------------------------------------------------------

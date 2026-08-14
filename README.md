@@ -57,10 +57,12 @@ same widgets, so they live here rather than being reimplemented per experiment:
 - `ui.js` (`window.ExpUI`) — builders returning HTML strings for labelled
   inputs, `<datalist>`-backed combos, grouped `<details>` sections, sliders
   with live readouts, color wells, font pickers, and the preview figure with
-  its caption, progress track and download button. Every control carries
-  `data-ctl="<name>"`, so one delegated listener maps an edit onto one state
-  field; `ExpUI.dom(root)` returns the accessors for readouts, status, busy
-  buttons and progress.
+  its caption, progress track, download button and any secondary actions
+  offered beside it. Every control carries `data-ctl="<name>"`, so one
+  delegated listener maps an edit onto one state field; `ExpUI.dom(root)`
+  returns the accessors for readouts, status, busy buttons and progress —
+  the secondary actions included, since they are addressed by name like
+  everything else.
 - `fonts.js` (`window.ExpFonts`) — loads a Google Fonts stylesheet and waits
   for every variant before booting the app behind a spinner, with a timeout so
   a blocked font CDN can't strand it. Canvas text has to be measured against

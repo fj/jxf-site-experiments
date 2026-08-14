@@ -368,11 +368,29 @@
     return true;
   }
 
+  // A saved page: ten rows again whatever the file held, each mark a mark and
+  // each count a count or the blank that prints an empty box.
+  function load(raw) {
+    var read = D.read;
+    var rows = read.rows(raw.rows, ROW_COUNT).map(function (saved) {
+      var row = blankRow();
+      TICK_FIELDS.forEach(function (tick) { row[tick.field] = read.flag(saved[tick.field]); });
+      row.quantity = read.countOrBlank(saved.quantity, QUANTITY_RANGE);
+      TEXT_FIELDS.forEach(function (field) {
+        row[field.field] = read.text(saved[field.field], "");
+      });
+      return row;
+    });
+    while (rows.length < ROW_COUNT) rows.push(blankRow());
+    return { rows: rows };
+  }
+
   D.pages.register({
     kind: KIND,
     label: "Inventory",
     create: create,
     render: render,
+    load: load,
     controls: {
       html: html,
       sync: sync,

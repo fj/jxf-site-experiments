@@ -97,6 +97,11 @@
     active: 0
   };
 
+  // What a setting falls back to when a saved file hasn't got it, or hasn't got
+  // it right: what the panel started with rather than what it happens to hold
+  // now, so the same file always loads the same way.
+  var defaults = JSON.parse(JSON.stringify(state));
+
   // The decoded picture. Kept out of `state` because it isn't a value the
   // controls edit — it's the result of loading one. `loadedUrl` records what
   // the current picture came from, so committing the URL field without having
@@ -310,6 +315,77 @@
     });
   }
 
+  // ---- Saving and loading the whole set ------------------------------------------------
+  // The file is D.saved's business — what is in it, what it is called in it,
+  // and what a value has to be before it is allowed near a card. This end of it
+  // is the button, the picker, and the sentence saying what happened.
+  var CONFIG_MIME = "text/yaml";
+  var CONFIG_SUFFIX = "-cards.yaml";
+
+  function configNote(text, kind) {
+    var node = dom.el('[data-out="config"]');
+    node.textContent = text || "";
+    node.classList.toggle("experiment-ext-dndc-note-error", kind === "error");
+  }
+
+  function saveConfig() {
+    var blocked = window.ExpPng.saveBlocker();
+    if (blocked) { configNote(blocked, "error"); return; }
+    try {
+      var text = D.saved.encode(state);
+      window.ExpPng.save(new Blob([text], { type: CONFIG_MIME }),
+        D.downloads.name(buildIdentity(), CONFIG_SUFFIX));
+      configNote("Sent to your downloads · " + cardCount(state.pages.length) + " · " +
+        text.length + " bytes");
+    } catch (err) {
+      configNote(String(err && err.message || err), "error");
+    }
+  }
+
+  function readText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result)); };
+      reader.onerror = function () { reject(new Error("that file could not be read")); };
+      reader.readAsText(file);
+    });
+  }
+
+  function loadConfig(file) {
+    configNote("Reading " + file.name + "…");
+    readText(file).then(function (text) {
+      applyConfig(D.saved.decode(text, defaults), file.name);
+    }).catch(function (err) {
+      configNote(String(err && err.message || err), "error");
+    }).then(function () {
+      // Cleared so that choosing the same file twice is two loads, which is
+      // what someone editing it in another window is doing.
+      dom.ctl("loadConfig").value = "";
+    });
+  }
+
+  // Everything at once: the shared settings, the set, and the picture, which is
+  // the one part that has to be fetched again rather than assigned.
+  function applyConfig(loaded, from) {
+    Object.keys(loaded.settings).forEach(function (field) {
+      state[field] = loaded.settings[field];
+    });
+    state.pages = loaded.pages;
+    state.active = 0;
+
+    syncShared();
+    renderTabs();
+    rebuildPage();
+    loadUrl(state.portraitUrl.trim());
+    sched();
+
+    configNote("Loaded " + cardCount(state.pages.length) + " from " + from +
+      (loaded.ignored.length
+        ? " · ignored " + cardCount(loaded.ignored.length) + " of a kind this doesn't know: " +
+          loaded.ignored.join(", ")
+        : ""));
+  }
+
   // ---- Portrait ----------------------------------------------------------------------
   // The state and the decoded picture stay here even though the controls are
   // built into a card's own region: a picture outlives the tab it was chosen
@@ -400,6 +476,11 @@
     var controls = controlsOf(page);
     if (inPage(target)) {
       if (controls.onControl) controls.onControl(page, name, target, event, pageContext());
+      return;
+    }
+
+    if (name === "loadConfig") {
+      if (target.files && target.files[0]) loadConfig(target.files[0]);
       return;
     }
 
@@ -633,6 +714,22 @@
         "dialogs size it correctly instead of guessing.</p>"
       ) +
 
+      U.group("Save and load",
+        '<div class="experiment-ext-dndc-config">' +
+        '<button type="button" class="experiment-ext-dndc-clear" data-ctl="saveConfig">' +
+        "<span>Save as YAML</span></button>" +
+        '<div class="' + U.PREFIX + 'field">' +
+        '<span class="' + U.PREFIX + 'field-label">&hellip;or load one back</span>' +
+        '<input type="file" accept=".yaml,.yml,text/yaml,text/plain" ' +
+        'class="experiment-ext-dndc-file" data-ctl="loadConfig">' +
+        "</div></div>" +
+        '<p class="experiment-ext-dndc-note">Every card and everything above them, as a text ' +
+        "file you can keep, hand-edit and load back. A picture you chose from a file isn’t " +
+        "in it, because the card holds the picture rather than the bytes; one named by a web " +
+        "address is.</p>" +
+        '<p class="experiment-ext-dndc-note" data-out="config"></p>'
+      ) +
+
       "</div></section>";
   }
 
@@ -813,6 +910,7 @@
     ACTIONS.forEach(function (action) {
       dom.ctl(action.name).addEventListener("click", function () { download(action); });
     });
+    dom.ctl("saveConfig").addEventListener("click", saveConfig);
     U.dropTarget(dom.el("[data-preview]"), "image/", loadFile);
 
     render();

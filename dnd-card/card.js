@@ -520,6 +520,9 @@
     { step: 2, label: "expertise" }
   ];
 
+  // None, proficient, expertise — which is also how many times the bonus counts.
+  var PROFICIENCY_RANGE = [0, PROFICIENCY_STEPS.length];
+
   // The numbers typed rather than dragged. `blank` marks the ones the card
   // draws a box for, which is exactly the set a player rubs out mid-session.
   var NUMBER_CONTROLS = {
@@ -753,6 +756,41 @@
     return true;
   }
 
+  // A saved page, every number checked against the range its own control
+  // offers. Only the skills somebody is actually trained in are kept, which is
+  // the shape a blank page has too: an untrained skill is an absent key, not a
+  // zero.
+  function load(raw) {
+    var read = D.read;
+    var page = create();
+    var abilities = raw.abilities || {};
+    var saves = raw.saves || {};
+    var skills = raw.skills || {};
+
+    page.hitPoints = read.countOrBlank(raw.hitPoints, D.RANGES.hitPoints);
+    page.temporaryHitPoints = read.countOrBlank(raw.temporaryHitPoints, D.RANGES.hitPoints);
+    page.hitDiceRemaining = read.countOrBlank(raw.hitDiceRemaining, D.RANGES.hitDice);
+    page.hitPointsMax = read.whole(raw.hitPointsMax, D.RANGES.hitPoints, page.hitPointsMax);
+    page.armorClass = read.whole(raw.armorClass, D.RANGES.armorClass, page.armorClass);
+    page.hitDie = Number(read.choice(raw.hitDie, D.dice.SIDES.map(String), String(page.hitDie)));
+    page.deathSuccesses = read.whole(raw.deathSuccesses, D.RANGES.deathSaves, 0);
+    page.deathFailures = read.whole(raw.deathFailures, D.RANGES.deathSaves, 0);
+    page.inspiration = read.flag(raw.inspiration);
+
+    D.ABILITIES.forEach(function (ability) {
+      page.abilities[ability.key] =
+        read.whole(abilities[ability.key], D.RANGES.score, page.abilities[ability.key]);
+      page.saves[ability.key] = read.flag(saves[ability.key]);
+    });
+
+    page.skills = {};
+    D.SKILLS.forEach(function (skill) {
+      var trained = read.whole(skills[skill.key], PROFICIENCY_RANGE, 0);
+      if (trained) page.skills[skill.key] = trained;
+    });
+    return page;
+  }
+
   D.pages.register({
     kind: KIND,
     label: "Character",
@@ -764,6 +802,7 @@
     create: create,
     frameOptions: frameOptions,
     render: render,
+    load: load,
     controls: {
       html: html,
       sync: sync,

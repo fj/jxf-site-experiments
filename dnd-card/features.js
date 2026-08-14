@@ -465,11 +465,40 @@
     });
   }
 
+  // A saved page: the rows it held, each one of a shape this page knows, and no
+  // more of them than a card has room for. A file with no rows at all is a
+  // blank page rather than an empty one, because that is what "add a row" has
+  // to start from.
+  function load(raw) {
+    var read = D.read;
+    if (!Array.isArray(raw.rows)) return create();
+    return {
+      rows: read.rows(raw.rows, MAX_ROWS).map(function (saved) {
+        var type = read.choice(saved.type, ROW_TYPES.map(function (kind) { return kind.type; }),
+          GENERAL);
+        if (type === SPELLCASTING) {
+          return {
+            type: SPELLCASTING,
+            level: read.whole(saved.level, D.RANGES.featureSlotLevel, D.RANGES.featureSlotLevel[0]),
+            slots: read.whole(saved.slots, D.RANGES.featureSlots, DEFAULT_SLOTS)
+          };
+        }
+        return {
+          type: GENERAL,
+          uses: read.whole(saved.uses, D.RANGES.featureUses, 0),
+          name: read.text(saved.name, ""),
+          description: read.text(saved.description, "")
+        };
+      })
+    };
+  }
+
   D.pages.register({
     kind: KIND,
     label: "Features",
     create: create,
     render: render,
+    load: load,
     controls: {
       html: html,
       sync: sync,

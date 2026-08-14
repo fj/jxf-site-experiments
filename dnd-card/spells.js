@@ -331,11 +331,28 @@
     return false;
   }
 
+  // A saved page: ten rows again whatever the file held, each one a school the
+  // marks know, a level in range, and text that is text.
+  function load(raw) {
+    var read = D.read;
+    var rows = read.rows(raw.rows, ROW_COUNT).map(function (saved) {
+      return {
+        school: schoolOf(saved),
+        level: read.whole(saved.level, D.RANGES.spellLevel, D.RANGES.spellLevel[0]),
+        name: read.text(saved.name, ""),
+        description: read.text(saved.description, "")
+      };
+    });
+    while (rows.length < ROW_COUNT) rows.push(blankRow());
+    return { rows: rows };
+  }
+
   D.pages.register({
     kind: KIND,
     label: "Spells",
     create: create,
     render: render,
+    load: load,
     controls: {
       html: html,
       sync: sync,

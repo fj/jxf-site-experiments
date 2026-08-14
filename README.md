@@ -140,18 +140,37 @@ A character has a *set* of these rather than one. Beside the character card
 there are inventory cards of ten items each (equipped and attuned as a tick and
 a triangle, a count, and the item's name and what it is), features cards of up
 to eight rows the reader adds, removes and drags into order (each with as many
-empty tally boxes as the ability has uses, or a spell level and its slots), and
-spells cards of ten rows, each marked with one of the eight schools of magic —
-`schools.js` holds those the way `dice.js` holds the dice, once in a unit
-circle, drawn onto the canvas or handed to the panel as an `<svg>`. Every card
-repeats the character card's header and puts its own name where that card keeps
-its three badges, so a card face-up on the table says whose it is. The panel
-follows: what belongs to the whole set sits in a block of its own above a tab
-strip, and under the strip are the controls of whichever card is being edited.
-Adding a kind is a module that registers with `pages.js`, a line in the
-manifest, and a block of styles for its own controls — nothing in `app.js` names
-a kind. The set comes back out as one PNG, as a `.tar.gz` of one PNG per card,
-or as a single PNG of all of them tiled.
+empty tally boxes down its left as the ability has uses, or a spell level and
+its slots), and spells cards of ten rows, each marked with one of the eight
+schools of magic and the level it is cast at — `schools.js` holds those the way
+`dice.js` holds the dice, once in a unit circle, drawn onto the canvas or handed
+to the panel as an `<svg>`. A features row and a spells row are both one line of
+type, "name — description", set by the same `sheet.js` routine: the description
+gives room first, the name second, and only what won't fit at its floor is cut.
+The spells card prints its rows by level and then by name whatever order they
+were typed in, because at the table a spell is looked for by the slot there is
+one of left.
+
+Every card repeats the character card's header and puts its own name where that
+card keeps its three badges, so a card face-up on the table says whose it is.
+The panel follows: what belongs to the whole set sits in a block of its own
+above a tab strip, and under the strip are the controls of whichever card is
+being edited — including the picture, which is built into the region of any card
+whose kind asks the frame for one. The strip is the set's order as well as its
+index: a tab can be dragged onto another, or moved with Ctrl and an arrow key,
+and the `+` at its end opens a menu of the kinds that can be added. Adding a
+kind is a module that registers with `pages.js`, a line in the manifest, and a
+block of styles for its own controls — nothing in `app.js` names a kind.
+
+The set comes back out as one PNG, as a `.tar.gz` of one PNG per card, or as a
+single PNG of all of them tiled — and as YAML, which is the one that also goes
+back *in*. `saved.js` owns that file: which block of it each setting sits in,
+and what a value has to be before it is allowed near a renderer. Nothing read
+from it is trusted, and every card goes to its own kind's `load()` to be made
+sense of, so a file written by an older version, hand-edited and got wrong, or
+not one of ours at all either loads as something drawable or is refused in a
+sentence. A picture chosen from a file isn't in it — the card holds the decoded
+image rather than the bytes — but one named by a URL is.
 
 Everything derivable is derived: modifiers from
 scores, the proficiency bonus from the level, initiative from Dexterity, saves

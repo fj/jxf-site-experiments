@@ -123,9 +123,6 @@ throws; all eighteen skills at none / proficient / expertise — is laid out on 
 `<canvas>` beside a portrait that fills the card's left third, and downloaded
 as a PNG that prints at 152 × 101 mm (1795 × 1193 px at 300 dpi, also
 offered at 150 and 600). The card is landscape, so the controls sit under the
-<<<<<<< HEAD
-preview rather than beside it. Everything derivable is derived: modifiers from
-=======
 preview rather than beside it.
 
 A character has a *set* of these rather than one. Beside the character card
@@ -146,7 +143,6 @@ a kind. The set comes back out as one PNG, as a `.tar.gz` of one PNG per card,
 or as a single PNG of all of them tiled.
 
 Everything derivable is derived: modifiers from
->>>>>>> ca9ce4b (fix(dnd-card): keep a card's controls and its downloads to themselves)
 scores, the proficiency bonus from the level, initiative from Dexterity, saves
 and skill totals from both. What isn't derived is what changes during play:
 hit points, temporary hit points and hit dice are write-in boxes rather than
@@ -172,5 +168,8 @@ dialogs size it correctly rather than assuming screen dpi. The picture is read
 locally; a picture given by URL is fetched with CORS requested, so a host that
 forbids cross-origin reads fails with an explanation instead of silently
 tainting the canvas. Modules on the `DndCard` namespace: `config.js`,
-`data.js`, `rules.js`, `dice.js`, `draw.js`, `portrait.js`, `card.js`,
-`app.js`.
+`data.js`, `rules.js`, `dice.js`, `schools.js`, `draw.js`, `portrait.js`,
+`sheet.js` (the frame every card draws inside, and the furniture more than one
+of them needs), `pages.js` (the kinds, and a set of them), then one module per
+kind — `card.js`, `inventory.js`, `features.js`, `spells.js` — with
+`downloads.js` and `app.js` last.

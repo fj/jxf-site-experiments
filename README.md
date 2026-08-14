@@ -62,7 +62,10 @@ same widgets, so they live here rather than being reimplemented per experiment:
   delegated listener maps an edit onto one state field; `ExpUI.dom(root)`
   returns the accessors for readouts, status, busy buttons and progress —
   the secondary actions included, since they are addressed by name like
-  everything else.
+  everything else. `ExpUI.readNumber` reads a typed number the way a typed
+  number has to be read: a half-typed value only takes effect while it is
+  already in range, and a commit rounds, clamps and writes the result back, so
+  the box shows what was taken from it.
 - `fonts.js` (`window.ExpFonts`) — loads a Google Fonts stylesheet and waits
   for every variant before booting the app behind a spinner, with a timeout so
   a blocked font CDN can't strand it. Canvas text has to be measured against

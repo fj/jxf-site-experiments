@@ -540,26 +540,10 @@
   var VALUE_CONTROLS = ["hitPoints", "hitPointsMax", "temporaryHitPoints",
     "armorClass", "deathSuccesses", "deathFailures"];
 
-  // Numbers commit differently from everything else: a half-typed value like
-  // "" or "1" on its way to "18" shouldn't snap to the range's floor, so a
-  // number only takes effect while typing if it's already in range, and is
-  // clamped and written back when the field commits (blur or Enter).
-  //
-  // A `blank` field has one state more: empty, which is not zero. Zero hit
-  // points is a character at nought and dying; an empty box is one nobody has
-  // written in yet, and that's what the card prints.
-  function readNumber(target, event, field, apply) {
-    var raw = target.value.trim();
-    var range = field.range;
-    if (raw === "" && field.blank) { apply(null); return; }
-
-    var parsed = Number(raw);
-    var usable = raw !== "" && isFinite(parsed);
-    if (event.type === "input" && (!usable || parsed < range[0] || parsed > range[1])) return;
-    var value = D.clampR(usable ? Math.round(parsed) : range[0], range);
-    if (event.type === "change") target.value = value;
-    apply(value);
-  }
+  // A `blank` field has one state more than the kit's reader gives every typed
+  // number: empty, which is not zero. Zero hit points is a character at nought
+  // and dying; an empty box is one nobody has written in yet, and that's what
+  // the card prints.
 
   // A character can't have more hit dice than levels, so that field's ceiling
   // moves with the level slider rather than being fixed in the markup.
@@ -729,7 +713,7 @@
   function onControl(page, name, target, event, ctx) {
     if (name.indexOf(ABILITY_CONTROL) === 0) {
       var abilityKey = name.slice(ABILITY_CONTROL.length);
-      readNumber(target, event, { range: D.RANGES.score }, function (value) {
+      U.readNumber(target, event, { range: D.RANGES.score }, function (value) {
         page.abilities[abilityKey] = value;
         syncAbilities(page, ctx.dom, ctx.identity);
         syncSkills(page, ctx.dom, ctx.identity);
@@ -744,7 +728,7 @@
       return true;
     }
     if (NUMBER_CONTROLS[name]) {
-      readNumber(target, event, numberControl(name, ctx.identity), function (value) {
+      U.readNumber(target, event, numberControl(name, ctx.identity), function (value) {
         page[name] = value;
         ctx.render();
       });

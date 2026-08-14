@@ -253,20 +253,8 @@
   }
 
   // A count is blank until someone writes one in, and blank is a value of its
-  // own: it prints the box empty. A half-typed number ("1" on its way to "12")
-  // only takes effect while it is already in range, and is clamped and written
-  // back when the field commits.
-  function readQuantity(target, event, apply) {
-    var raw = String(target.value).trim();
-    if (raw === "") { apply(null); return; }
-    var parsed = Number(raw);
-    var usable = isFinite(parsed);
-    if (event.type === "input" &&
-      (!usable || parsed < QUANTITY_RANGE[0] || parsed > QUANTITY_RANGE[1])) return;
-    var value = D.clampR(usable ? Math.round(parsed) : QUANTITY_RANGE[0], QUANTITY_RANGE);
-    if (event.type === "change") target.value = value;
-    apply(value);
-  }
+  // own: the card prints that box empty.
+  var QUANTITY_FIELD_SPEC = { range: QUANTITY_RANGE, blank: true };
 
   // ---- Control markup ------------------------------------------------------------
   // Five controls in a row say no more about themselves than three marks on the
@@ -353,7 +341,7 @@
     if (!row) return false;
 
     if (control.field === QUANTITY_FIELD.field) {
-      readQuantity(target, event, function (value) {
+      U.readNumber(target, event, QUANTITY_FIELD_SPEC, function (value) {
         row.quantity = value;
         ctx.render();
       });

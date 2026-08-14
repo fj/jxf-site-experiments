@@ -376,6 +376,27 @@
     return element.value;
   };
 
+  // A number typed into a box, taken when it is worth taking. A half-typed
+  // value ("1" on its way to "18") passes through out of range on the way, so
+  // an `input` only takes effect while the value already fits; a `change` —
+  // blur or Enter — rounds, clamps and writes the result back, so what the box
+  // shows afterwards is what was taken from it. `spec.blank` gives an empty box
+  // a value of its own, null, rather than the range's floor: a quantity nobody
+  // has written in is not a quantity of none. `apply` is called only when
+  // there is something to apply.
+  U.readNumber = function (target, event, spec, apply) {
+    var raw = String(target.value).trim();
+    var range = spec.range;
+    if (raw === "" && spec.blank) { apply(null); return; }
+
+    var parsed = Number(raw);
+    var usable = raw !== "" && isFinite(parsed);
+    if (event.type === "input" && (!usable || parsed < range[0] || parsed > range[1])) return;
+    var value = Math.max(range[0], Math.min(range[1], Math.round(usable ? parsed : range[0])));
+    if (event.type === "change") target.value = value;
+    apply(value);
+  };
+
   // ---- Drag and drop --------------------------------------------------------
   // Accepting a dropped file anywhere over the preview is the obvious gesture
   // for image-backed experiments; onFile gets the first matching File.

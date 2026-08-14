@@ -400,6 +400,67 @@
   }
 }
 
+// The row holding the download button and the figure's secondary actions. On a
+// narrow screen the row becomes a stack of full-width buttons, since three pill
+// buttons side by side wrap into an unreadable ragged block.
+.experiment-ext-ui-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.7rem;
+
+  @include exp-mobile {
+    flex-direction: column;
+    align-items: stretch;
+
+    .experiment-ext-ui-download { align-self: stretch; }
+  }
+}
+
+// Secondary actions: the download button's shape, outlined rather than filled,
+// so the primary download stays the one the eye lands on.
+.experiment-ext-ui-action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82em;
+  font-weight: 500;
+  padding: 0.42rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid $exp-border;
+  background: transparent;
+  color: $exp-muted;
+  transition: color 0.15s ease, border-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    color: $exp-link;
+    border-color: $exp-link;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $exp-link;
+    outline-offset: 1px;
+  }
+
+  &:disabled { opacity: 0.6; cursor: wait; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    color: $exp-muted-dark;
+
+    &:hover:not(:disabled) {
+      color: $exp-link-dark;
+      border-color: $exp-link-dark;
+    }
+
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
 // A thin progress track under the download button. Determinate when a fraction
 // is known, indeterminate (a sliding sliver) while an opaque step runs.
 .experiment-ext-ui-progress {

@@ -57,16 +57,25 @@ same widgets, so they live here rather than being reimplemented per experiment:
 - `ui.js` (`window.ExpUI`) — builders returning HTML strings for labelled
   inputs, `<datalist>`-backed combos, grouped `<details>` sections, sliders
   with live readouts, color wells, font pickers, and the preview figure with
-  its caption, progress track and download button. Every control carries
-  `data-ctl="<name>"`, so one delegated listener maps an edit onto one state
-  field; `ExpUI.dom(root)` returns the accessors for readouts, status, busy
-  buttons and progress.
+  its caption, progress track, download button and any secondary actions
+  offered beside it. Every control carries `data-ctl="<name>"`, so one
+  delegated listener maps an edit onto one state field; `ExpUI.dom(root)`
+  returns the accessors for readouts, status, busy buttons and progress —
+  the secondary actions included, since they are addressed by name like
+  everything else.
 - `fonts.js` (`window.ExpFonts`) — loads a Google Fonts stylesheet and waits
   for every variant before booting the app behind a spinner, with a timeout so
   a blocked font CDN can't strand it. Canvas text has to be measured against
   the real faces; `ctx.font` doesn't trigger a download on its own.
 - `png.js` (`window.ExpPng`) — encodes a canvas, rewrites the PNG's `pHYs`
   chunk so the file declares its print resolution, and saves it.
+- `archive.js` (`window.ExpArchive`) — packs several files into one `.tar.gz`,
+  for an experiment that produces a set rather than a single download. The tar
+  is ustar, written here byte by byte; the compression is the browser's
+  `CompressionStream`. Nothing goes into an archive that couldn't come back
+  out: a name too long for a ustar header, an entry with no file behind it, a
+  name that would shadow an earlier one, and an engine that can't gzip each
+  stop the archive with a sentence saying so.
 
 ## Experiments
 

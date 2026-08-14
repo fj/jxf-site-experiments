@@ -237,7 +237,7 @@
   // ---- Preview figure -------------------------------------------------------
   // The canvas holds the output bitmap at full resolution; CSS scales it to
   // the column. Below it: a caption, an optional progress track and status
-  // line, and the download button.
+  // line, the download button, and any secondary actions beside it.
 
   // Lucide "download", matching the site's icon partial: inline stroke SVG on
   // currentColor.
@@ -247,17 +247,30 @@
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/>' +
     '<line x1="12" x2="12" y1="15" y2="3"/></svg>';
 
+  // opts.actions: [{name, label}] — further downloads offered beside the
+  // primary one and styled subordinate to it. Each carries data-ctl and wraps
+  // its label in a <span>, so dom.busy/ready/disable reach them exactly as
+  // they reach the download button. A lone button is left unwrapped: there is
+  // nothing to lay out beside it.
   U.figure = function (opts) {
     opts = opts || {};
     var name = opts.name || "download";
+    var actions = opts.actions || [];
+
+    var download = '<button type="button" class="' + P + 'download"' + attrs({ "data-ctl": name }) + ">" +
+      DOWNLOAD_ICON + "<span>" + esc(opts.button || "Download PNG") + "</span></button>";
+    var secondary = actions.map(function (action) {
+      return '<button type="button" class="' + P + 'action"' + attrs({ "data-ctl": action.name }) + ">" +
+        "<span>" + esc(action.label) + "</span></button>";
+    }).join("");
+
     return '<figure class="' + P + 'figure">' +
       '<div class="' + P + 'preview" data-preview>' +
       '<canvas class="' + P + 'canvas"' + attrs({ role: "img", "aria-label": opts.ariaLabel }) + "></canvas></div>" +
       '<figcaption class="' + P + 'caption" data-out="caption"></figcaption>' +
       (opts.progress === false ? "" : '<div class="' + P + 'progress" data-progress hidden><span></span></div>') +
       (opts.status === false ? "" : '<p class="' + P + 'status" data-out="status" role="status"></p>') +
-      '<button type="button" class="' + P + 'download"' + attrs({ "data-ctl": name }) + ">" +
-      DOWNLOAD_ICON + "<span>" + esc(opts.button || "Download PNG") + "</span></button>" +
+      (actions.length ? '<div class="' + P + 'actions">' + download + secondary + "</div>" : download) +
       "</figure>";
   };
 

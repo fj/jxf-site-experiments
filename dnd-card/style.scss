@@ -824,3 +824,86 @@ $dndc-item-quantity-width: 4.5em;
     &:disabled:hover { border-color: $exp-border-dark; color: inherit; }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Spells: ten rows of a school, a name, and a line about what it does
+// ---------------------------------------------------------------------------
+// Wide enough for "Transmutation" and the mark beside it in this grid's
+// smaller type. Fixed, so the ten pickers line up with each other.
+$dndc-spell-school-width: 11rem;
+// The description is the longer of a row's two lines on the card, so it is the
+// wider of the two boxes here.
+$dndc-spell-description-share: 1.6fr;
+
+// Ten rows three controls wide take the panel's whole width, as the skill list
+// does.
+.experiment-ext-dndc .experiment-ext-ui-group[data-group="spells"] { grid-column: 1 / -1; }
+
+// One grid for the heads and all ten rows rather than a grid each: columns
+// only line up when they are the same columns.
+.experiment-ext-dndc-spells {
+  display: grid;
+  grid-template-columns:
+    $dndc-spell-school-width minmax(0, 1fr) minmax(0, $dndc-spell-description-share);
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.4rem;
+  font-size: 0.85em;
+
+  input { padding: 0.35rem 0.5rem; }
+  // Not the shorthand: the select keeps the room its arrow sits in.
+  select { padding-top: 0.3rem; padding-bottom: 0.3rem; }
+
+  // Three boxes abreast on a phone is three boxes too narrow to read what's in
+  // them. The picker and the name share a line and the description takes the
+  // next, so a row is two lines — and the air belongs between rows rather than
+  // inside one.
+  @include exp-mobile {
+    grid-template-columns: $dndc-spell-school-width minmax(0, 1fr);
+    row-gap: 0.3rem;
+
+    .experiment-ext-dndc-spell-description { grid-column: 1 / -1; }
+    .experiment-ext-dndc-spell + .experiment-ext-dndc-spell {
+      > .experiment-ext-dndc-spell-school,
+      > .experiment-ext-dndc-spell-name { margin-top: 0.55rem; }
+    }
+  }
+}
+
+// The heads and each row are wrappers for grouping, not boxes: their cells
+// belong to the grid above.
+.experiment-ext-dndc-spell,
+.experiment-ext-dndc-spell-head { display: contents; }
+
+.experiment-ext-dndc-spell-head {
+  font-family: $exp-mono-font-family;
+  font-size: 0.68em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+
+  // Each field repeats its column's caption as a placeholder, which is what
+  // names the columns once there is no room for a row of headings.
+  @include exp-mobile { display: none; }
+}
+
+// The picker with its own mark beside it, as the hit die picker carries its
+// solid.
+.experiment-ext-dndc-spell-school {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+
+  > select { flex: 1; min-width: 0; }
+}
+
+// The mark strokes in currentColor, so muting the box is all dark mode needs.
+.experiment-ext-dndc-spell-icon {
+  display: flex;
+  flex: none;
+  color: $exp-muted;
+
+  @include exp-dark { color: $exp-muted-dark; }
+}

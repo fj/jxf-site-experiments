@@ -7,7 +7,8 @@
  * because spelling out "Transmutation" ten times would take the room the
  * spell's own name needs, and a shape sorts a page faster than a word reads.
  * schools.js draws the marks; this file is the page kind they sit in — what a
- * blank one holds, and how a row of it is drawn.
+ * blank one holds, how a row of it is drawn, and the ten rows of controls that
+ * fill it.
  *
  * There are always ten rows, and a blank one prints blank. The card is meant
  * to be written on between sessions, and a list that grew and shrank with what
@@ -28,6 +29,7 @@
   "use strict";
 
   var D = window.DndCard = window.DndCard || {};
+  var U = window.ExpUI;
 
   var KIND = "spells";
   var ROW_COUNT = 10;
@@ -172,10 +174,101 @@
     }
   }
 
+  // ---- Controls -----------------------------------------------------------------
+  var SCHOOL_CONTROL = "spellSchool-";
+  var NAME_CONTROL = "spellName-";
+  var DESCRIPTION_CONTROL = "spellDescription-";
+  var ICON_OUT = "spellIcon-";
+
+  // Each of a row's controls, and the field on the row it writes.
+  var ROW_CONTROLS = [
+    { prefix: SCHOOL_CONTROL, field: "school" },
+    { prefix: NAME_CONTROL, field: "name" },
+    { prefix: DESCRIPTION_CONTROL, field: "description" }
+  ];
+
+  // The column heads carry the captions, so the fields themselves are labelled
+  // for anyone who can't see the heads — and a placeholder repeats the caption
+  // for the narrow layout, where the heads are gone.
+  function fieldHtml(name, label, placeholder, className) {
+    return '<input type="text" class="' + U.PREFIX + "input " + className +
+      '" data-ctl="' + name + '" aria-label="' + U.esc(label) +
+      '" placeholder="' + U.esc(placeholder) + '">';
+  }
+
+  function rowHtml(index, options) {
+    var ordinal = index + 1;
+    return '<div class="experiment-ext-dndc-spell">' +
+      '<div class="experiment-ext-dndc-spell-school">' +
+      '<select class="' + U.PREFIX + 'select" data-ctl="' + SCHOOL_CONTROL + index +
+      '" aria-label="Spell ' + ordinal + ' school">' + options + "</select>" +
+      '<span class="experiment-ext-dndc-spell-icon" data-out="' + ICON_OUT + index + '"></span>' +
+      "</div>" +
+      fieldHtml(NAME_CONTROL + index, "Spell " + ordinal + " name", "Spell",
+        "experiment-ext-dndc-spell-name") +
+      fieldHtml(DESCRIPTION_CONTROL + index, "Spell " + ordinal + " description", "What it does",
+        "experiment-ext-dndc-spell-description") +
+      "</div>";
+  }
+
+  function html() {
+    var options = U.options(D.schools.LIST.map(function (school) {
+      return { value: school.key, label: school.label };
+    }));
+    var rows = "";
+    for (var i = 0; i < ROW_COUNT; i++) rows += rowHtml(i, options);
+
+    return U.group("Spells",
+      '<p class="experiment-ext-dndc-note">Ten rows, always. One left empty prints as an empty ' +
+      "row, ready for a spell nobody has learned yet. The card prints a school as its mark " +
+      "rather than its name — the mark beside each picker is the one it prints.</p>" +
+      '<div class="experiment-ext-dndc-spells">' +
+      '<div class="experiment-ext-dndc-spell-head" aria-hidden="true">' +
+      "<span>School</span><span>Spell</span><span>What it does</span></div>" +
+      rows + "</div>",
+      { key: "spells" });
+  }
+
+  // The mark beside the picker is the one the card prints, drawn from the same
+  // geometry and stroked in currentColor so it follows the panel into dark mode.
+  function syncIcon(row, dom, index) {
+    dom.el('[data-out="' + ICON_OUT + index + '"]').innerHTML = D.schools.svg(schoolOf(row));
+  }
+
+  function sync(page, dom) {
+    for (var index = 0; index < ROW_COUNT; index++) {
+      var row = page.rows[index];
+      dom.ctl(SCHOOL_CONTROL + index).value = schoolOf(row);
+      dom.ctl(NAME_CONTROL + index).value = written(row.name);
+      dom.ctl(DESCRIPTION_CONTROL + index).value = written(row.description);
+      syncIcon(row, dom, index);
+    }
+  }
+
+  function onControl(page, name, target, event, ctx) {
+    for (var i = 0; i < ROW_CONTROLS.length; i++) {
+      var control = ROW_CONTROLS[i];
+      if (name.indexOf(control.prefix) !== 0) continue;
+      var index = +name.slice(control.prefix.length);
+      var row = page.rows[index];
+      if (!row) return false;
+      row[control.field] = target.value;
+      if (control.field === "school") syncIcon(row, ctx.dom, index);
+      ctx.render();
+      return true;
+    }
+    return false;
+  }
+
   D.pages.register({
     kind: KIND,
     label: "Spells",
     create: create,
-    render: render
+    render: render,
+    controls: {
+      html: html,
+      sync: sync,
+      onControl: onControl
+    }
   });
 })();

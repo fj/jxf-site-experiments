@@ -513,3 +513,152 @@ $dndc-prof-diamond: 1.35rem;
     &:hover { border-color: $exp-error-dark; color: $exp-error-dark; }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Inventory: ten rows of two marks, a count and the item
+// ---------------------------------------------------------------------------
+// The mark's footprint, and the mark inside it. Its outline is drawn as the
+// shape with a smaller copy of itself over the middle, because a triangle
+// cannot be given a border any other way, and one mechanism for both shapes
+// keeps them the same weight.
+$dndc-tick-size: 2rem;
+$dndc-tick-mark: 1.35rem;
+$dndc-tick-corner: 0.12rem;
+$dndc-tick-hollow: 0.72;
+// A triangle's centre of area is two thirds of the way down, so that is what
+// the inner copy shrinks toward if the outline is to stay even.
+$dndc-triangle-centroid: 66.7%;
+
+// Wide enough for the three digits the card's box holds.
+$dndc-item-quantity-width: 4.5em;
+
+// The item list is five columns wide, so it takes a whole row of the region.
+.experiment-ext-dndc .experiment-ext-ui-group[data-group="inventory"] { grid-column: 1 / -1; }
+
+// One grid for the header and all ten rows, for the reason the abilities have
+// one: columns line up only when they are the same columns. The two mark
+// columns take the width of the words over them, exactly as they do on the
+// card, since a square and a triangle say nothing about themselves.
+.experiment-ext-dndc-items {
+  display: grid;
+  grid-template-columns:
+    auto auto $dndc-item-quantity-width minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+  font-size: 0.85em;
+
+  input { padding: 0.35rem 0.5rem; }
+
+  .experiment-ext-dndc-item-quantity {
+    text-align: center;
+    font-family: $exp-mono-font-family;
+  }
+
+  // Five columns don't fit a phone. The marks and the count keep a row of
+  // their own — they are what the card puts side by side — and the name and
+  // the description take a full-width row each under them, where they have
+  // room to be read. The fourth column is what those rows span into; nothing
+  // is placed in it.
+  @include exp-mobile {
+    grid-template-columns: auto auto $dndc-item-quantity-width minmax(0, 1fr);
+
+    .experiment-ext-dndc-item-name,
+    .experiment-ext-dndc-item-description { grid-column: 1 / -1; }
+
+    .experiment-ext-dndc-item + .experiment-ext-dndc-item > .experiment-ext-dndc-tick,
+    .experiment-ext-dndc-item + .experiment-ext-dndc-item > .experiment-ext-dndc-item-quantity {
+      margin-top: 0.8rem;
+    }
+  }
+}
+
+// The header and each row are wrappers for grouping, not boxes: their cells
+// belong to the grid above.
+.experiment-ext-dndc-item,
+.experiment-ext-dndc-item-head { display: contents; }
+
+.experiment-ext-dndc-item-head {
+  font-family: $exp-mono-font-family;
+  font-size: 0.68em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $exp-muted;
+  @include exp-dark { color: $exp-muted-dark; }
+
+  // Over the marks and the count, then over the two text fields. Each caption
+  // says which column it heads, so these follow the markup rather than a count
+  // of cells.
+  > span { text-align: center; }
+  > span[data-column="name"],
+  > span[data-column="description"] { text-align: left; }
+
+  // The text fields name themselves with their placeholders once they are on
+  // rows of their own; the count's caption stretches over what they leave, so
+  // the header still fills its row and the first item starts on the next one.
+  @include exp-mobile {
+    > span[data-column="quantity"] { grid-column: 3 / -1; text-align: left; }
+
+    > span[data-column="name"],
+    > span[data-column="description"] { display: none; }
+  }
+}
+
+// A mark, mirroring the card: a square for what's worn or held, a triangle for
+// what's attuned, each hollow until it applies. aria-pressed carries the state
+// for anyone not seeing the fill.
+.experiment-ext-dndc-tick {
+  appearance: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: $dndc-tick-size;
+  height: $dndc-tick-size;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+
+  &::before,
+  > span {
+    position: absolute;
+    width: $dndc-tick-mark;
+    height: $dndc-tick-mark;
+    border-radius: $dndc-tick-corner;
+  }
+
+  &::before { content: ""; background: $exp-border; }
+  > span { background: $exp-surface; transform: scale($dndc-tick-hollow); }
+
+  &[data-shape="triangle"] {
+    &::before,
+    > span {
+      border-radius: 0;
+      clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    }
+
+    > span { transform-origin: 50% $dndc-triangle-centroid; }
+  }
+
+  &:hover::before { background: $exp-link; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: -2px; border-radius: 0.3rem; }
+
+  // Filling the mark is a matter of taking its middle away.
+  &[data-on="true"] {
+    &::before { background: $exp-link; }
+    > span { background: transparent; }
+  }
+
+  @include exp-dark {
+    &::before { background: $exp-border-dark; }
+    > span { background: $exp-surface-dark; }
+    &:hover::before { background: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+
+    &[data-on="true"] {
+      &::before { background: $exp-link-dark; }
+      > span { background: transparent; }
+    }
+  }
+}

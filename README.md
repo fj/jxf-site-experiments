@@ -79,6 +79,14 @@ same widgets, so they live here rather than being reimplemented per experiment:
   out: a name too long for a ustar header, an entry with no file behind it, a
   name that would shadow an earlier one, and an engine that can't gzip each
   stop the archive with a sentence saying so.
+- `yaml.js` (`window.ExpYaml`) — the block subset of YAML, written and read,
+  for an experiment that wants to hand the reader everything they typed and
+  take it back afterwards. JSON would do that in two builtin calls, but nobody
+  edits JSON by hand. Mappings, sequences, the three kinds of scalar, comments;
+  anchors, tags, block scalars, flow collections, tabs and duplicate keys are
+  refused by line number rather than half-supported. Everything it writes it
+  reads back as what it was written from, and what it writes is what PyYAML
+  reads too.
 
 ## Experiments
 

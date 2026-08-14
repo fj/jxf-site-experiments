@@ -40,4 +40,5 @@ scripts:
   - card.js
   - inventory.js
   - features.js
+  - spells.js
   - app.js

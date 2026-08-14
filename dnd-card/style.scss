@@ -41,6 +41,12 @@ $dndc-prof-diamond: 1.35rem;
 // and big enough to be a comfortable touch target.
 $dndc-row-button: 2.2rem;
 
+// A feature row's count box holds two digits and no more; its text fields take
+// what's left, wrapping to their own line before they get narrower than this.
+$dndc-feature-count: 5rem;
+$dndc-feature-field: 11rem;
+$dndc-feature-picker: 12rem;
+
 .experiment-ext-dndc {
   // The card is landscape, so it takes the full width and the controls go
   // underneath rather than alongside.
@@ -697,12 +703,6 @@ $dndc-item-quantity-width: 4.5em;
     border-color: $exp-border-dark;
     background: $exp-surface-dark;
   }
-
-  // A handle and a remove button take their width off the fields between them,
-  // which on a phone is all the width there is: stack the pairs instead.
-  @include exp-mobile {
-    .experiment-ext-ui-grid2 { grid-template-columns: minmax(0, 1fr); }
-  }
 }
 
 // Where a dragged row would land. Both a color and an offset outline, so the
@@ -718,11 +718,22 @@ $dndc-item-quantity-width: 4.5em;
   }
 }
 
+// A row's fields in the order the card prints them: how many boxes, then what
+// they count. The count is fixed and narrow — it holds two digits — and the
+// text takes everything else.
 .experiment-ext-dndc-feature-fields {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: end;
   gap: 0.6rem;
   min-width: 0;
+
+  > * { flex: 1 1 $dndc-feature-field; min-width: 0; }
+  > :first-child { flex: 0 0 $dndc-feature-count; }
+
+  // A spellcasting row has one picker where a general row has two text fields,
+  // and a picker holding "1st" has no use for the width of both.
+  select { max-width: $dndc-feature-picker; }
 }
 
 // The handle and the remove button share a footprint, so every row's fields

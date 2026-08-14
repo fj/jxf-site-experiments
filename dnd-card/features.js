@@ -12,12 +12,16 @@
  * would mean either a row nobody can read or a second card, and a second card
  * is what the tab strip is for.
  *
- * A row comes in two shapes. A general row is a name, its description, and a
- * run of empty boxes to tick off as the uses go. A spellcasting row is that
- * same run of boxes for one spell level's slots, which is the same gesture
- * during play and so is drawn the same way. The boxes print empty on purpose:
- * a card that printed today's remaining uses would be wrong by the first short
- * rest, and these are somewhere to put a pencil mark instead.
+ * A row comes in two shapes. A general row is a run of empty boxes to tick off
+ * as the uses go, then a name and what it does. A spellcasting row is that same
+ * run of boxes for one spell level's slots, which is the same gesture during
+ * play and so is drawn the same way. The boxes print empty on purpose: a card
+ * that printed today's remaining uses would be wrong by the first short rest,
+ * and these are somewhere to put a pencil mark instead.
+ *
+ * The boxes come first because they are what a hand reaches for mid-turn, and
+ * they keep a column as wide as the row that wants the most of them, so the
+ * names beside them line up as a column rather than a ragged edge.
  *
  * Every length below is a design px on the 300 dpi card and is scaled by the
  * frame's `u()`, so the same layout renders at any output resolution.
@@ -46,7 +50,6 @@
   var NAME_MIN_SIZE = 24;
   var DESCRIPTION_SIZE = 26;
   var DESCRIPTION_MIN_SIZE = 16;
-  var LINE_GAP = 10;
   var LEVEL_SIZE = 34;
   var LABEL_GAP = 18;
 
@@ -54,9 +57,7 @@
   // at a glance.
   var TALLY_RADIUS = 16;
   var TALLY_SPACING = 46;
-  var TALLY_GAP = 26;      // between the text column and the first box
-
-  var ELLIPSIS = "…";
+  var TALLY_GAP = 26;      // between the last box and the text column
 
   // ---- The page ---------------------------------------------------------------
   // The two shapes a row comes in, in the order the "add a row" buttons offer
@@ -108,24 +109,33 @@
   function render(frame, page) {
     var top = frame.top + D.sheet.sectionHeader(frame, TITLE, frame.top);
     var height = frame.bottom - top;
+    var column = tallyColumn(frame, page);
     D.sheet.rows(frame,
       { x: frame.left, y: top, width: frame.width, height: height },
       { count: MAX_ROWS, rowHeight: height / MAX_ROWS },
       function (rect, index) {
-        if (page.rows[index]) drawRow(frame, page.rows[index], rect);
+        if (page.rows[index]) drawRow(frame, page.rows[index], rect, column);
       });
   }
 
-  function drawRow(frame, row, rect) {
-    var inset = frame.u(ROW_INSET);
-    var count = tallyOf(row);
-    var middle = rect.y + rect.height / 2;
-    var width = tallyWidth(frame, count);
-    var room = rect.width - 2 * inset - (count ? width + frame.u(TALLY_GAP) : 0);
+  // The room the boxes take on every row, which is the room the row wanting
+  // the most of them takes. A page with no boxes anywhere gives it all back to
+  // the names.
+  function tallyColumn(frame, page) {
+    var most = page.rows.reduce(function (widest, row) {
+      return Math.max(widest, tallyOf(row));
+    }, 0);
+    return most ? tallyWidth(frame, most) + frame.u(TALLY_GAP) : 0;
+  }
 
-    drawTally(frame, count, rect.x + rect.width - inset, middle);
-    if (row.type === SPELLCASTING) drawSpellcasting(frame, row, rect.x + inset, middle);
-    else drawGeneral(frame, row, rect.x + inset, middle, room);
+  function drawRow(frame, row, rect, column) {
+    var inset = frame.u(ROW_INSET);
+    var middle = rect.y + rect.height / 2;
+    var left = rect.x + inset;
+
+    drawTally(frame, tallyOf(row), left, middle);
+    if (row.type === SPELLCASTING) drawSpellcasting(frame, row, left + column, middle);
+    else drawGeneral(frame, row, left + column, rect.x + rect.width - inset, middle);
   }
 
   // What the card can be sure of is how many boxes there are, never how many
@@ -140,18 +150,22 @@
     return count > 0 ? 2 * frame.u(TALLY_RADIUS) + (count - 1) * frame.u(TALLY_SPACING) : 0;
   }
 
-  function drawTally(frame, count, right, centerY) {
+  function drawTally(frame, count, left, centerY) {
     var radius = frame.u(TALLY_RADIUS);
     for (var i = 0; i < count; i++) {
-      D.sheet.tickBox(frame, right - radius - i * frame.u(TALLY_SPACING), centerY, radius, false);
+      D.sheet.tickBox(frame, left + radius + i * frame.u(TALLY_SPACING), centerY, radius, false);
     }
   }
 
-  function drawGeneral(frame, row, left, middle, room) {
-    var lines = [];
-    if (row.name) lines.push(fitLine(frame.ctx, row.name, nameRun(frame), room));
-    if (row.description) lines.push(fitLine(frame.ctx, row.description, descriptionRun(frame), room));
-    stack(frame, lines, left, middle);
+  function drawGeneral(frame, row, left, right, middle) {
+    D.sheet.namedLine(frame, {
+      name: row.name,
+      description: row.description,
+      left: left, right: right, middle: middle,
+      nameSize: frame.u(NAME_SIZE), nameMinSize: frame.u(NAME_MIN_SIZE),
+      descriptionSize: frame.u(DESCRIPTION_SIZE),
+      descriptionMinSize: frame.u(DESCRIPTION_MIN_SIZE)
+    });
   }
 
   function drawSpellcasting(frame, row, left, middle) {
@@ -164,47 +178,6 @@
         family: frame.display, weight: 700, size: frame.u(LEVEL_SIZE),
         color: frame.tone.ink, align: "left"
       });
-  }
-
-  function nameRun(frame) {
-    return {
-      family: frame.body, weight: 700, size: frame.u(NAME_SIZE),
-      color: frame.tone.ink, minSize: frame.u(NAME_MIN_SIZE)
-    };
-  }
-
-  function descriptionRun(frame) {
-    return {
-      family: frame.body, weight: 400, size: frame.u(DESCRIPTION_SIZE),
-      color: frame.tone.muted, minSize: frame.u(DESCRIPTION_MIN_SIZE)
-    };
-  }
-
-  // A line shrinks toward its own floor first and only loses its tail once the
-  // floor isn't enough, so nothing can run under the tally boxes. The
-  // description's floor is the lower of the two, which is what makes it the
-  // first of the pair to give on a row that overruns.
-  function fitLine(ctx, text, run, room) {
-    run.size = D.draw.fitSize(ctx, text, run, room);
-    if (D.draw.measure(ctx, text, run) <= room) return { text: text, run: run };
-    var kept = text;
-    while (kept && D.draw.measure(ctx, kept + ELLIPSIS, run) > room) kept = kept.slice(0, -1);
-    return { text: kept ? kept + ELLIPSIS : "", run: run };
-  }
-
-  // The row's lines, centered on it as one block: a feature with no description
-  // sits on the middle of its row rather than high in it.
-  function stack(frame, lines, left, middle) {
-    var cap = D.sheet.RATIO.capHeight;
-    var gap = frame.u(LINE_GAP);
-    var height = lines.reduce(function (sum, line) { return sum + line.run.size * cap; }, 0) +
-      gap * Math.max(0, lines.length - 1);
-    var baseline = middle - height / 2;
-    lines.forEach(function (line) {
-      baseline += line.run.size * cap;
-      D.draw.text(frame.ctx, line.text, left, baseline, line.run);
-      baseline += gap;
-    });
   }
 
   // ---- Controls -----------------------------------------------------------------
@@ -258,18 +231,22 @@
     return options;
   }
 
+  // The count comes first, where the boxes it prints are: a row's controls read
+  // left to right the way the row does. It is typed rather than dragged because
+  // it is a small whole number somebody already knows — a slider is for finding
+  // a value, and this one is looked up.
+  function countHtml(index, field, caption, range) {
+    return U.number(ctlName(index, field), caption, { min: range[0], max: range[1] });
+  }
+
   function fieldsHtml(row, index) {
     if (row.type === SPELLCASTING) {
-      return U.grid2(
-        U.select(ctlName(index, "level"), "Spell level", levelOptions()),
-        U.range(ctlName(index, "slots"), "Slots",
-          D.RANGES.featureSlots[0], D.RANGES.featureSlots[1]));
+      return countHtml(index, "slots", "Slots", D.RANGES.featureSlots) +
+        U.select(ctlName(index, "level"), "Spell level", levelOptions());
     }
-    return U.grid2(
-      U.text(ctlName(index, "name"), "Feature"),
-      U.text(ctlName(index, "description"), "Description")) +
-      U.range(ctlName(index, "uses"), "Uses",
-        D.RANGES.featureUses[0], D.RANGES.featureUses[1]);
+    return countHtml(index, "uses", "Uses", D.RANGES.featureUses) +
+      U.text(ctlName(index, "name"), "Feature") +
+      U.text(ctlName(index, "description"), "Description");
   }
 
   function rowHtml(page, row, index) {
@@ -300,17 +277,13 @@
     return U.group("Features",
       '<p class="experiment-ext-dndc-note" id="' + HINT_ID + '">Drag a handle to reorder a row, ' +
       "or press the up and down arrow keys while it has focus. Up to " + MAX_ROWS +
-      " rows fit on a card; the boxes print empty, to tick off during play.</p>" +
+      " rows fit on a card. The card prints that many boxes down the left of the row, empty, " +
+      "to tick off during play.</p>" +
       '<div class="experiment-ext-dndc-features" data-features>' +
       page.rows.map(function (row, index) { return rowHtml(page, row, index); }).join("") +
       "</div>" +
       addHtml(page),
       { key: "features" });
-  }
-
-  function count(dom, index, field, value) {
-    dom.ctl(ctlName(index, field)).value = String(value);
-    dom.val(ctlName(index, field), String(value));
   }
 
   // The two buttons carry the row's name, which the reader is free to change
@@ -323,12 +296,12 @@
   function sync(page, dom) {
     page.rows.forEach(function (row, index) {
       if (row.type === SPELLCASTING) {
+        dom.ctl(ctlName(index, "slots")).value = String(row.slots);
         dom.ctl(ctlName(index, "level")).value = String(row.level);
-        count(dom, index, "slots", row.slots);
       } else {
+        dom.ctl(ctlName(index, "uses")).value = String(row.uses);
         dom.ctl(ctlName(index, "name")).value = row.name;
         dom.ctl(ctlName(index, "description")).value = row.description;
-        count(dom, index, "uses", row.uses);
       }
       retitle(page, dom, index);
     });
@@ -351,13 +324,11 @@
 
     var range = rangeFor(field);
     if (!range) return false;
-    var value = Math.round(+target.value);
-    if (isFinite(value)) {
-      row[field] = D.clampR(value, range);
-      count(ctx.dom, index, field, row[field]);
+    U.readNumber(target, event, { range: range }, function (value) {
+      row[field] = value;
       retitle(page, ctx.dom, index);
       ctx.render();
-    }
+    });
     return true;
   }
 

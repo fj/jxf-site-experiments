@@ -96,12 +96,12 @@
     pan: [-100, 100],
     deathSaves: [0, 3],
 
-    // A feature row holds six tally boxes beside a name and its description:
-    // past that the boxes are what the row is and there is nowhere left to say
-    // what they count. The third is the spell levels one of those rows counts
-    // slots for.
-    featureUses: [0, 6],
-    featureSlots: [0, 6],
+    // A feature row holds ten tally boxes to the left of a name and its
+    // description: past that the boxes are what the row is and there is
+    // nowhere left to say what they count. The third is the spell levels one
+    // of those rows counts slots for.
+    featureUses: [0, 10],
+    featureSlots: [0, 10],
     featureSlotLevel: [1, 9],
 
     // A spell's own level, which is not the caster's. Zero is a cantrip —

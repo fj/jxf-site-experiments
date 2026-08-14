@@ -30,10 +30,27 @@
     return (n < 0 ? "−" : "+") + Math.abs(n);
   }
 
+  // "1st", "2nd", "3rd", "4th" — and the teens, which the last digit alone
+  // gets wrong. A spell level is written this way wherever it is written out.
+  var ORDINAL_SUFFIXES = ["th", "st", "nd", "rd"];
+  var LAST_DIGIT = 10;
+  var LAST_TWO_DIGITS = 100;
+  var TEENS = [11, 13];
+
+  function ordinal(n) {
+    var last = n % LAST_DIGIT;
+    var pair = n % LAST_TWO_DIGITS;
+    var irregular = pair >= TEENS[0] && pair <= TEENS[1];
+    return n + (irregular || last >= ORDINAL_SUFFIXES.length
+      ? ORDINAL_SUFFIXES[0]
+      : ORDINAL_SUFFIXES[last]);
+  }
+
   D.rules = {
     modifier: modifier,
     proficiencyBonus: proficiencyBonus,
     signed: signed,
+    ordinal: ordinal,
 
     savingThrow: function (score, proficient, level) {
       return modifier(score) + (proficient ? proficiencyBonus(level) : 0);

@@ -159,7 +159,7 @@
     var label = frame.labelRun(frame.tone.accent);
     label.align = "left";
     var width = D.draw.text(frame.ctx, SPELLCASTING_LABEL, left, middle + label.size * lift, label);
-    D.draw.text(frame.ctx, ordinal(row.level), left + width + frame.u(LABEL_GAP),
+    D.draw.text(frame.ctx, D.rules.ordinal(row.level), left + width + frame.u(LABEL_GAP),
       middle + frame.u(LEVEL_SIZE) * lift, {
         family: frame.display, weight: 700, size: frame.u(LEVEL_SIZE),
         color: frame.tone.ink, align: "left"
@@ -207,20 +207,6 @@
     });
   }
 
-  // "1st", "2nd", "3rd", "4th" — and the teens, which the last digit alone
-  // gets wrong.
-  var ORDINAL_SUFFIXES = ["th", "st", "nd", "rd"];
-  var LAST_DIGIT = 10;
-  var LAST_TWO_DIGITS = 100;
-  var TEENS = [11, 13];
-
-  function ordinal(n) {
-    var last = n % LAST_DIGIT;
-    var pair = n % LAST_TWO_DIGITS;
-    var irregular = pair >= TEENS[0] && pair <= TEENS[1];
-    return n + (irregular || last >= ORDINAL_SUFFIXES.length ? ORDINAL_SUFFIXES[0] : ORDINAL_SUFFIXES[last]);
-  }
-
   // ---- Controls -----------------------------------------------------------------
   // One block per row: the handle that moves it, its own fields, and the button
   // that takes it off the card. Adding or removing a row changes which controls
@@ -248,7 +234,7 @@
   }
 
   function titleOf(row) {
-    if (row.type === SPELLCASTING) return ordinal(row.level) + "-level spell slots";
+    if (row.type === SPELLCASTING) return D.rules.ordinal(row.level) + "-level spell slots";
     return row.name.trim() || UNTITLED;
   }
 
@@ -267,7 +253,7 @@
     var range = D.RANGES.featureSlotLevel;
     var options = [];
     for (var level = range[0]; level <= range[1]; level++) {
-      options.push({ value: String(level), label: ordinal(level) });
+      options.push({ value: String(level), label: D.rules.ordinal(level) });
     }
     return options;
   }

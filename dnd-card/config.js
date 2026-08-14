@@ -102,7 +102,11 @@
     // slots for.
     featureUses: [0, 6],
     featureSlots: [0, 6],
-    featureSlotLevel: [1, 9]
+    featureSlotLevel: [1, 9],
+
+    // A spell's own level, which is not the caster's. Zero is a cantrip —
+    // a level in the arithmetic, a word on the card.
+    spellLevel: [0, 9]
   };
 
   D.clamp = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };

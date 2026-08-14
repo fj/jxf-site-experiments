@@ -826,16 +826,18 @@ $dndc-item-quantity-width: 4.5em;
 }
 
 // ---------------------------------------------------------------------------
-// Spells: ten rows of a school, a name, and a line about what it does
+// Spells: ten rows of a school, a level, a name, and a line about what it does
 // ---------------------------------------------------------------------------
 // Wide enough for "Transmutation" and the mark beside it in this grid's
 // smaller type. Fixed, so the ten pickers line up with each other.
 $dndc-spell-school-width: 11rem;
+// The level's own picker, wide enough for "Cantrip" and its arrow.
+$dndc-spell-level-width: 6.5rem;
 // The description is the longer of a row's two lines on the card, so it is the
 // wider of the two boxes here.
 $dndc-spell-description-share: 1.6fr;
 
-// Ten rows three controls wide take the panel's whole width, as the skill list
+// Ten rows four controls wide take the panel's whole width, as the skill list
 // does.
 .experiment-ext-dndc .experiment-ext-ui-group[data-group="spells"] { grid-column: 1 / -1; }
 
@@ -844,7 +846,8 @@ $dndc-spell-description-share: 1.6fr;
 .experiment-ext-dndc-spells {
   display: grid;
   grid-template-columns:
-    $dndc-spell-school-width minmax(0, 1fr) minmax(0, $dndc-spell-description-share);
+    $dndc-spell-school-width $dndc-spell-level-width
+    minmax(0, 1fr) minmax(0, $dndc-spell-description-share);
   align-items: center;
   column-gap: 0.5rem;
   row-gap: 0.4rem;
@@ -854,18 +857,19 @@ $dndc-spell-description-share: 1.6fr;
   // Not the shorthand: the select keeps the room its arrow sits in.
   select { padding-top: 0.3rem; padding-bottom: 0.3rem; }
 
-  // Three boxes abreast on a phone is three boxes too narrow to read what's in
-  // them. The picker and the name share a line and the description takes the
-  // next, so a row is two lines — and the air belongs between rows rather than
-  // inside one.
+  // Four boxes abreast on a phone is four boxes too narrow to read what's in
+  // them. The two pickers share a line, then the name, then the description, so
+  // a row is three lines — and the air belongs between rows rather than inside
+  // one.
   @include exp-mobile {
     grid-template-columns: $dndc-spell-school-width minmax(0, 1fr);
     row-gap: 0.3rem;
 
+    .experiment-ext-dndc-spell-name,
     .experiment-ext-dndc-spell-description { grid-column: 1 / -1; }
     .experiment-ext-dndc-spell + .experiment-ext-dndc-spell {
       > .experiment-ext-dndc-spell-school,
-      > .experiment-ext-dndc-spell-name { margin-top: 0.55rem; }
+      > .experiment-ext-dndc-spell-level { margin-top: 0.55rem; }
     }
   }
 }

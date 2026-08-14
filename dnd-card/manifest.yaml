@@ -34,5 +34,7 @@ scripts:
   - dice.js
   - draw.js
   - portrait.js
+  - sheet.js
+  - pages.js
   - card.js
   - app.js

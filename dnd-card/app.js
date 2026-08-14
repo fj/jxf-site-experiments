@@ -16,8 +16,8 @@
  * the manifest.
  *
  * This file owns the shared state, the DOM, and the wiring. The widgets come
- * from the shared control kit (ExpUI, ExpFonts, ExpPng); the card-specific
- * work lives in the modules the manifest loads before it:
+ * from the shared control kit (ExpUI, ExpFonts); the card-specific work lives
+ * in the modules the manifest loads before it:
  *   config.js   — sizing, fonts, themes, ranges     (DndCard.CARD_MM, …)
  *   data.js     — the 2024 PHB tables               (DndCard.SKILLS, …)
  *   rules.js    — modifiers, proficiency, totals    (DndCard.rules)
@@ -28,6 +28,7 @@
  *   sheet.js    — the frame every page draws in     (DndCard.sheet)
  *   pages.js    — the kinds, and a set of them      (DndCard.pages)
  *   card.js, …  — one module per kind of page
+ *   downloads.js — the set of pages as files        (DndCard.downloads)
  *
  * State holds only what the player typed: the shared half here, the per-page
  * half on the page objects themselves. Everything derived — modifiers, saving
@@ -47,13 +48,6 @@
   // The faces the card sets type in, in the order the panel offers them. Each
   // is a state field of the same name holding a key from D.FONTS.
   var FONT_CONTROLS = ["nameFont", "displayFont", "bodyFont"];
-
-  // Progress the download reports. Encoding is a single opaque call, so these
-  // are the boundaries between steps rather than a continuous measure.
-  var STEP_RENDER = 0.15;
-  var STEP_ENCODE = 0.55;
-  var STEP_STAMP = 0.85;
-  var STEP_DONE = 1;
 
   // The panel's own furniture: the block above the tabs, the tabs, and the
   // panel the active card's controls are built into.
@@ -208,44 +202,84 @@
   }
 
   // ---- Download --------------------------------------------------------------------
-  function fileSlug() {
-    return String(state.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "player";
+  // What the set can be downloaded as: the card on screen, every card as its
+  // own file, or every card on one. Each hangs off one control and runs one of
+  // D.downloads' jobs; `told` reads that job's summary back in the terms the
+  // job worked in.
+  var PRIMARY = "download";   // the figure's own button; the rest sit beside it
+
+  var ACTIONS = [
+    { name: PRIMARY, job: D.downloads.page, told: pixels },
+    {
+      name: "downloadAll", label: "Download all", job: D.downloads.set,
+      told: function (summary) { return cardCount(summary.cards) + " · " + pixels(summary) + " each"; }
+    },
+    {
+      name: "downloadSheet", label: "Download all as one", job: D.downloads.sheet,
+      told: function (summary) { return cardCount(summary.cards) + " on one " + pixels(summary) + " sheet"; }
+    }
+  ];
+
+  var ACTION_NAMES = ACTIONS.map(function (action) { return action.name; });
+
+  function pixels(summary) { return summary.width + " × " + summary.height + " px"; }
+
+  function cardCount(count) { return count + (count === 1 ? " card" : " cards"); }
+
+  // The primary download names the card it will save, so its caption follows
+  // the tab strip. The kit remembers a button's resting caption the first time
+  // that button goes busy, so this is written back after a run as well.
+  function syncDownloadLabel() {
+    dom.ctl(PRIMARY).querySelector("span").textContent = "Download " + activeLabel();
   }
 
-  function download() {
+  function requestFor(name) {
+    return {
+      // The set as it stood when the button was pressed: a card added while an
+      // archive is being built is not one of the cards in it, and neither is a
+      // row typed into one after it. A page is plain data by contract, so
+      // copying it copies everything the renderer will read off it — an array
+      // of the same page objects would let an edit land in a card already
+      // reported as saved.
+      pages: JSON.parse(JSON.stringify(state.pages)),
+      active: state.active,
+      identity: buildIdentity(),
+      look: buildLook(),
+      dpi: state.dpi,
+      report: function (label, fraction) {
+        dom.busy(name, label);
+        dom.progress(fraction);
+      }
+    };
+  }
+
+  function download(action) {
     // Ask before doing the work: where the answer is knowable, there's no
-    // point rendering and encoding a card the browser won't be allowed to save.
-    var blocked = window.ExpPng.saveBlocker();
+    // point rendering and encoding cards the browser won't be allowed to save.
+    var blocked = action.job.blocker();
     if (blocked) {
       dom.status(blocked, "error");
       return;
     }
 
-    var size = outputSize();
     var startedAt = performance.now();
-    dom.busy("download", "Rendering…");
     dom.status("");
-    dom.progress(STEP_RENDER);
-    render();
+    dom.disable(ACTION_NAMES, true);
 
-    dom.busy("download", "Encoding PNG…");
-    dom.progress(STEP_ENCODE);
-    window.ExpPng.encode(canvas).then(function (blob) {
-      dom.busy("download", "Tagging " + state.dpi + " dpi…");
-      dom.progress(STEP_STAMP);
-      return window.ExpPng.withDensity(blob, state.dpi);
-    }).then(function (blob) {
-      dom.progress(STEP_DONE);
-      window.ExpPng.save(blob, fileSlug() + "-card-" + size.width + "x" + size.height + ".png");
+    action.job.run(requestFor(action.name)).then(function (summary) {
       // "Sent", not "saved": the browser takes it from here and tells no one
-      // what it did with it. Naming where to look is the honest version.
-      dom.status("Sent to your downloads · " + size.width + " × " + size.height +
-        " px tagged " + state.dpi + " dpi · " + Math.round(performance.now() - startedAt) + " ms");
+      // what it did with it. Naming where to look is the honest version, and
+      // reading the summary rather than the controls — still editable while a
+      // file is being written — is what makes the rest of the sentence honest.
+      dom.status("Sent to your downloads · " + action.told(summary) + " tagged " +
+        summary.dpi + " dpi · " + Math.round(performance.now() - startedAt) + " ms");
     }).catch(function (err) {
       dom.status(String(err && err.message || err), "error");
     }).then(function () {
-      dom.ready("download");
+      dom.ready(action.name);
+      dom.disable(ACTION_NAMES, false);
       dom.progress(null);
+      syncDownloadLabel();
     });
   }
 
@@ -528,6 +562,7 @@
   function renderTabs() {
     dom.el('[data-out="tabs"]').innerHTML = tabsHtml();
     pageRegion().setAttribute("aria-labelledby", tabId(state.active));
+    syncDownloadLabel();
   }
 
   // A page's controls are built fresh every time one is shown, and again
@@ -548,7 +583,14 @@
     // wants the page's full width, which leaves no column to put them beside.
     mount.innerHTML = '<div class="' + U.PREFIX + 'layout">' +
 
-      U.figure({ ariaLabel: "Live preview of the player card", button: "Download PNG" }) +
+      U.figure({
+        ariaLabel: "Live preview of the player card",
+        // The primary button is captioned for the card it will save, which is
+        // whichever one the tab strip is on; the others are the same whatever
+        // is showing.
+        button: "Download " + activeLabel(),
+        actions: ACTIONS.filter(function (action) { return action.name !== PRIMARY; })
+      }) +
 
       '<div class="' + U.PREFIX + 'panel">' +
       everyCardHtml() +
@@ -571,7 +613,9 @@
 
     U.bind(root, onControl);
     root.addEventListener("click", onClick);
-    dom.ctl("download").addEventListener("click", download);
+    ACTIONS.forEach(function (action) {
+      dom.ctl(action.name).addEventListener("click", function () { download(action); });
+    });
     dom.ctl("portraitClear").addEventListener("click", clearPortrait);
     U.dropTarget(dom.el("[data-preview]"), "image/", loadFile);
 

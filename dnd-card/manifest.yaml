@@ -28,6 +28,7 @@ scripts:
   - ../shared/ui.js
   - ../shared/fonts.js
   - ../shared/png.js
+  - ../shared/archive.js
   - config.js
   - data.js
   - rules.js
@@ -41,4 +42,5 @@ scripts:
   - inventory.js
   - features.js
   - spells.js
+  - downloads.js
   - app.js

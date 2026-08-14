@@ -39,4 +39,5 @@ scripts:
   - pages.js
   - card.js
   - inventory.js
+  - features.js
   - app.js

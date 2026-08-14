@@ -7,20 +7,33 @@
  * so the download is exactly what's on screen. The card sits above the
  * controls, at the full width of the page, because it is landscape.
  *
- * This file owns the control state, the DOM, and the wiring. The widgets come
- * from the shared control kit (ExpUI, ExpFonts, ExpPng); the card-specific
- * work lives in the modules the manifest loads before it:
+ * A character has a *set* of cards rather than one, so the panel is in three
+ * parts: what every card in the set shares, the strip of cards themselves, and
+ * the controls of whichever one is being edited. Only the third of those knows
+ * anything card-shaped, and it doesn't know it either — it asks the page's kind
+ * for its markup and hands its events back. Nothing in this file names a kind:
+ * a new one is a new module that registers itself with D.pages and a line in
+ * the manifest.
+ *
+ * This file owns the shared state, the DOM, and the wiring. The widgets come
+ * from the shared control kit (ExpUI, ExpFonts); the card-specific work lives
+ * in the modules the manifest loads before it:
  *   config.js   — sizing, fonts, themes, ranges     (DndCard.CARD_MM, …)
  *   data.js     — the 2024 PHB tables               (DndCard.SKILLS, …)
  *   rules.js    — modifiers, proficiency, totals    (DndCard.rules)
  *   dice.js     — the shape of each die             (DndCard.dice)
+ *   schools.js  — the mark of each school of magic  (DndCard.schools)
  *   draw.js     — canvas primitives                 (DndCard.draw)
  *   portrait.js — loading and framing the picture   (DndCard.portrait)
- *   card.js     — the card layout                   (DndCard.card)
+ *   sheet.js    — the frame every page draws in     (DndCard.sheet)
+ *   pages.js    — the kinds, and a set of them      (DndCard.pages)
+ *   card.js, …  — one module per kind of page
+ *   downloads.js — the set of pages as files        (DndCard.downloads)
  *
- * State holds only what the player typed. Everything derived — modifiers,
- * saving throws, skill totals, the pixel dimensions — is computed on the way
- * into a render, so there's no second copy to keep in step.
+ * State holds only what the player typed: the shared half here, the per-page
+ * half on the page objects themselves. Everything derived — modifiers, saving
+ * throws, skill totals, the pixel dimensions — is computed on the way into a
+ * render, so there's no second copy to keep in step.
  */
 (function () {
   "use strict";
@@ -32,28 +45,19 @@
 
   var dom = U.dom(root);
 
-  var ABILITY_CONTROL = "ability:";
-  var SAVE_CONTROL = "save:";
-
   // The faces the card sets type in, in the order the panel offers them. Each
   // is a state field of the same name holding a key from D.FONTS.
   var FONT_CONTROLS = ["nameFont", "displayFont", "bodyFont"];
 
-  // A skill's two markers, in the order they're drawn. The index is how many
-  // times the proficiency bonus counts once that marker is the last one filled.
-  var PROFICIENCY_STEPS = [
-    { step: 1, label: "proficient" },
-    { step: 2, label: "expertise" }
-  ];
-
-  // Progress the download reports. Encoding is a single opaque call, so these
-  // are the boundaries between steps rather than a continuous measure.
-  var STEP_RENDER = 0.15;
-  var STEP_ENCODE = 0.55;
-  var STEP_STAMP = 0.85;
-  var STEP_DONE = 1;
+  // The panel's own furniture: the block above the tabs, the tabs, and the
+  // panel the active card's controls are built into.
+  var EVERY_TITLE_ID = "experiment-ext-dndc-every-title";
+  var PAGE_PANEL_ID = "experiment-ext-dndc-page";
+  var TAB_ID_PREFIX = "experiment-ext-dndc-tab-";
 
   // ---- State (what the controls edit) ----------------------------------------
+  // Everything here belongs to the whole set. What belongs to one card is on
+  // that card, put there by its kind's create().
   var state = {
     name: "Thistle Quickfoot",
     species: "Halfling",
@@ -61,30 +65,6 @@
     subclass: "Thief",
     background: "Charlatan",
     level: 5,
-
-    // The three the card leaves a box for. null is a value in its own right:
-    // it prints the box empty, for a pencil.
-    hitPoints: 32,
-    temporaryHitPoints: null,
-    hitDiceRemaining: 4,
-
-    hitPointsMax: 38,
-    hitDie: 8,
-    // What it takes to hit you comes off what you're wearing, so it's typed.
-    // Initiative isn't here: it's the Dexterity modifier, so the card works it
-    // out like every other number it can.
-    armorClass: 15,
-
-    deathSuccesses: 0,
-    deathFailures: 0,
-    inspiration: true,
-
-    abilities: { str: 10, dex: 17, con: 13, int: 12, wis: 14, cha: 10 },
-    saves: { str: false, dex: true, con: false, int: true, wis: false, cha: false },
-    skills: {
-      acrobatics: 1, deception: 1, insight: 1, perception: 1,
-      "sleight-of-hand": 2, stealth: 2
-    },
 
     theme: "parchment",
     paper: "#f2e6cc",
@@ -101,7 +81,10 @@
     panX: 0,
     panY: 0,
 
-    dpi: D.REF_DPI
+    dpi: D.REF_DPI,
+
+    pages: D.pages.initial(),
+    active: 0
   };
 
   // The decoded picture. Kept out of `state` because it isn't a value the
@@ -113,17 +96,58 @@
 
   var canvas, ctx;
 
-  // ---- Derived model -----------------------------------------------------------
-  function abilityScore(key) { return state.abilities[key]; }
+  // ---- The set ---------------------------------------------------------------
+  function activePage() { return state.pages[state.active]; }
 
-  function abilityByKey(key) {
-    for (var i = 0; i < D.ABILITIES.length; i++) if (D.ABILITIES[i].key === key) return D.ABILITIES[i];
-    return D.ABILITIES[0];
+  function controlsOf(page) { return D.pages.definition(page.kind).controls || {}; }
+
+  function activeLabel() { return D.pages.labelFor(state.pages, state.active); }
+
+  function pageRegion() { return dom.el("#" + PAGE_PANEL_ID); }
+
+  // What a page's control hooks are given: how to ask for a repaint, how to ask
+  // for their own markup back, a DOM handle, and the character their numbers
+  // come off. Built per call, so `identity` is never stale. The handle is
+  // scoped to the page's own markup: every control in the mount is named in one
+  // flat data-ctl namespace, and a card has no business reading — or
+  // overwriting — the block above the tabs.
+  function pageContext() {
+    return {
+      render: sched,
+      rebuild: rebuildPage,
+      dom: U.dom(pageRegion()),
+      identity: buildIdentity()
+    };
   }
 
-  function skillProficiency(key) { return state.skills[key] || 0; }
+  // …and for the same reason a page's hooks are offered only the events its own
+  // controls raised.
+  function inPage(target) {
+    var region = pageRegion();
+    return !!(target && region && region.contains(target));
+  }
 
-  function buildModel() {
+  function showPage(index) {
+    var count = state.pages.length;
+    state.active = ((index % count) + count) % count;
+    renderTabs();
+    rebuildPage();
+    sched();
+  }
+
+  function addPage(kind) {
+    state.pages.push(D.pages.create(kind));
+    showPage(state.pages.length - 1);
+  }
+
+  function removePage(index) {
+    if (!D.pages.removable(state.pages[index].kind)) return;
+    state.pages.splice(index, 1);
+    showPage(Math.min(index, state.pages.length - 1));
+  }
+
+  // ---- Derived model -----------------------------------------------------------
+  function buildIdentity() {
     return {
       name: state.name,
       species: state.species,
@@ -131,40 +155,7 @@
       subclass: state.subclass,
       background: state.background,
       level: state.level,
-      proficiencyBonus: D.rules.proficiencyBonus(state.level),
-
-      hitPoints: state.hitPoints,
-      hitPointsMax: state.hitPointsMax,
-      temporaryHitPoints: state.temporaryHitPoints,
-      hitDiceRemaining: state.hitDiceRemaining,
-      hitDiceTotal: state.level,
-      hitDie: state.hitDie,
-      armorClass: state.armorClass,
-      initiative: D.rules.initiative(abilityScore("dex")),
-
-      deathSuccesses: state.deathSuccesses,
-      deathFailures: state.deathFailures,
-      inspiration: state.inspiration,
-
-      abilities: D.ABILITIES.map(function (ability) {
-        var score = abilityScore(ability.key);
-        return {
-          abbr: ability.abbr,
-          score: score,
-          modifier: D.rules.modifier(score),
-          saveProficient: !!state.saves[ability.key],
-          save: D.rules.savingThrow(score, state.saves[ability.key], state.level)
-        };
-      }),
-
-      skills: D.SKILLS.map(function (skill) {
-        return {
-          label: skill.label,
-          abbr: abilityByKey(skill.ability).abbr,
-          proficiency: skillProficiency(skill.key),
-          modifier: D.rules.skillCheck(abilityScore(skill.ability), skillProficiency(skill.key), state.level)
-        };
-      })
+      proficiencyBonus: D.rules.proficiencyBonus(state.level)
     };
   }
 
@@ -187,7 +178,7 @@
     var size = outputSize();
     if (canvas.width !== size.width) canvas.width = size.width;
     if (canvas.height !== size.height) canvas.height = size.height;
-    D.card.render(ctx, size, buildModel(), buildLook());
+    D.sheet.render(ctx, size, activePage(), buildIdentity(), buildLook(), activeLabel());
     syncCaption();
   }
 
@@ -198,6 +189,7 @@
     var shown = canvas.getBoundingClientRect().width;
     var scale = shown ? shown / size.width : 1;
     dom.caption(
+      activeLabel() + " · " +
       size.width + " × " + size.height + " px · " +
       D.CARD_MM.width + " × " + D.CARD_MM.height + " mm at " + state.dpi + " dpi" +
       (Math.abs(scale - 1) < 0.01 ? "" : " · preview scaled to " + Math.round(scale * 100) + "%"));
@@ -210,44 +202,84 @@
   }
 
   // ---- Download --------------------------------------------------------------------
-  function fileSlug() {
-    return String(state.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "player";
+  // What the set can be downloaded as: the card on screen, every card as its
+  // own file, or every card on one. Each hangs off one control and runs one of
+  // D.downloads' jobs; `told` reads that job's summary back in the terms the
+  // job worked in.
+  var PRIMARY = "download";   // the figure's own button; the rest sit beside it
+
+  var ACTIONS = [
+    { name: PRIMARY, job: D.downloads.page, told: pixels },
+    {
+      name: "downloadAll", label: "Download all", job: D.downloads.set,
+      told: function (summary) { return cardCount(summary.cards) + " · " + pixels(summary) + " each"; }
+    },
+    {
+      name: "downloadSheet", label: "Download all as one", job: D.downloads.sheet,
+      told: function (summary) { return cardCount(summary.cards) + " on one " + pixels(summary) + " sheet"; }
+    }
+  ];
+
+  var ACTION_NAMES = ACTIONS.map(function (action) { return action.name; });
+
+  function pixels(summary) { return summary.width + " × " + summary.height + " px"; }
+
+  function cardCount(count) { return count + (count === 1 ? " card" : " cards"); }
+
+  // The primary download names the card it will save, so its caption follows
+  // the tab strip. The kit remembers a button's resting caption the first time
+  // that button goes busy, so this is written back after a run as well.
+  function syncDownloadLabel() {
+    dom.ctl(PRIMARY).querySelector("span").textContent = "Download " + activeLabel();
   }
 
-  function download() {
+  function requestFor(name) {
+    return {
+      // The set as it stood when the button was pressed: a card added while an
+      // archive is being built is not one of the cards in it, and neither is a
+      // row typed into one after it. A page is plain data by contract, so
+      // copying it copies everything the renderer will read off it — an array
+      // of the same page objects would let an edit land in a card already
+      // reported as saved.
+      pages: JSON.parse(JSON.stringify(state.pages)),
+      active: state.active,
+      identity: buildIdentity(),
+      look: buildLook(),
+      dpi: state.dpi,
+      report: function (label, fraction) {
+        dom.busy(name, label);
+        dom.progress(fraction);
+      }
+    };
+  }
+
+  function download(action) {
     // Ask before doing the work: where the answer is knowable, there's no
-    // point rendering and encoding a card the browser won't be allowed to save.
-    var blocked = window.ExpPng.saveBlocker();
+    // point rendering and encoding cards the browser won't be allowed to save.
+    var blocked = action.job.blocker();
     if (blocked) {
       dom.status(blocked, "error");
       return;
     }
 
-    var size = outputSize();
     var startedAt = performance.now();
-    dom.busy("download", "Rendering…");
     dom.status("");
-    dom.progress(STEP_RENDER);
-    render();
+    dom.disable(ACTION_NAMES, true);
 
-    dom.busy("download", "Encoding PNG…");
-    dom.progress(STEP_ENCODE);
-    window.ExpPng.encode(canvas).then(function (blob) {
-      dom.busy("download", "Tagging " + state.dpi + " dpi…");
-      dom.progress(STEP_STAMP);
-      return window.ExpPng.withDensity(blob, state.dpi);
-    }).then(function (blob) {
-      dom.progress(STEP_DONE);
-      window.ExpPng.save(blob, fileSlug() + "-card-" + size.width + "x" + size.height + ".png");
+    action.job.run(requestFor(action.name)).then(function (summary) {
       // "Sent", not "saved": the browser takes it from here and tells no one
-      // what it did with it. Naming where to look is the honest version.
-      dom.status("Sent to your downloads · " + size.width + " × " + size.height +
-        " px tagged " + state.dpi + " dpi · " + Math.round(performance.now() - startedAt) + " ms");
+      // what it did with it. Naming where to look is the honest version, and
+      // reading the summary rather than the controls — still editable while a
+      // file is being written — is what makes the rest of the sentence honest.
+      dom.status("Sent to your downloads · " + action.told(summary) + " tagged " +
+        summary.dpi + " dpi · " + Math.round(performance.now() - startedAt) + " ms");
     }).catch(function (err) {
       dom.status(String(err && err.message || err), "error");
     }).then(function () {
-      dom.ready("download");
+      dom.ready(action.name);
+      dom.disable(ACTION_NAMES, false);
       dom.progress(null);
+      syncDownloadLabel();
     });
   }
 
@@ -297,53 +329,26 @@
   }
 
   // ---- Controls -------------------------------------------------------------------------
-  // Numbers commit differently from everything else: a half-typed value like
-  // "" or "1" on its way to "18" shouldn't snap to the range's floor, so a
-  // number only takes effect while typing if it's already in range, and is
-  // clamped and written back when the field commits (blur or Enter).
-  //
-  // A `blank` field has one state more: empty, which is not zero. Zero hit
-  // points is a character at nought and dying; an empty box is one nobody has
-  // written in yet, and that's what the card prints.
-  function readNumber(target, event, field, apply) {
-    var raw = target.value.trim();
-    var range = field.range;
-    if (raw === "" && field.blank) { apply(null); return; }
-
-    var parsed = Number(raw);
-    var usable = raw !== "" && isFinite(parsed);
-    if (event.type === "input" && (!usable || parsed < range[0] || parsed > range[1])) return;
-    var value = D.clampR(usable ? Math.round(parsed) : range[0], range);
-    if (event.type === "change") target.value = value;
-    apply(value);
-  }
-
-  // The numbers typed rather than dragged. `blank` marks the ones the card
-  // draws a box for, which is exactly the set a player rubs out mid-session.
-  var NUMBER_FIELDS = {
-    hitPoints: { range: D.RANGES.hitPoints, blank: true },
-    temporaryHitPoints: { range: D.RANGES.hitPoints, blank: true },
-    hitDiceRemaining: { range: D.RANGES.hitDice, blank: true },
-    hitPointsMax: { range: D.RANGES.hitPoints },
-    armorClass: { range: D.RANGES.armorClass }
-  };
-
-  // A character can't have more hit dice than levels, so that field's ceiling
-  // moves with the level slider rather than being fixed in the markup.
-  function fieldFor(name) {
-    var field = NUMBER_FIELDS[name];
-    if (name !== "hitDiceRemaining") return field;
-    return { range: [D.RANGES.hitDice[0], state.level], blank: field.blank };
-  }
-
   // Controls whose value changes the card's palette away from a named theme.
   var THEME_COLORS = ["paper", "ink", "accent"];
 
   // <select> values arrive as strings; these are the ones state holds as
   // numbers, because the card does arithmetic or geometry with them.
-  var NUMERIC_SELECTS = ["dpi", "hitDie"];
+  var NUMERIC_SELECTS = ["dpi"];
 
+  // An edit inside the active card's controls is the card's to make sense of;
+  // anything else is the shared block's. A card's control that its own kind
+  // declines stops here rather than falling through: the region decides whose
+  // an edit is, not the kind's cooperation, or a row named `level` would set
+  // the character's.
   function onControl(name, target, event) {
+    var page = activePage();
+    var controls = controlsOf(page);
+    if (inPage(target)) {
+      if (controls.onControl) controls.onControl(page, name, target, event, pageContext());
+      return;
+    }
+
     if (name === "portraitFile") {
       if (target.files && target.files[0]) loadFile(target.files[0]);
       return;
@@ -352,29 +357,6 @@
       state.portraitUrl = target.value;
       var url = target.value.trim();
       if (event.type === "change" && url !== loadedUrl) loadUrl(url);
-      return;
-    }
-    if (name.indexOf(ABILITY_CONTROL) === 0) {
-      var abilityKey = name.slice(ABILITY_CONTROL.length);
-      readNumber(target, event, { range: D.RANGES.score }, function (value) {
-        state.abilities[abilityKey] = value;
-        syncAbilities();
-        syncSkills();
-        sched();
-      });
-      return;
-    }
-    if (name.indexOf(SAVE_CONTROL) === 0) {
-      state.saves[name.slice(SAVE_CONTROL.length)] = target.checked;
-      syncAbilities();
-      sched();
-      return;
-    }
-    if (NUMBER_FIELDS[name]) {
-      readNumber(target, event, fieldFor(name), function (value) {
-        state[name] = value;
-        sched();
-      });
       return;
     }
 
@@ -386,15 +368,11 @@
       dom.ctl("theme").value = "custom";
     }
     if (name === "className") syncSubclassChoices();
-    if (name === "level") {
-      if (state.hitDiceRemaining != null) {
-        state.hitDiceRemaining = Math.min(state.hitDiceRemaining, state.level);
-        dom.ctl("hitDiceRemaining").value = state.hitDiceRemaining;
-      }
-      syncAbilities();
-      syncSkills();
-    }
     syncReadouts();
+    // What the shared block holds — the level above all — is what half the
+    // numbers on a card are worked out from, so the card's own controls are
+    // re-read whenever it changes.
+    syncPage();
     sched();
   }
 
@@ -409,60 +387,33 @@
     dom.ctl("accent").value = state.accent;
   }
 
-  function onProficiencyClick(event) {
-    var button = event.target.closest ? event.target.closest("[data-prof]") : null;
-    if (!button) return;
-    var key = button.dataset.prof;
-    state.skills[key] = D.rules.toggleProficiency(skillProficiency(key), +button.dataset.step);
-    syncSkills();
-    sched();
+  function hit(event, selector) {
+    return event.target.closest ? event.target.closest(selector) : null;
+  }
+
+  function onClick(event) {
+    var page = activePage();
+    var controls = controlsOf(page);
+    if (inPage(event.target) && controls.onClick &&
+      controls.onClick(page, event, pageContext())) return;
+
+    var tab = hit(event, "[data-page]");
+    if (tab) { showPage(+tab.dataset.page); return; }
+    var step = hit(event, "[data-page-step]");
+    if (step) { showPage(state.active + (+step.dataset.pageStep)); return; }
+    var add = hit(event, "[data-add]");
+    if (add) { addPage(add.dataset.add); return; }
+    if (hit(event, "[data-page-remove]")) removePage(state.active);
   }
 
   // ---- Syncing controls and readouts -------------------------------------------------
   function syncReadouts() {
-    var bonus = D.rules.proficiencyBonus(state.level);
     dom.val("level", String(state.level));
-    dom.val("deathSuccesses", String(state.deathSuccesses));
-    dom.val("deathFailures", String(state.deathFailures));
     dom.val("zoom", state.zoom + "%");
     dom.val("panX", state.panX + "%");
     dom.val("panY", state.panY + "%");
-    dom.el('[data-out="die"]').innerHTML = D.dice.svg(state.hitDie);
     dom.el('[data-out="derived"]').textContent =
-      "Proficiency bonus " + D.rules.signed(bonus) + " · " + state.level + " hit dice";
-  }
-
-  function syncAbilities() {
-    D.ABILITIES.forEach(function (ability) {
-      var score = abilityScore(ability.key);
-      dom.val("mod:" + ability.key, D.rules.signed(D.rules.modifier(score)));
-      dom.val("save:" + ability.key,
-        D.rules.signed(D.rules.savingThrow(score, state.saves[ability.key], state.level)));
-    });
-    // Initiative has no field of its own — it follows Dexterity — so this is
-    // where the card's third badge gets to say where its number came from.
-    dom.el('[data-out="initiative"]').textContent = "Initiative " +
-      D.rules.signed(D.rules.initiative(abilityScore("dex"))) + ", from Dexterity.";
-  }
-
-  // A marker here shows the bonus filling it is worth — the card leaves its own
-  // diamonds empty and prints the number once, but this is where the clicking
-  // happens. Each carries its own on/off state for assistive technology.
-  function syncSkills() {
-    var bonus = D.rules.signed(D.rules.proficiencyBonus(state.level));
-    D.SKILLS.forEach(function (skill) {
-      var proficiency = skillProficiency(skill.key);
-      PROFICIENCY_STEPS.forEach(function (marker) {
-        var button = dom.el('[data-prof="' + skill.key + '"][data-step="' + marker.step + '"]');
-        var applies = proficiency >= marker.step;
-        button.firstChild.textContent = bonus;
-        button.dataset.on = applies ? "true" : "false";
-        button.setAttribute("aria-pressed", applies ? "true" : "false");
-        button.setAttribute("aria-label", skill.label + ": " + marker.label);
-      });
-      dom.val("skill:" + skill.key,
-        D.rules.signed(D.rules.skillCheck(abilityScore(skill.ability), proficiency, state.level)));
-    });
+      "Proficiency bonus " + D.rules.signed(D.rules.proficiencyBonus(state.level));
   }
 
   // The subclasses worth suggesting depend on the class that's been typed.
@@ -472,27 +423,23 @@
 
   var fontPickSync = {};
 
-  function syncControls() {
-    // A blank field is state.<name> === null; writing that straight onto an
-    // input would put the word "null" in it.
+  function syncShared() {
     ["name", "species", "className", "subclass", "background", "portraitUrl",
-      "hitPoints", "hitPointsMax", "temporaryHitPoints", "hitDiceRemaining", "armorClass",
-      "level", "deathSuccesses", "deathFailures", "zoom", "panX", "panY",
+      "level", "zoom", "panX", "panY",
       "theme", "paper", "ink", "accent"].forEach(function (name) {
-        dom.ctl(name).value = state[name] == null ? "" : state[name];
+        dom.ctl(name).value = state[name];
       });
-    dom.ctl("inspiration").checked = state.inspiration;
     dom.ctl("dpi").value = String(state.dpi);
-    dom.ctl("hitDie").value = String(state.hitDie);
-    D.ABILITIES.forEach(function (ability) {
-      dom.ctl(ABILITY_CONTROL + ability.key).value = abilityScore(ability.key);
-      dom.ctl(SAVE_CONTROL + ability.key).checked = !!state.saves[ability.key];
-    });
     FONT_CONTROLS.forEach(function (name) { fontPickSync[name](); });
     syncSubclassChoices();
-    syncAbilities();
-    syncSkills();
     syncReadouts();
+  }
+
+  function syncPage() {
+    var page = activePage();
+    var controls = controlsOf(page);
+    var ctx = pageContext();
+    if (controls.sync) controls.sync(page, ctx.dom, ctx);
   }
 
   function initFontPick(name) {
@@ -502,73 +449,17 @@
   }
 
   // ---- Skeleton ---------------------------------------------------------------------
-  // Three bare numbers in a row don't say which is which; the header does. The
-  // checkbox's column is the one it doesn't name, because what that box does is
-  // worth more words than a column head has room for.
-  function abilitiesHtml() {
-    return '<div class="experiment-ext-dndc-abilities">' +
-      '<div class="experiment-ext-dndc-ability-head" aria-hidden="true">' +
-      "<span></span><span>Score</span><span>Mod</span><span></span><span>Save</span></div>" +
-      D.ABILITIES.map(abilityRowHtml).join("") + "</div>";
-  }
-
-  function abilityRowHtml(ability) {
-    var scoreId = "experiment-ext-dndc-" + ability.key;
-    return '<div class="experiment-ext-dndc-ability">' +
-      '<label class="experiment-ext-dndc-ability-name" for="' + scoreId + '">' + ability.label + "</label>" +
-      '<input type="number" class="' + U.PREFIX + 'input" id="' + scoreId + '" data-ctl="' +
-      ABILITY_CONTROL + ability.key + '" min="' + D.RANGES.score[0] + '" max="' + D.RANGES.score[1] + '">' +
-      '<span class="experiment-ext-dndc-derived" data-val="mod:' + ability.key + '"></span>' +
-      '<label class="' + U.PREFIX + 'check"><input type="checkbox" data-ctl="' + SAVE_CONTROL + ability.key + '"> Proficient</label>' +
-      '<span class="experiment-ext-dndc-derived" data-val="save:' + ability.key + '"></span>' +
-      "</div>";
-  }
-
-  // A field the card prints as a box: the dash stands in for the empty box
-  // you'd get by leaving it alone.
-  function writeIn(range) {
-    return { min: range[0], max: range[1], placeholder: "—" };
-  }
-
-  // The die beside its own name: "d8" is what you call it, the octahedron is
-  // what you pick up. It's chosen, not worked out from the class — multiclass
-  // characters and homebrew both have more than one answer.
-  function hitDieFieldHtml() {
-    var options = D.dice.SIDES.map(function (sides) {
-      return { value: String(sides), label: "d" + sides };
-    });
-    return '<div class="experiment-ext-dndc-die">' + U.select("hitDie", "Hit die", options) +
-      '<span class="experiment-ext-dndc-die-icon" data-out="die"></span></div>';
-  }
-
-  function profMarkerHtml(skill, marker) {
-    return '<button type="button" class="experiment-ext-dndc-prof" data-prof="' + skill.key +
-      '" data-step="' + marker.step + '" title="' + U.esc(skill.label + ": " + marker.label) +
-      '"><span aria-hidden="true"></span></button>';
-  }
-
-  function skillRowHtml(skill) {
-    return '<div class="experiment-ext-dndc-skill">' +
-      PROFICIENCY_STEPS.map(function (marker) { return profMarkerHtml(skill, marker); }).join("") +
-      '<span class="experiment-ext-dndc-skill-name">' + U.esc(skill.label) + "</span>" +
-      '<span class="experiment-ext-dndc-skill-ability">' + abilityByKey(skill.ability).abbr + "</span>" +
-      '<span class="experiment-ext-dndc-derived" data-val="skill:' + skill.key + '"></span>' +
-      "</div>";
-  }
-
-  function buildSkeleton(mount) {
+  // The block above the tabs: everything true of the whole set, whichever card
+  // is on top.
+  function everyCardHtml() {
     var resolutions = D.DPI_CHOICES.map(function (dpi) {
       var size = D.pixelsFor(dpi);
       return { value: String(dpi), label: dpi + " dpi — " + size.width + " × " + size.height + " px" };
     });
 
-    // The card comes first and the controls sit under it: a landscape card
-    // wants the page's full width, which leaves no column to put them beside.
-    mount.innerHTML = '<div class="' + U.PREFIX + 'layout">' +
-
-      U.figure({ ariaLabel: "Live preview of the player card", button: "Download PNG" }) +
-
-      '<div class="' + U.PREFIX + 'panel">' +
+    return '<section class="experiment-ext-dndc-every" aria-labelledby="' + EVERY_TITLE_ID + '">' +
+      '<h3 class="experiment-ext-dndc-region-title" id="' + EVERY_TITLE_ID + '">Every card</h3>' +
+      '<div class="experiment-ext-dndc-region-body">' +
 
       U.group("Character",
         U.text("name", "Character name") +
@@ -584,7 +475,7 @@
 
       U.group("Portrait",
         '<div class="' + U.PREFIX + 'field">' +
-        '<span class="' + U.PREFIX + 'field-label">Picture &mdash; the left third of the card</span>' +
+        '<span class="' + U.PREFIX + 'field-label">Picture &mdash; the left third of the character card</span>' +
         '<input type="file" accept="image/*" class="experiment-ext-dndc-file" data-ctl="portraitFile">' +
         "</div>" +
         U.text("portraitUrl", "&hellip;or the address of one", { placeholder: "https://…", spellcheck: false }) +
@@ -593,44 +484,6 @@
         U.range("panY", "Pan down", D.RANGES.pan[0], D.RANGES.pan[1]) +
         '<button type="button" class="experiment-ext-dndc-clear" data-ctl="portraitClear">Remove picture</button>' +
         '<p class="experiment-ext-dndc-note" data-out="portrait"></p>'
-      ) +
-
-      U.group("Vitals",
-        U.grid2(
-          U.number("hitPoints", "Hit points", writeIn(D.RANGES.hitPoints)),
-          U.number("hitPointsMax", "Maximum", { min: D.RANGES.hitPoints[0], max: D.RANGES.hitPoints[1] })) +
-        U.grid2(
-          U.number("temporaryHitPoints", "Temporary", writeIn(D.RANGES.hitPoints)),
-          U.number("hitDiceRemaining", "Hit dice left", writeIn(D.RANGES.hitDice))) +
-        U.grid2(
-          U.number("armorClass", "Armor class",
-            { min: D.RANGES.armorClass[0], max: D.RANGES.armorClass[1] }),
-          hitDieFieldHtml()) +
-        '<p class="experiment-ext-dndc-note">Hit points, temporary hit points and hit dice ' +
-        "are boxes on the card rather than printed numbers. Leave one empty and it prints " +
-        "empty, ready for a pencil.</p>" +
-        '<p class="experiment-ext-dndc-note" data-out="initiative"></p>'
-      ) +
-
-      U.group("Situational",
-        U.range("deathSuccesses", "Death saves", D.RANGES.deathSaves[0], D.RANGES.deathSaves[1]) +
-        U.range("deathFailures", "Failures", D.RANGES.deathSaves[0], D.RANGES.deathSaves[1]) +
-        U.check("inspiration", "Heroic inspiration")
-      ) +
-
-      U.group("Abilities &amp; saving throws",
-        '<p class="experiment-ext-dndc-note">Checking a box adds your proficiency bonus to that ' +
-        "saving throw — it doesn’t turn the save on, and the card marks it with a filled " +
-        "diamond.</p>" +
-        abilitiesHtml()
-      ) +
-
-      U.group("Skills",
-        '<p class="experiment-ext-dndc-note">Fill the first diamond for proficiency and both for ' +
-        "expertise. Each one adds your proficiency bonus, which the card prints once, in the " +
-        "diamond beside the character’s name.</p>" +
-        '<div class="experiment-ext-dndc-skills">' + D.SKILLS.map(skillRowHtml).join("") + "</div>",
-        { key: "skills" }
       ) +
 
       U.group("Look",
@@ -652,11 +505,97 @@
 
       U.group("Output",
         U.select("dpi", "Print resolution", resolutions) +
-        '<p class="experiment-ext-dndc-note">Always ' + D.CARD_MM.width + " &times; " + D.CARD_MM.height +
-        "&nbsp;mm on paper. The PNG carries its resolution, so print dialogs size it correctly " +
-        "instead of guessing.</p>"
+        '<p class="experiment-ext-dndc-note">Every card is ' + D.CARD_MM.width + " &times; " +
+        D.CARD_MM.height + "&nbsp;mm on paper. The PNG carries its resolution, so print " +
+        "dialogs size it correctly instead of guessing.</p>"
       ) +
 
+      "</div></section>";
+  }
+
+  function tabId(index) { return TAB_ID_PREFIX + index; }
+
+  // One tab per card, and a button for every kind a reader may add. The
+  // steppers are for a set too wide to point at: with one card there is
+  // nowhere for them to go.
+  function tabsHtml() {
+    var tabs = state.pages.map(function (page, i) {
+      return '<button type="button" role="tab" class="experiment-ext-dndc-tab" id="' + tabId(i) +
+        '" data-page="' + i + '" aria-controls="' + PAGE_PANEL_ID +
+        '" aria-selected="' + (i === state.active ? "true" : "false") + '">' +
+        U.esc(D.pages.labelFor(state.pages, i)) + "</button>";
+    }).join("");
+
+    var adders = D.pages.addable().map(function (definition) {
+      return '<button type="button" class="experiment-ext-dndc-add-card" data-add="' +
+        U.esc(definition.kind) + '">+ ' + U.esc(definition.label) + "</button>";
+    }).join("");
+
+    return '<div class="experiment-ext-dndc-tabs">' +
+      stepHtml(-1, "‹", "Previous card") +
+      '<div class="experiment-ext-dndc-tablist" role="tablist" aria-label="Cards">' + tabs + "</div>" +
+      stepHtml(1, "›", "Next card") +
+      "</div>" +
+      (adders ? '<div class="experiment-ext-dndc-add">' +
+        '<span class="experiment-ext-dndc-add-label">Add a card</span>' + adders + "</div>" : "");
+  }
+
+  function stepHtml(delta, glyph, label) {
+    return '<button type="button" class="experiment-ext-dndc-step" data-page-step="' + delta +
+      '" aria-label="' + label + '"' + (state.pages.length < 2 ? " disabled" : "") + ">" +
+      glyph + "</button>";
+  }
+
+  function pageHtml() {
+    var page = activePage();
+    var controls = controlsOf(page);
+    return '<div class="experiment-ext-dndc-region-body">' +
+      (controls.html ? controls.html(page, pageContext()) : "") +
+      (D.pages.removable(page.kind)
+        ? '<div class="experiment-ext-dndc-page-actions">' +
+          '<button type="button" class="experiment-ext-dndc-clear" data-page-remove>Remove this card</button>' +
+          "</div>"
+        : "") +
+      "</div>";
+  }
+
+  function renderTabs() {
+    dom.el('[data-out="tabs"]').innerHTML = tabsHtml();
+    pageRegion().setAttribute("aria-labelledby", tabId(state.active));
+    syncDownloadLabel();
+  }
+
+  // A page's controls are built fresh every time one is shown, and again
+  // whenever a kind asks for its own markup back, so a kind that binds anything
+  // beyond an edit or a click — a drag, a key — is handed its region to bind it
+  // to each time.
+  function rebuildPage() {
+    var region = pageRegion();
+    var page = activePage();
+    var controls = controlsOf(page);
+    region.innerHTML = pageHtml();
+    syncPage();
+    if (controls.mounted) controls.mounted(page, region, pageContext());
+  }
+
+  function buildSkeleton(mount) {
+    // The card comes first and the controls sit under it: a landscape card
+    // wants the page's full width, which leaves no column to put them beside.
+    mount.innerHTML = '<div class="' + U.PREFIX + 'layout">' +
+
+      U.figure({
+        ariaLabel: "Live preview of the player card",
+        // The primary button is captioned for the card it will save, which is
+        // whichever one the tab strip is on; the others are the same whatever
+        // is showing.
+        button: "Download " + activeLabel(),
+        actions: ACTIONS.filter(function (action) { return action.name !== PRIMARY; })
+      }) +
+
+      '<div class="' + U.PREFIX + 'panel">' +
+      everyCardHtml() +
+      '<div class="experiment-ext-dndc-cards" data-out="tabs"></div>' +
+      '<div class="experiment-ext-dndc-page" id="' + PAGE_PANEL_ID + '" role="tabpanel"></div>' +
       "</div></div>";
   }
 
@@ -668,11 +607,15 @@
     canvas = dom.canvas();
     ctx = canvas.getContext("2d");
     FONT_CONTROLS.forEach(function (name) { initFontPick(name); });
-    syncControls();
+    syncShared();
+    renderTabs();
+    rebuildPage();
 
     U.bind(root, onControl);
-    root.addEventListener("click", onProficiencyClick);
-    dom.ctl("download").addEventListener("click", download);
+    root.addEventListener("click", onClick);
+    ACTIONS.forEach(function (action) {
+      dom.ctl(action.name).addEventListener("click", function () { download(action); });
+    });
     dom.ctl("portraitClear").addEventListener("click", clearPortrait);
     U.dropTarget(dom.el("[data-preview]"), "image/", loadFile);
 

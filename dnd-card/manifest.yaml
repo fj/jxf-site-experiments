@@ -28,11 +28,19 @@ scripts:
   - ../shared/ui.js
   - ../shared/fonts.js
   - ../shared/png.js
+  - ../shared/archive.js
   - config.js
   - data.js
   - rules.js
   - dice.js
+  - schools.js
   - draw.js
   - portrait.js
+  - sheet.js
+  - pages.js
   - card.js
+  - inventory.js
+  - features.js
+  - spells.js
+  - downloads.js
   - app.js

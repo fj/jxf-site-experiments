@@ -94,7 +94,15 @@
     armorClass: [0, 40],
     zoom: [100, 400],
     pan: [-100, 100],
-    deathSaves: [0, 3]
+    deathSaves: [0, 3],
+
+    // A feature row holds six tally boxes beside a name and its description:
+    // past that the boxes are what the row is and there is nowhere left to say
+    // what they count. The third is the spell levels one of those rows counts
+    // slots for.
+    featureUses: [0, 6],
+    featureSlots: [0, 6],
+    featureSlotLevel: [1, 9]
   };
 
   D.clamp = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };

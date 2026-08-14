@@ -22,6 +22,7 @@
  *   data.js     — the 2024 PHB tables               (DndCard.SKILLS, …)
  *   rules.js    — modifiers, proficiency, totals    (DndCard.rules)
  *   dice.js     — the shape of each die             (DndCard.dice)
+ *   schools.js  — the mark of each school of magic  (DndCard.schools)
  *   draw.js     — canvas primitives                 (DndCard.draw)
  *   portrait.js — loading and framing the picture   (DndCard.portrait)
  *   sheet.js    — the frame every page draws in     (DndCard.sheet)

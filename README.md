@@ -69,6 +69,13 @@ same widgets, so they live here rather than being reimplemented per experiment:
   the real faces; `ctx.font` doesn't trigger a download on its own.
 - `png.js` (`window.ExpPng`) — encodes a canvas, rewrites the PNG's `pHYs`
   chunk so the file declares its print resolution, and saves it.
+- `archive.js` (`window.ExpArchive`) — packs several files into one `.tar.gz`,
+  for an experiment that produces a set rather than a single download. The tar
+  is ustar, written here byte by byte; the compression is the browser's
+  `CompressionStream`. Nothing goes into an archive that couldn't come back
+  out: a name too long for a ustar header, an entry with no file behind it, a
+  name that would shadow an earlier one, and an engine that can't gzip each
+  stop the archive with a sentence saying so.
 
 ## Experiments
 

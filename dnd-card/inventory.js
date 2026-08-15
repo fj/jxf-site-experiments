@@ -1,11 +1,13 @@
 /*
  * Player Card — the inventory page.
  *
- * What the character is carrying, ten rows to a card. The ten are fixed: no
- * row is ever added and none is ever taken away, because a blank row is the
- * point. This is a card that gets written on at the table, and a list you have
- * to grow before you can note down the dagger you just picked up is no use
- * with a pencil in your hand.
+ * What the character is carrying. The card prints ten rows whatever the list
+ * holds, and a row nobody has typed into prints as an empty one: this is a card
+ * that gets written on at the table, and the room to note down the dagger you
+ * just picked up has to already be there. So the ten rows are the card's, and
+ * the list is the reader's — they add an item, take one off, and put the rest
+ * in the order they want to read them in, which is the order the card prints.
+ * rowlist.js runs that list; this file says what a row of it holds.
  *
  * A row reads left to right as three questions and an answer: is it worn or
  * held (a square), is it attuned (a triangle), how many (a box to write the
@@ -30,7 +32,8 @@
 
   var KIND = "inventory";
 
-  // As many rows as fill the card at a size a hand can write in.
+  // As many rows as fill the card at a size a hand can write in, which is also
+  // as many as the list can hold: an eleventh would have nowhere to print.
   var ROW_COUNT = 10;
 
   // The column headings, over the marks they name.
@@ -74,6 +77,10 @@
   // on the card and in the panel both — and how big that shape is drawn. The
   // row's state, the card's columns and the panel's buttons all come from here,
   // so a mark cannot be one thing in one place and something else in another.
+  //
+  // The card sizes its column from the label; the panel's is a fixed
+  // `$dndc-item-mark-width` in style.scss, so a label longer than "Equipped"
+  // has to be given that width too.
   var TICK_FIELDS = [
     {
       field: "equipped", label: "Equipped",
@@ -99,16 +106,20 @@
   var TICK_FIELD_NAMES = fieldNames(TICK_FIELDS);
   var TEXT_FIELD_NAMES = fieldNames(TEXT_FIELDS);
 
+  // The one kind of row this page has, which "add a row" offers by name.
+  var ITEM = "item";
+
   function blankRow() {
     var row = { quantity: null, name: "", description: "" };
     TICK_FIELDS.forEach(function (tick) { row[tick.field] = false; });
     return row;
   }
 
+  // A list whose only control is "add a row" says nothing about what a row is,
+  // so a fresh page starts with a blank one to fill in. The card prints the
+  // other nine either way.
   function create() {
-    var rows = [];
-    for (var i = 0; i < ROW_COUNT; i++) rows.push(blankRow());
-    return { rows: rows };
+    return { rows: [blankRow()] };
   }
 
   // A row by the index the markup wrote, or null when that names no row of
@@ -144,7 +155,9 @@
     var height = frame.bottom - top;
     D.sheet.rows(frame, { x: frame.left, y: top, width: frame.width, height: height },
       { count: ROW_COUNT, rowHeight: height / ROW_COUNT },
-      function (row, index) { drawRow(page.rows[index], row); });
+      // A row the list hasn't got is drawn blank rather than left out: its
+      // marks and its box are the room to write in at the table.
+      function (row, index) { drawRow(page.rows[index] || blankRow(), row); });
 
     function headingRun() {
       return frame.labelRun(tone.muted);
@@ -238,46 +251,58 @@
   }
 
   // ---- Controls -----------------------------------------------------------------
-  // One panel row per card row, in the card's own order: the two marks, the
-  // count, then the item.
+  // The rows are a D.rowList: it owns the handle, the remove button and the
+  // "add a row" bar, and this page owns the five controls between them, in the
+  // card's own order.
   //
-  // Every control this page owns names a field of one of its rows — "name:3" is
-  // the fourth row's name — so one name and one parse serve them all.
+  // Every one of those names a field of one of the rows — "name:3" is the
+  // fourth row's name — so one name and one parse serve them all.
   var FIELD_SEPARATOR = ":";
 
   function controlName(field, index) { return field + FIELD_SEPARATOR + index; }
 
+  // The index comes back as a number, because a label saying which row of how
+  // many is arithmetic and "3" + 1 is "31".
   function parseControl(name) {
     var parts = String(name).split(FIELD_SEPARATOR);
-    return parts.length === 2 ? { field: parts[0], index: parts[1] } : null;
+    return parts.length === 2 ? { field: parts[0], index: +parts[1] } : null;
   }
 
   // A count is blank until someone writes one in, and blank is a value of its
   // own: the card prints that box empty.
   var QUANTITY_FIELD_SPEC = { range: QUANTITY_RANGE, blank: true };
 
+  // An item is what it is called, and a row nobody has named yet is still one
+  // the handles have to be able to say what they are moving.
+  var UNNAMED = "an unnamed item";
+
+  function titleOf(row) {
+    return row.name.trim() || UNNAMED;
+  }
+
   // ---- Control markup ------------------------------------------------------------
   // Five controls in a row say no more about themselves than three marks on the
-  // card do, so the panel is headed the same way the card is. Each caption
-  // names its own column, which is what the stylesheet reaches for rather than
-  // counting cells.
+  // card do, so the list is headed the same way the card is. These are the
+  // captions alone: the list hangs them in a row of its own, which is what
+  // holds each one over the column it names. Each says which column that is,
+  // so the stylesheet reaches for that rather than counting cells.
   function headingCellHtml(field) {
     return '<span data-column="' + field.field + '">' + field.label + "</span>";
   }
 
   function headHtml() {
-    return '<div class="experiment-ext-dndc-item-head" aria-hidden="true">' +
-      TICK_FIELDS.concat([QUANTITY_FIELD], TEXT_FIELDS).map(headingCellHtml).join("") +
-      "</div>";
+    return TICK_FIELDS.concat([QUANTITY_FIELD], TEXT_FIELDS).map(headingCellHtml).join("");
   }
 
   function rowLabel(index, field) { return "Item " + (index + 1) + ": " + field.label.toLowerCase(); }
 
   // The marks as the shapes they are on the card, filled by the same rule.
-  // aria-pressed carries the state for anyone not seeing the fill.
+  // aria-pressed carries the state for anyone not seeing the fill. Which row a
+  // mark is on is the row's to say rather than the button's: the list has
+  // already written that on the box around it.
   function tickHtml(index, tick) {
     return '<button type="button" class="experiment-ext-dndc-tick" data-shape="' + tick.shape +
-      '" data-tick="' + tick.field + '" data-row="' + index + '" aria-pressed="false" aria-label="' +
+      '" data-tick="' + tick.field + '" aria-pressed="false" aria-label="' +
       U.esc(rowLabel(index, tick)) + '"><span aria-hidden="true"></span></button>';
   }
 
@@ -295,28 +320,31 @@
       U.esc(rowLabel(index, QUANTITY_FIELD)) + '">';
   }
 
-  function itemHtml(index) {
-    return '<div class="experiment-ext-dndc-item">' +
-      TICK_FIELDS.map(function (tick) { return tickHtml(index, tick); }).join("") +
+  function fieldsHtml(row, index) {
+    return TICK_FIELDS.map(function (tick) { return tickHtml(index, tick); }).join("") +
       quantityHtml(index) +
-      TEXT_FIELDS.map(function (field) { return textHtml(index, field); }).join("") +
-      "</div>";
+      TEXT_FIELDS.map(function (field) { return textHtml(index, field); }).join("");
   }
 
-  function html() {
-    var items = [];
-    for (var i = 0; i < ROW_COUNT; i++) items.push(itemHtml(i));
-    return U.group("Items",
-      '<p class="experiment-ext-dndc-note">Ten rows, always: one left empty prints as an empty ' +
-      "row, which is somewhere to write at the table. The square marks what is worn or held, " +
-      "the triangle what is attuned.</p>" +
-      '<div class="experiment-ext-dndc-items">' + headHtml() + items.join("") + "</div>",
-      { key: "inventory" });
+  var LIST = {
+    key: KIND,
+    max: ROW_COUNT,
+    types: [{ type: ITEM, label: "Item", create: blankRow }],
+    rowClass: "experiment-ext-dndc-row-item",
+    note: "A row you haven't added prints as an empty one, which is somewhere to write at the " +
+      "table. The square marks what is worn or held, the triangle what is attuned.",
+    title: titleOf,
+    fields: fieldsHtml,
+    head: headHtml()
+  };
+
+  function html(page) {
+    return U.group("Items", D.rowList.html(LIST, page), { key: KIND });
   }
 
   // ---- Syncing controls ----------------------------------------------------------
   function syncTick(row, index, field, dom) {
-    var button = dom.el('[data-tick="' + field + '"][data-row="' + index + '"]');
+    var button = dom.el('[data-row="' + index + '"] [data-tick="' + field + '"]');
     var on = !!row[field];
     button.dataset.on = on ? "true" : "false";
     button.setAttribute("aria-pressed", on ? "true" : "false");
@@ -333,6 +361,7 @@
         dom.ctl(controlName(field.field, index)).value = row[field.field];
       });
     });
+    D.rowList.sync(LIST, page, dom);
   }
 
   function onControl(page, name, target, event, ctx) {
@@ -349,29 +378,54 @@
     }
     if (TEXT_FIELD_NAMES.indexOf(control.field) !== -1) {
       row[control.field] = target.value;
+      // The handles carry the item's name, which is being typed as they say it.
+      D.rowList.retitle(LIST, page, ctx.dom, control.index);
       ctx.render();
       return true;
     }
     return false;
   }
 
+  // A mark is this page's; everything else about a row is the list's.
   function onClick(page, event, ctx) {
     var button = event.target.closest ? event.target.closest("[data-tick]") : null;
-    if (!button) return false;
+    if (!button) return D.rowList.onClick(LIST, page, event, ctx);
+
     var field = button.dataset.tick;
-    var row = rowAt(page, button.dataset.row);
+    var index = D.rowList.rowIndex(button);
+    var row = index == null ? null : rowAt(page, index);
     if (!row || TICK_FIELD_NAMES.indexOf(field) === -1) return false;
 
     row[field] = !row[field];
-    syncTick(row, +button.dataset.row, field, ctx.dom);
+    syncTick(row, index, field, ctx.dom);
     ctx.render();
     return true;
   }
 
-  // A saved page: ten rows again whatever the file held, each mark a mark and
-  // each count a count or the blank that prints an empty box.
+  function mounted(page, element, ctx) {
+    D.rowList.mounted(LIST, page, element, ctx);
+  }
+
+  // A row nobody has written anything into, which the card prints exactly as
+  // it prints one the list hasn't got.
+  function isBlank(row) {
+    return row.quantity == null && !row.name && !row.description &&
+      TICK_FIELDS.every(function (tick) { return !row[tick.field]; });
+  }
+
+  // A saved page: the rows it held, no more of them than the card prints, each
+  // mark a mark and each count a count or the blank that prints an empty box.
+  //
+  // Blank rows on the end are dropped. Every file written before the list could
+  // be added to holds ten rows whatever was typed into them, and one arriving
+  // full is one nothing can be added to until nine empty rows are deleted by
+  // hand. The card prints the same ten either way, so this costs the reader
+  // nothing and gives them back the room to add a row. A page left with none is
+  // a blank page rather than an empty one, because that is what "add a row" has
+  // to start from.
   function load(raw) {
     var read = D.read;
+    if (!Array.isArray(raw.rows)) return create();
     var rows = read.rows(raw.rows, ROW_COUNT).map(function (saved) {
       var row = blankRow();
       TICK_FIELDS.forEach(function (tick) { row[tick.field] = read.flag(saved[tick.field]); });
@@ -381,8 +435,8 @@
       });
       return row;
     });
-    while (rows.length < ROW_COUNT) rows.push(blankRow());
-    return { rows: rows };
+    while (rows.length && isBlank(rows[rows.length - 1])) rows.pop();
+    return rows.length ? { rows: rows } : create();
   }
 
   D.pages.register({
@@ -395,7 +449,8 @@
       html: html,
       sync: sync,
       onControl: onControl,
-      onClick: onClick
+      onClick: onClick,
+      mounted: mounted
     }
   });
 })();

@@ -784,7 +784,7 @@ $dndc-feature-picker: 12rem;
 }
 
 // ---------------------------------------------------------------------------
-// Inventory: ten rows of two marks, a count and the item
+// Inventory: a list of items, ten of which the card prints
 // ---------------------------------------------------------------------------
 // The mark's footprint, and the mark inside it. Its outline is drawn as the
 // shape with a smaller copy of itself over the middle, because a triangle
@@ -800,21 +800,30 @@ $dndc-triangle-centroid: 66.7%;
 
 // Wide enough for the three digits the card's box holds.
 $dndc-item-quantity-width: 4.5em;
+// A mark's column, wide enough for the word over it — "EQUIPPED" is the
+// longest — with the shape centered under it. Fixed rather than taken from the
+// word, because each row is a grid of its own now and one grid cannot take the
+// width a column of another one worked out. In em, so it holds that word
+// whatever size the panel's type comes out at.
+$dndc-item-mark-width: 3.6em;
 
-// The item list is five columns wide, so it takes a whole row of the region.
+// A row is five controls wide, so the list takes a whole row of the region.
 .experiment-ext-dndc .experiment-ext-ui-group[data-group="inventory"] { grid-column: 1 / -1; }
 
-// One grid for the header and all ten rows, for the reason the abilities have
-// one: columns line up only when they are the same columns. The two mark
-// columns take the width of the words over them, exactly as they do on the
-// card, since a square and a triangle say nothing about themselves.
-.experiment-ext-dndc-items {
-  display: grid;
-  grid-template-columns:
-    auto auto $dndc-item-quantity-width minmax(0, 1fr) minmax(0, 1.4fr);
-  align-items: center;
-  gap: 0.4rem 0.5rem;
+// The item's five fields are a grid rather than the run of boxes a feature's
+// are: a mark and a count are read down the list as columns, exactly as they
+// are on the card, and columns line up only when they are the same columns.
+.experiment-ext-dndc-row-item {
   font-size: 0.85em;
+
+  .experiment-ext-dndc-row-fields {
+    display: grid;
+    grid-template-columns:
+      $dndc-item-mark-width $dndc-item-mark-width $dndc-item-quantity-width
+      minmax(0, 1fr) minmax(0, 1.4fr);
+    align-items: center;
+    gap: 0.4rem 0.5rem;
+  }
 
   input { padding: 0.35rem 0.5rem; }
 
@@ -829,46 +838,23 @@ $dndc-item-quantity-width: 4.5em;
   // room to be read. The fourth column is what those rows span into; nothing
   // is placed in it.
   @include exp-mobile {
-    grid-template-columns: auto auto $dndc-item-quantity-width minmax(0, 1fr);
+    .experiment-ext-dndc-row-fields {
+      grid-template-columns:
+        $dndc-item-mark-width $dndc-item-mark-width $dndc-item-quantity-width minmax(0, 1fr);
+    }
 
     .experiment-ext-dndc-item-name,
     .experiment-ext-dndc-item-description { grid-column: 1 / -1; }
 
-    .experiment-ext-dndc-item + .experiment-ext-dndc-item > .experiment-ext-dndc-tick,
-    .experiment-ext-dndc-item + .experiment-ext-dndc-item > .experiment-ext-dndc-item-quantity {
-      margin-top: 0.8rem;
+    // The text fields name themselves with their placeholders once they are
+    // on rows of their own; the count's caption stretches over what they
+    // leave, so the strip still fills its row.
+    &.experiment-ext-dndc-row-head {
+      span[data-column="quantity"] { grid-column: 3 / -1; text-align: left; }
+
+      span[data-column="name"],
+      span[data-column="description"] { display: none; }
     }
-  }
-}
-
-// The header and each row are wrappers for grouping, not boxes: their cells
-// belong to the grid above.
-.experiment-ext-dndc-item,
-.experiment-ext-dndc-item-head { display: contents; }
-
-.experiment-ext-dndc-item-head {
-  font-family: $exp-mono-font-family;
-  font-size: 0.68em;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: $exp-muted;
-  @include exp-dark { color: $exp-muted-dark; }
-
-  // Over the marks and the count, then over the two text fields. Each caption
-  // says which column it heads, so these follow the markup rather than a count
-  // of cells.
-  > span { text-align: center; }
-  > span[data-column="name"],
-  > span[data-column="description"] { text-align: left; }
-
-  // The text fields name themselves with their placeholders once they are on
-  // rows of their own; the count's caption stretches over what they leave, so
-  // the header still fills its row and the first item starts on the next one.
-  @include exp-mobile {
-    > span[data-column="quantity"] { grid-column: 3 / -1; text-align: left; }
-
-    > span[data-column="name"],
-    > span[data-column="description"] { display: none; }
   }
 }
 

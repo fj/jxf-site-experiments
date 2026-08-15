@@ -57,6 +57,7 @@
   code { font-size: inherit; }
 }
 
+.experiment-ext-ui-prose,
 .experiment-ext-ui-textarea,
 .experiment-ext-ui-input,
 .experiment-ext-ui-select {
@@ -88,6 +89,19 @@
   resize: vertical;
   min-height: 6em;
   font-family: $exp-mono-font-family;
+}
+
+// A box for a sentence rather than a blob: a text input's face and padding,
+// but what is typed wraps and the box grows to hold it. Its height is set from
+// its content, so it carries no resize handle of its own — and a cap, past
+// which a description nobody meant to write scrolls instead of taking the
+// panel over.
+.experiment-ext-ui-prose {
+  display: block;
+  resize: none;
+  overflow-y: auto;
+  max-height: 9em;
+  line-height: 1.35;
 }
 
 .experiment-ext-ui-select {

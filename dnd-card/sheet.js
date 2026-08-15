@@ -92,10 +92,13 @@
   // A zebra stripe sits inside its row, so consecutive stripes stay apart.
   var ROW_INSET = 4;
 
-  // "Fireball — a burst of flame". The share is the most of a line the
-  // description may claim before the name has to start giving room back.
-  var LINE_SEPARATOR = " — ";
-  var LINE_SHARE = 0.55;
+  // "Fireball — a burst of flame", wrapped down the row it sits in. Lines are
+  // stacked at this multiple of their own type size, so the leading a row
+  // spends its depth on scales with what is set in it. Tight, because the
+  // depth a line of leading costs is a line of description nobody gets to
+  // read — and tight enough that a full block still clears its own stripe.
+  var LINE_SEPARATOR = "—";
+  var LINE_LEADING = 1.15;
   var ELLIPSIS = "…";
 
   // Tally marks: a square for a thing that's on, a triangle for a second
@@ -360,60 +363,154 @@
     }
   }
 
-  // As much of `text` as fits, shrunk toward its own floor first and only cut
-  // once the floor isn't enough. An ellipsis is that decision showing, where a
-  // string running off the edge would read as a printing fault.
-  function fitCut(ctx, text, run, room) {
-    run.size = D.draw.fitSize(ctx, text, run, room);
-    if (D.draw.measure(ctx, text, run) <= room) return text;
-    var kept = text;
-    while (kept && D.draw.measure(ctx, kept + ELLIPSIS, run) > room) kept = kept.slice(0, -1);
-    kept = kept.replace(/\s+$/, "");
-    return kept ? kept + ELLIPSIS : "";
+  // A word wider than the column it is set in is cut into pieces that fit,
+  // rather than left to run off the edge of the card.
+  function wordPieces(ctx, word, run, room) {
+    var pieces = [];
+    var rest = word;
+    while (D.draw.measure(ctx, rest, run) > room) {
+      var kept = rest;
+      while (kept.length > 1 && D.draw.measure(ctx, kept, run) > room) kept = kept.slice(0, -1);
+      pieces.push(kept);
+      rest = rest.slice(kept.length);
+    }
+    if (rest) pieces.push(rest);
+    return pieces;
   }
 
-  // A row of a list, on one line: what it is called, and then what it is. The
-  // name takes the ink because it is what the row gets looked up by; the
-  // description follows in the muted tone after an em dash.
+  // The words of a run of styled text in reading order, each carrying the run
+  // it is set in. `glue` is a word that may not open a line: an em dash at the
+  // head of one reads as a dash rather than as the join it is. `joined` is the
+  // tail of a word that had to be split, which takes no space before it.
+  function wordsOf(ctx, segments, room) {
+    var words = [];
+    segments.forEach(function (segment) {
+      segment.text.split(/\s+/).forEach(function (word) {
+        if (!word) return;
+        wordPieces(ctx, word, segment.run, room).forEach(function (piece, i) {
+          words.push({
+            text: piece,
+            run: segment.run,
+            width: D.draw.measure(ctx, piece, segment.run),
+            glue: i === 0 && !!segment.glue,
+            joined: i > 0
+          });
+        });
+      });
+    });
+    return words;
+  }
+
+  // Greedily: a word joins the line being built while there is room for it and
+  // opens the next one when there isn't. A line is as tall as the largest type
+  // set on it, so a name and the start of its description share one line's
+  // depth rather than each claiming their own.
+  function wrapWords(ctx, words, room) {
+    var lines = [];
+    var line = null;
+    words.forEach(function (word) {
+      var gap = line && !word.joined
+        ? D.draw.measure(ctx, " ", line.words[line.words.length - 1].run) : 0;
+      if (line && (word.glue || line.width + gap + word.width <= room)) {
+        word.gap = gap;
+        line.words.push(word);
+        line.width += gap + word.width;
+        line.size = Math.max(line.size, word.run.size);
+        return;
+      }
+      word.gap = 0;
+      line = { words: [word], width: word.width, size: word.run.size };
+      lines.push(line);
+    });
+    return lines;
+  }
+
+  function lineHeight(line) { return line.size * LINE_LEADING; }
+
+  function blockHeight(lines) {
+    return lines.reduce(function (total, line) { return total + lineHeight(line); }, 0);
+  }
+
+  // As many lines as the row is deep, and never fewer than one: a row with
+  // something written on it has to say something.
+  function linesWithin(lines, room) {
+    var used = 0;
+    for (var i = 0; i < lines.length; i++) {
+      used += lineHeight(lines[i]);
+      if (i && used > room) return lines.slice(0, i);
+    }
+    return lines;
+  }
+
+  // The last line of a block that had more to say ends in an ellipsis, which
+  // is that decision showing, where a sentence that merely stopped would read
+  // as a printing fault. Whole words go when there is no room for even one
+  // character of them and their ellipsis.
+  function ellipsize(ctx, line, room) {
+    while (line.words.length) {
+      var last = line.words[line.words.length - 1];
+      var head = line.width - last.gap - last.width;
+      var kept = last.text;
+      while (kept && head + last.gap + D.draw.measure(ctx, kept + ELLIPSIS, last.run) > room) {
+        kept = kept.slice(0, -1);
+      }
+      if (kept) {
+        last.text = kept + ELLIPSIS;
+        return;
+      }
+      line.width = head;
+      line.words.pop();
+    }
+  }
+
+  // Each line is centered in a box of its own depth, so a single line lands
+  // exactly where an unwrapped one used to.
+  function drawWrapped(frame, lines, left, top) {
+    var y = top;
+    lines.forEach(function (line) {
+      var height = lineHeight(line);
+      var x = left;
+      line.words.forEach(function (word) {
+        x += word.gap;
+        D.draw.text(frame.ctx, word.text, x,
+          y + height / 2 + word.run.size * CENTERED_BASELINE_LIFT, word.run);
+        x += word.width;
+      });
+      y += height;
+    });
+  }
+
+  // A row of a list: what it is called, and then what it is. The name takes
+  // the ink because it is what the row gets looked up by; the description
+  // follows in the muted tone after an em dash.
   //
-  // The description is what gives when the pair won't fit. It may claim only
-  // its share of the line, it shrinks into whatever the name leaves, and it is
-  // cut once shrinking reaches its floor. The name gives second, and only once
-  // even the description's share won't hold it. Returns the width the pair
-  // took, so a caller can put something after it.
+  // Both are set at the size they were asked for and wrapped across as many
+  // lines as `height` holds, centered on `middle`. Type that shrank to fit
+  // would let the longest description on a card decide how legible the
+  // shortest one is; type that wraps keeps every row at one size and spends
+  // the row's depth instead. What will not fit even wrapped is cut.
   function namedLine(frame, line) {
     var ctx = frame.ctx;
     var name = String(line.name == null ? "" : line.name).trim();
     var description = String(line.description == null ? "" : line.description).trim();
-    if (!name && !description) return 0;
+    if (!name && !description) return;
 
     var nameRun = {
-      family: frame.body, weight: 700, size: line.nameSize,
-      color: frame.tone.ink, minSize: line.nameMinSize
+      family: frame.body, weight: 700, size: line.nameSize, color: frame.tone.ink
     };
     var tailRun = {
-      family: frame.body, weight: 400, size: line.descriptionSize,
-      color: frame.tone.muted, minSize: line.descriptionMinSize
+      family: frame.body, weight: 400, size: line.descriptionSize, color: frame.tone.muted
     };
-    var tail = (name && description ? LINE_SEPARATOR : "") + description;
+    var segments = [];
+    if (name) segments.push({ text: name, run: nameRun });
+    if (name && description) segments.push({ text: LINE_SEPARATOR, run: tailRun, glue: true });
+    if (description) segments.push({ text: description, run: tailRun });
+
     var room = line.right - line.left;
-
-    // What the description asks for, up to its share: a short one leaves the
-    // name nearly the whole line, and a long one is held to its share so the
-    // name shrinks only when it is itself the reason the line won't fit.
-    var reserved = tail ? Math.min(D.draw.measure(ctx, tail, tailRun), room * LINE_SHARE) : 0;
-    var nameWidth = 0;
-    if (name) {
-      var shown = fitCut(ctx, name, nameRun, room - reserved);
-      nameWidth = D.draw.text(ctx, shown, line.left,
-        line.middle + nameRun.size * CENTERED_BASELINE_LIFT, nameRun);
-    }
-    if (!tail) return nameWidth;
-
-    var left = line.left + nameWidth;
-    var rest = fitCut(ctx, tail, tailRun, line.right - left);
-    return nameWidth + D.draw.text(ctx, rest, left,
-      line.middle + tailRun.size * CENTERED_BASELINE_LIFT, tailRun);
+    var wrapped = wrapWords(ctx, wordsOf(ctx, segments, room), room);
+    var shown = linesWithin(wrapped, line.height);
+    if (shown.length < wrapped.length) ellipsize(ctx, shown[shown.length - 1], room);
+    drawWrapped(frame, shown, line.left, line.middle - blockHeight(shown) / 2);
   }
 
   // A box in the paper's own color, holding the value when there is one and

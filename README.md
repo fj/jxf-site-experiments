@@ -55,7 +55,8 @@ same widgets, so they live here rather than being reimplemented per experiment:
   `@import "../shared/controls";` and then only writes rules for what's
   genuinely its own.
 - `ui.js` (`window.ExpUI`) — builders returning HTML strings for labelled
-  inputs, `<datalist>`-backed combos, grouped `<details>` sections, sliders
+  inputs, `<datalist>`-backed combos, prose boxes that wrap what is typed and
+  grow to hold it, grouped `<details>` sections, sliders
   with live readouts, color wells, font pickers, and the preview figure with
   its caption, progress track, download button and any secondary actions
   offered beside it. Every control carries `data-ctl="<name>"`, so one
@@ -144,9 +145,10 @@ empty tally boxes down its left as the ability has uses, or a spell level and
 its slots), and spells cards of ten rows, each marked with one of the eight
 schools of magic and the level it is cast at — `schools.js` holds those the way
 `dice.js` holds the dice, once in a unit circle, drawn onto the canvas or handed
-to the panel as an `<svg>`. A features row and a spells row are both one line of
-type, "name — description", set by the same `sheet.js` routine: the description
-gives room first, the name second, and only what won't fit at its floor is cut.
+to the panel as an `<svg>`. A features row and a spells row are both a run of
+type, "name — description", set by the same `sheet.js` routine: it wraps them
+down the row at the size they were asked for rather than shrinking them, and
+cuts with an ellipsis only what a row that deep still cannot hold.
 The spells card prints its rows by level and then by name whatever order they
 were typed in, because at the table a spell is looked for by the slot there is
 one of left.

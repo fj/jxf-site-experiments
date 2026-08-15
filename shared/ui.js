@@ -78,6 +78,25 @@
       attrs({ id: idFor(name), "data-ctl": name, rows: opts.rows || 4, spellcheck: opts.spellcheck === false ? "false" : null }) + "></textarea>");
   };
 
+  // A box for a sentence: a <textarea> rather than an <input>, so a
+  // description that outgrows one line wraps into view instead of scrolling
+  // sideways out of it. `data-grow` makes it as deep as what is typed into it
+  // — U.bind does that as it is typed, U.grow once it is filled in from
+  // elsewhere. Bare, for a caller laying out its own grid; U.prose labels it.
+  U.proseBox = function (name, opts) {
+    opts = opts || {};
+    return '<textarea class="' + P + "prose" + (opts.className ? " " + opts.className : "") + '"' +
+      attrs({
+        id: idFor(name), "data-ctl": name, "data-grow": true, rows: opts.rows || 1,
+        placeholder: opts.placeholder, "aria-label": opts.ariaLabel,
+        spellcheck: opts.spellcheck === false ? "false" : null
+      }) + "></textarea>";
+  };
+
+  U.prose = function (name, caption, opts) {
+    return labelled(name, caption, U.proseBox(name, opts));
+  };
+
   // items: ["a", …] or [{value, label}, …].
   U.options = function (items) {
     return items.map(function (it) {
@@ -356,13 +375,38 @@
     return d;
   };
 
+  // ---- Growing boxes --------------------------------------------------------
+  // A [data-grow] box is as deep as what is in it. `scrollHeight` measures the
+  // content and leaves the border out, which a border-box height has to carry.
+  // A box that is off screen measures nothing and is left at its resting depth
+  // rather than collapsed to none.
+
+  function fitToContent(box) {
+    box.style.height = "auto";
+    if (!box.scrollHeight) return;
+    var style = window.getComputedStyle(box);
+    var border = style.boxSizing === "border-box"
+      ? parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) : 0;
+    box.style.height = box.scrollHeight + border + "px";
+  }
+
+  // Every growing box under `root`, for the ones filled in from somewhere
+  // other than the keyboard: a loaded file, a rebuilt panel.
+  U.grow = function (root) {
+    var boxes = root.querySelectorAll("[data-grow]");
+    for (var i = 0; i < boxes.length; i++) fitToContent(boxes[i]);
+  };
+
   // One delegated listener per mount for both event types: `input` fires as a
   // control is dragged or typed into, `change` when a select or checkbox
   // commits. Handlers get (name, element, event).
   U.bind = function (root, handler) {
     function onEvent(e) {
-      var name = e.target && e.target.dataset ? e.target.dataset.ctl : null;
-      if (name) handler(name, e.target, e);
+      var target = e.target;
+      var name = target && target.dataset ? target.dataset.ctl : null;
+      if (!name) return;
+      if (target.dataset.grow != null) fitToContent(target);
+      handler(name, target, e);
     }
     root.addEventListener("input", onEvent);
     root.addEventListener("change", onEvent);

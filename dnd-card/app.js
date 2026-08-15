@@ -652,11 +652,14 @@
     syncReadouts();
   }
 
+  // A box that grows with what is in it was just written into from here rather
+  // than from the keyboard, so it is sized once the values are in place.
   function syncPage() {
     var page = activePage();
     var controls = controlsOf(page);
     var ctx = pageContext();
     if (controls.sync) controls.sync(page, ctx.dom, ctx);
+    U.grow(pageRegion());
   }
 
   function initFontPick(name) {

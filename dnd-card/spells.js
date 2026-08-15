@@ -23,9 +23,9 @@
  * on a row nobody has used yet — not even its school — because ink is the one
  * thing a pencil can't take back.
  *
- * A row is one line of type, set by D.sheet.namedLine, which is where the rules
- * about what gives when a name and its description won't both fit are written
- * down.
+ * A row is a run of type set by D.sheet.namedLine, which wraps it down the row
+ * at the size it was asked for rather than shrinking it, and cuts what a row
+ * that deep still cannot hold.
  *
  * Every length below is a design px on the 300 dpi card and is scaled by the
  * frame's `u()`, so the same layout renders at any output resolution.
@@ -70,9 +70,7 @@
   // The name is what the row is looked up by, so it takes the ink; what the
   // spell does follows in the muted tone, at the size of a caption.
   var NAME_SIZE = 32;
-  var NAME_MIN_SIZE = 20;
   var DESCRIPTION_SIZE = 27;
-  var DESCRIPTION_MIN_SIZE = 17;
   var TEXT_INSET = 14;        // the row's right margin
 
   // ---- The page ---------------------------------------------------------------
@@ -193,9 +191,8 @@
       D.sheet.namedLine(frame, {
         name: written(spell.name).trim(),
         description: written(spell.description).trim(),
-        left: textLeft, right: textRight, middle: middle,
-        nameSize: u(NAME_SIZE), nameMinSize: u(NAME_MIN_SIZE),
-        descriptionSize: u(DESCRIPTION_SIZE), descriptionMinSize: u(DESCRIPTION_MIN_SIZE)
+        left: textLeft, right: textRight, middle: middle, height: row.height,
+        nameSize: u(NAME_SIZE), descriptionSize: u(DESCRIPTION_SIZE)
       });
     }
   }

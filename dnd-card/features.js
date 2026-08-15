@@ -8,9 +8,10 @@
  * added, removed, and put in the order they want to read them in mid-turn.
  *
  * Eight rows is the cap because eight is what the card's height holds at a size
- * a name and a line of description are both legible at across a table. A ninth
- * would mean either a row nobody can read or a second card, and a second card
- * is what the tab strip is for.
+ * a name and its description are both legible at across a table. A ninth would
+ * mean either a row nobody can read or a second card, and a second card is what
+ * the tab strip is for. A row longer than one line wraps into the depth its
+ * row has rather than shrinking, and what still will not fit is cut.
  *
  * A row comes in two shapes. A general row is a run of empty boxes to tick off
  * as the uses go, then a name and what it does. A spellcasting row is that same
@@ -47,9 +48,7 @@
   // card's rows are the same height whether the reader filled in two or eight.
   var ROW_INSET = 20;
   var NAME_SIZE = 34;
-  var NAME_MIN_SIZE = 24;
   var DESCRIPTION_SIZE = 26;
-  var DESCRIPTION_MIN_SIZE = 16;
   var LEVEL_SIZE = 34;
   var LABEL_GAP = 18;
 
@@ -135,7 +134,7 @@
 
     drawTally(frame, tallyOf(row), left, middle);
     if (row.type === SPELLCASTING) drawSpellcasting(frame, row, left + column, middle);
-    else drawGeneral(frame, row, left + column, rect.x + rect.width - inset, middle);
+    else drawGeneral(frame, row, left + column, rect.x + rect.width - inset, rect);
   }
 
   // What the card can be sure of is how many boxes there are, never how many
@@ -157,14 +156,15 @@
     }
   }
 
-  function drawGeneral(frame, row, left, right, middle) {
+  // The whole row is the description's to wrap into, so the depth it is given
+  // is the row's own rather than the one line the name sits on.
+  function drawGeneral(frame, row, left, right, rect) {
     D.sheet.namedLine(frame, {
       name: row.name,
       description: row.description,
-      left: left, right: right, middle: middle,
-      nameSize: frame.u(NAME_SIZE), nameMinSize: frame.u(NAME_MIN_SIZE),
-      descriptionSize: frame.u(DESCRIPTION_SIZE),
-      descriptionMinSize: frame.u(DESCRIPTION_MIN_SIZE)
+      left: left, right: right,
+      middle: rect.y + rect.height / 2, height: rect.height,
+      nameSize: frame.u(NAME_SIZE), descriptionSize: frame.u(DESCRIPTION_SIZE)
     });
   }
 

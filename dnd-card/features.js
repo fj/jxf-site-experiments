@@ -4,8 +4,9 @@
  * What a character can *do* that isn't a number on the character card: the
  * class feature with three uses a day, the trait their species gets, and the
  * spell slots a caster spends. No two characters have the same list and no
- * list survives a level, so this is the one page whose rows the reader builds:
- * added, removed, and put in the order they want to read them in mid-turn.
+ * list survives a level, so the rows are a list the reader builds — added,
+ * removed, and put in the order they want to read them in mid-turn — which is
+ * rowlist.js's to run.
  *
  * Eight rows is the cap because eight is what the card's height holds at a size
  * a name and its description are both legible at across a table. A ninth would
@@ -77,9 +78,15 @@
     }
   ];
 
+  // The table above is this page's own, and so is reading it: making a blank
+  // page and reading a saved one are neither of them the panel's business.
   function rowType(type) {
     for (var i = 0; i < ROW_TYPES.length; i++) if (ROW_TYPES[i].type === type) return ROW_TYPES[i];
     return null;
+  }
+
+  function typeNames() {
+    return ROW_TYPES.map(function (kind) { return kind.type; });
   }
 
   // One row per spell level is how a caster fills this page in, so a new
@@ -181,12 +188,11 @@
   }
 
   // ---- Controls -----------------------------------------------------------------
-  // One block per row: the handle that moves it, its own fields, and the button
-  // that takes it off the card. Adding or removing a row changes which controls
-  // exist, so both ask for the markup back rather than editing it in place.
-  var HINT_ID = "experiment-ext-dndc-feature-hint";
-  var HANDLE_GLYPH = "⠿";
-  var REMOVE_GLYPH = "×";
+  // The rows are a D.rowList: it owns the handle, the remove button and the
+  // "add a row" bar, and this page owns what is between them. Every control
+  // here names a row and a field of it — "row-2-name" is the third row's name
+  // — so one pattern reads them all, and a rebuilt list writes the indices
+  // afresh.
   var UNTITLED = "an unnamed feature";
 
   var ROW_CONTROL = /^row-(\d+)-([a-z]+)$/;
@@ -209,17 +215,6 @@
   function titleOf(row) {
     if (row.type === SPELLCASTING) return D.rules.ordinal(row.level) + "-level spell slots";
     return row.name.trim() || UNTITLED;
-  }
-
-  // A handle says what it moves and where that is now, so a move made from the
-  // keyboard is announced as the row's new position when focus follows it.
-  function moveLabel(page, index) {
-    return "Move " + titleOf(page.rows[index]) +
-      " (row " + (index + 1) + " of " + page.rows.length + ")";
-  }
-
-  function removeLabel(page, index) {
-    return "Remove " + titleOf(page.rows[index]);
   }
 
   function levelOptions() {
@@ -249,48 +244,23 @@
       U.prose(ctlName(index, "description"), "Description");
   }
 
-  function rowHtml(page, row, index) {
-    return '<div class="experiment-ext-dndc-feature" data-row="' + index + '">' +
-      '<button type="button" class="experiment-ext-dndc-handle" draggable="true" data-move="' +
-      index + '" aria-describedby="' + HINT_ID + '" aria-label="' +
-      U.esc(moveLabel(page, index)) + '"><span aria-hidden="true">' + HANDLE_GLYPH + "</span></button>" +
-      '<div class="experiment-ext-dndc-feature-fields">' + fieldsHtml(row, index) + "</div>" +
-      '<button type="button" class="experiment-ext-dndc-remove" data-remove-row="' + index +
-      '" aria-label="' + U.esc(removeLabel(page, index)) + '"><span aria-hidden="true">' +
-      REMOVE_GLYPH + "</span></button>" +
-      "</div>";
-  }
-
-  function addHtml(page) {
-    var full = page.rows.length >= MAX_ROWS;
-    return '<div class="experiment-ext-dndc-add-row">' +
-      '<span class="experiment-ext-dndc-add-row-label">Add a row</span>' +
-      ROW_TYPES.map(function (kind) {
-        return '<button type="button" class="experiment-ext-dndc-add-row-button" data-add-row="' +
-          kind.type + '"' + (full ? " disabled" : "") + ">+ " + U.esc(kind.label) + "</button>";
-      }).join("") +
-      (full ? '<span class="experiment-ext-dndc-note">Full — remove a row to add another.</span>' : "") +
-      "</div>";
-  }
+  var LIST = {
+    key: KIND,
+    max: MAX_ROWS,
+    types: ROW_TYPES,
+    rowClass: "experiment-ext-dndc-row-feature",
+    note: "The card prints that many boxes down the left of the row, empty, to tick off " +
+      "during play.",
+    title: titleOf,
+    fields: fieldsHtml
+  };
 
   function html(page) {
-    return U.group("Features",
-      '<p class="experiment-ext-dndc-note" id="' + HINT_ID + '">Drag a handle to reorder a row, ' +
-      "or press the up and down arrow keys while it has focus. Up to " + MAX_ROWS +
-      " rows fit on a card. The card prints that many boxes down the left of the row, empty, " +
-      "to tick off during play.</p>" +
-      '<div class="experiment-ext-dndc-features" data-features>' +
-      page.rows.map(function (row, index) { return rowHtml(page, row, index); }).join("") +
-      "</div>" +
-      addHtml(page),
-      { key: "features" });
+    return U.group("Features", D.rowList.html(LIST, page), { key: KIND });
   }
 
-  // The two buttons carry the row's name, which the reader is free to change
-  // while they are on screen.
   function retitle(page, dom, index) {
-    dom.el('[data-move="' + index + '"]').setAttribute("aria-label", moveLabel(page, index));
-    dom.el('[data-remove-row="' + index + '"]').setAttribute("aria-label", removeLabel(page, index));
+    D.rowList.retitle(LIST, page, dom, index);
   }
 
   function sync(page, dom) {
@@ -303,8 +273,8 @@
         dom.ctl(ctlName(index, "name")).value = row.name;
         dom.ctl(ctlName(index, "description")).value = row.description;
       }
-      retitle(page, dom, index);
     });
+    D.rowList.sync(LIST, page, dom);
   }
 
   function onControl(page, name, target, event, ctx) {
@@ -332,137 +302,14 @@
     return true;
   }
 
-  // ---- Adding, removing and reordering --------------------------------------------
-  function closestTo(target, selector) {
-    return target && target.closest ? target.closest(selector) : null;
-  }
-
-  function focusIn(ctx, selector) {
-    var node = ctx.dom.el(selector);
-    if (node && node.focus) node.focus();
-  }
-
-  function addRow(page, type, ctx) {
-    var kind = rowType(type);
-    if (!kind) return false;
-    if (page.rows.length < MAX_ROWS) {
-      page.rows.push(kind.create(page));
-      ctx.rebuild();
-      // The reader adds a row in order to fill it in, so that is where they are
-      // put down.
-      focusIn(ctx, '[data-row="' + (page.rows.length - 1) + '"] input, [data-row="' +
-        (page.rows.length - 1) + '"] select');
-      ctx.render();
-    }
-    return true;
-  }
-
-  function removeRow(page, index, ctx) {
-    if (index < 0 || index >= page.rows.length) return false;
-    page.rows.splice(index, 1);
-    ctx.rebuild();
-    // Whatever moved up into the gap, or the add buttons once the last row has
-    // gone: never nothing, which is where focus would otherwise land.
-    var next = Math.min(index, page.rows.length - 1);
-    focusIn(ctx, next < 0 ? "[data-add-row]" : '[data-move="' + next + '"]');
-    ctx.render();
-    return true;
-  }
-
-  // Focus follows the row rather than staying at the position the handle was
-  // at, so a reader moving a row three places up presses the same key three
-  // times. Both ends are a no-op, and nothing is rebuilt for one.
-  function move(page, from, to, ctx) {
-    if (from === to || to < 0 || to >= page.rows.length) return false;
-    page.rows.splice(to, 0, page.rows.splice(from, 1)[0]);
-    ctx.rebuild();
-    focusIn(ctx, '[data-move="' + to + '"]');
-    ctx.render();
-    return true;
-  }
-
+  // Adding, removing and reordering are the list's, and every one of them ends
+  // in a rebuilt panel.
   function onClick(page, event, ctx) {
-    var add = closestTo(event.target, "[data-add-row]");
-    if (add) return addRow(page, add.dataset.addRow, ctx);
-    var remove = closestTo(event.target, "[data-remove-row]");
-    if (remove) return removeRow(page, +remove.dataset.removeRow, ctx);
-    return false;
+    return D.rowList.onClick(LIST, page, event, ctx);
   }
-
-  // A drag and the arrow keys do the same thing, so they are bound together and
-  // both end in move(). The list is the node to bind to: the region around it
-  // outlives a rebuild, while this list is thrown away by one, and listeners
-  // bound to it go with it rather than piling up a set per rebuild.
-  var DROP_CLASS = "experiment-ext-dndc-feature-over";
 
   function mounted(page, element, ctx) {
-    var list = element.querySelector("[data-features]");
-    if (!list) return;
-    var from = null;
-
-    function handleAt(target) {
-      var handle = closestTo(target, "[data-move]");
-      return handle ? +handle.dataset.move : null;
-    }
-
-    // Which row the pointer is over, and only while a handle is being dragged:
-    // a file dragged onto the panel is not a reorder.
-    function rowUnder(event) {
-      if (from == null) return null;
-      var row = closestTo(event.target, "[data-row]");
-      return row ? +row.dataset.row : null;
-    }
-
-    function markDrop(index) {
-      clearDrop();
-      var row = list.querySelector('[data-row="' + index + '"]');
-      if (row) row.classList.add(DROP_CLASS);
-    }
-
-    function clearDrop() {
-      var marked = list.querySelectorAll("." + DROP_CLASS);
-      for (var i = 0; i < marked.length; i++) marked[i].classList.remove(DROP_CLASS);
-    }
-
-    list.addEventListener("keydown", function (event) {
-      var index = handleAt(event.target);
-      if (index == null) return;
-      var step = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
-      if (!step) return;
-      event.preventDefault();   // an arrow key on a button scrolls the page
-      move(page, index, index + step, ctx);
-    });
-
-    list.addEventListener("dragstart", function (event) {
-      from = handleAt(event.target);
-      if (from == null) return;
-      event.dataTransfer.effectAllowed = "move";
-      // Firefox starts no drag at all unless the transfer carries something.
-      event.dataTransfer.setData("text/plain", String(from));
-    });
-
-    list.addEventListener("dragover", function (event) {
-      var over = rowUnder(event);
-      if (over == null) return;
-      event.preventDefault();   // not preventing the default is how a drop is refused
-      event.dataTransfer.dropEffect = "move";
-      markDrop(over);
-    });
-
-    list.addEventListener("drop", function (event) {
-      var over = rowUnder(event);
-      if (over == null) return;
-      event.preventDefault();
-      var moved = from;
-      clearDrop();
-      from = null;
-      move(page, moved, over, ctx);
-    });
-
-    list.addEventListener("dragend", function () {
-      from = null;
-      clearDrop();
-    });
+    D.rowList.mounted(LIST, page, element, ctx);
   }
 
   // A saved page: the rows it held, each one of a shape this page knows, and no
@@ -474,8 +321,7 @@
     if (!Array.isArray(raw.rows)) return create();
     return {
       rows: read.rows(raw.rows, MAX_ROWS).map(function (saved) {
-        var type = read.choice(saved.type, ROW_TYPES.map(function (kind) { return kind.type; }),
-          GENERAL);
+        var type = read.choice(saved.type, typeNames(), GENERAL);
         if (type === SPELLCASTING) {
           return {
             type: SPELLCASTING,

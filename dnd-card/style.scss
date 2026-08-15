@@ -37,14 +37,15 @@ $dndc-skill-column-width: 24rem;
 $dndc-prof-size: 2rem;
 $dndc-prof-diamond: 1.35rem;
 
-// A feature row's two buttons — the drag handle and the remove button. Square,
+// A list row's two buttons — the drag handle and the remove button. Square,
 // and big enough to be a comfortable touch target.
 $dndc-row-button: 2.2rem;
+// A row's fields take what the buttons leave, wrapping to a line of their own
+// before they get narrower than this.
+$dndc-row-field: 11rem;
 
-// A feature row's count box holds two digits and no more; its text fields take
-// what's left, wrapping to their own line before they get narrower than this.
+// A feature row's count box holds two digits and no more.
 $dndc-feature-count: 5rem;
-$dndc-feature-field: 11rem;
 $dndc-feature-picker: 12rem;
 
 .experiment-ext-dndc {
@@ -590,162 +591,17 @@ $dndc-feature-picker: 12rem;
 }
 
 // ---------------------------------------------------------------------------
-// Inventory: ten rows of two marks, a count and the item
+// Lists: rows the reader adds, removes and puts in order
 // ---------------------------------------------------------------------------
-// The mark's footprint, and the mark inside it. Its outline is drawn as the
-// shape with a smaller copy of itself over the middle, because a triangle
-// cannot be given a border any other way, and one mechanism for both shapes
-// keeps them the same weight.
-$dndc-tick-size: 2rem;
-$dndc-tick-mark: 1.35rem;
-$dndc-tick-corner: 0.12rem;
-$dndc-tick-hollow: 0.72;
-// A triangle's centre of area is two thirds of the way down, so that is what
-// the inner copy shrinks toward if the outline is to stay even.
-$dndc-triangle-centroid: 66.7%;
+// What the features and the items have in common. A page's own fields go in
+// the middle of a row; everything around one is here.
 
-// Wide enough for the three digits the card's box holds.
-$dndc-item-quantity-width: 4.5em;
+// A list is its hint, its rows and the bar that adds one, held together so
+// each can be reached by the list it belongs to. It is no box of its own: the
+// three stay children of the panel's column, spaced as the kit spaces them.
+.experiment-ext-dndc-list { display: contents; }
 
-// The item list is five columns wide, so it takes a whole row of the region.
-.experiment-ext-dndc .experiment-ext-ui-group[data-group="inventory"] { grid-column: 1 / -1; }
-
-// One grid for the header and all ten rows, for the reason the abilities have
-// one: columns line up only when they are the same columns. The two mark
-// columns take the width of the words over them, exactly as they do on the
-// card, since a square and a triangle say nothing about themselves.
-.experiment-ext-dndc-items {
-  display: grid;
-  grid-template-columns:
-    auto auto $dndc-item-quantity-width minmax(0, 1fr) minmax(0, 1.4fr);
-  align-items: center;
-  gap: 0.4rem 0.5rem;
-  font-size: 0.85em;
-
-  input { padding: 0.35rem 0.5rem; }
-
-  .experiment-ext-dndc-item-quantity {
-    text-align: center;
-    font-family: $exp-mono-font-family;
-  }
-
-  // Five columns don't fit a phone. The marks and the count keep a row of
-  // their own — they are what the card puts side by side — and the name and
-  // the description take a full-width row each under them, where they have
-  // room to be read. The fourth column is what those rows span into; nothing
-  // is placed in it.
-  @include exp-mobile {
-    grid-template-columns: auto auto $dndc-item-quantity-width minmax(0, 1fr);
-
-    .experiment-ext-dndc-item-name,
-    .experiment-ext-dndc-item-description { grid-column: 1 / -1; }
-
-    .experiment-ext-dndc-item + .experiment-ext-dndc-item > .experiment-ext-dndc-tick,
-    .experiment-ext-dndc-item + .experiment-ext-dndc-item > .experiment-ext-dndc-item-quantity {
-      margin-top: 0.8rem;
-    }
-  }
-}
-
-// The header and each row are wrappers for grouping, not boxes: their cells
-// belong to the grid above.
-.experiment-ext-dndc-item,
-.experiment-ext-dndc-item-head { display: contents; }
-
-.experiment-ext-dndc-item-head {
-  font-family: $exp-mono-font-family;
-  font-size: 0.68em;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: $exp-muted;
-  @include exp-dark { color: $exp-muted-dark; }
-
-  // Over the marks and the count, then over the two text fields. Each caption
-  // says which column it heads, so these follow the markup rather than a count
-  // of cells.
-  > span { text-align: center; }
-  > span[data-column="name"],
-  > span[data-column="description"] { text-align: left; }
-
-  // The text fields name themselves with their placeholders once they are on
-  // rows of their own; the count's caption stretches over what they leave, so
-  // the header still fills its row and the first item starts on the next one.
-  @include exp-mobile {
-    > span[data-column="quantity"] { grid-column: 3 / -1; text-align: left; }
-
-    > span[data-column="name"],
-    > span[data-column="description"] { display: none; }
-  }
-}
-
-// A mark, mirroring the card: a square for what's worn or held, a triangle for
-// what's attuned, each hollow until it applies. aria-pressed carries the state
-// for anyone not seeing the fill.
-.experiment-ext-dndc-tick {
-  appearance: none;
-  position: relative;
-  display: grid;
-  place-items: center;
-  justify-self: center;
-  width: $dndc-tick-size;
-  height: $dndc-tick-size;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-
-  &::before,
-  > span {
-    position: absolute;
-    width: $dndc-tick-mark;
-    height: $dndc-tick-mark;
-    border-radius: $dndc-tick-corner;
-  }
-
-  &::before { content: ""; background: $exp-border; }
-  > span { background: $exp-surface; transform: scale($dndc-tick-hollow); }
-
-  &[data-shape="triangle"] {
-    &::before,
-    > span {
-      border-radius: 0;
-      clip-path: polygon(50% 0, 100% 100%, 0 100%);
-    }
-
-    > span { transform-origin: 50% $dndc-triangle-centroid; }
-  }
-
-  &:hover::before { background: $exp-link; }
-  &:focus-visible { outline: 2px solid $exp-link; outline-offset: -2px; border-radius: 0.3rem; }
-
-  // Filling the mark is a matter of taking its middle away.
-  &[data-on="true"] {
-    &::before { background: $exp-link; }
-    > span { background: transparent; }
-  }
-
-  @include exp-dark {
-    &::before { background: $exp-border-dark; }
-    > span { background: $exp-surface-dark; }
-    &:hover::before { background: $exp-link-dark; }
-    &:focus-visible { outline-color: $exp-link-dark; }
-
-    &[data-on="true"] {
-      &::before { background: $exp-link-dark; }
-      > span { background: transparent; }
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Features: rows the reader adds, removes and puts in order
-// ---------------------------------------------------------------------------
-// The rows are as wide as the panel gets: a feature's name and its description
-// sit side by side, and halving that would leave neither enough to read.
-.experiment-ext-dndc .experiment-ext-ui-group[data-group="features"] { grid-column: 1 / -1; }
-
-.experiment-ext-dndc-features {
+.experiment-ext-dndc-rows {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -754,7 +610,7 @@ $dndc-item-quantity-width: 4.5em;
 // A row is a box of its own, because it's a thing that can be picked up and
 // put down somewhere else — the handle to the left, what it moves in the
 // middle, and the button that takes it away on the right.
-.experiment-ext-dndc-feature {
+.experiment-ext-dndc-row {
   display: grid;
   grid-template-columns: $dndc-row-button minmax(0, 1fr) $dndc-row-button;
   align-items: center;
@@ -772,7 +628,7 @@ $dndc-item-quantity-width: 4.5em;
 
 // Where a dragged row would land. Both a color and an offset outline, so the
 // target is obvious to anyone who can't tell the two borders apart.
-.experiment-ext-dndc-feature-over {
+.experiment-ext-dndc-row-over {
   border-color: $exp-link;
   outline: 2px dashed $exp-link;
   outline-offset: 2px;
@@ -783,24 +639,48 @@ $dndc-item-quantity-width: 4.5em;
   }
 }
 
-// A row's fields in the order the card prints them: how many boxes, then what
-// they count. The count is fixed and narrow — it holds two digits — and the
-// text takes everything else. They line up at the top, because the description
-// grows down as it is typed into and the fields beside it belong next to its
-// first line rather than its last.
-.experiment-ext-dndc-feature-fields {
+// A row's fields, side by side while the panel is wide enough to hold them.
+// They line up at the top, because a box that grows down as it is typed into
+// belongs beside its first line rather than its last.
+.experiment-ext-dndc-row-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: start;
   gap: 0.6rem;
   min-width: 0;
 
-  > * { flex: 1 1 $dndc-feature-field; min-width: 0; }
-  > :first-child { flex: 0 0 $dndc-feature-count; }
+  > * { flex: 1 1 $dndc-row-field; min-width: 0; }
+}
 
-  // A spellcasting row has one picker where a general row has two text fields,
-  // and a picker holding "1st" has no use for the width of both.
-  select { max-width: $dndc-feature-picker; }
+// The words over a list whose fields say nothing about themselves. It is built
+// as a row with its handle and its remove button left empty, which is what
+// keeps the captions over the columns they name; it just isn't drawn as one.
+// Only the captions are set small — the strip itself stays in the type a row
+// is set in, because a column measured in a smaller em would come out a
+// different width from the one under it.
+.experiment-ext-dndc-row-head {
+  padding-block: 0;
+  border-color: transparent;
+  background: none;
+
+  span[data-column] {
+    font-family: $exp-mono-font-family;
+    font-size: 0.68em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: $exp-muted;
+    text-align: center;
+
+    @include exp-dark { color: $exp-muted-dark; }
+  }
+
+  span[data-column="name"],
+  span[data-column="description"] { text-align: left; }
+
+  @include exp-dark {
+    border-color: transparent;
+    background: none;
+  }
 }
 
 // The handle and the remove button share a footprint, so every row's fields
@@ -887,7 +767,7 @@ $dndc-item-quantity-width: 4.5em;
   &:hover { border-color: $exp-link; color: $exp-link; }
   &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
 
-  // A full card still shows both buttons, greyed: the row of things you could
+  // A full card still shows every button, greyed: the row of things you could
   // add is also what says how many kinds of row there are.
   &:disabled {
     opacity: 0.45;
@@ -901,6 +781,159 @@ $dndc-item-quantity-width: 4.5em;
     &:focus-visible { outline-color: $exp-link-dark; }
     &:disabled:hover { border-color: $exp-border-dark; color: inherit; }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Inventory: a list of items, ten of which the card prints
+// ---------------------------------------------------------------------------
+// The mark's footprint, and the mark inside it. Its outline is drawn as the
+// shape with a smaller copy of itself over the middle, because a triangle
+// cannot be given a border any other way, and one mechanism for both shapes
+// keeps them the same weight.
+$dndc-tick-size: 2rem;
+$dndc-tick-mark: 1.35rem;
+$dndc-tick-corner: 0.12rem;
+$dndc-tick-hollow: 0.72;
+// A triangle's centre of area is two thirds of the way down, so that is what
+// the inner copy shrinks toward if the outline is to stay even.
+$dndc-triangle-centroid: 66.7%;
+
+// Wide enough for the three digits the card's box holds.
+$dndc-item-quantity-width: 4.5em;
+// A mark's column, wide enough for the word over it — "EQUIPPED" is the
+// longest — with the shape centered under it. Fixed rather than taken from the
+// word, because each row is a grid of its own now and one grid cannot take the
+// width a column of another one worked out. In em, so it holds that word
+// whatever size the panel's type comes out at.
+$dndc-item-mark-width: 3.6em;
+
+// A row is five controls wide, so the list takes a whole row of the region.
+.experiment-ext-dndc .experiment-ext-ui-group[data-group="inventory"] { grid-column: 1 / -1; }
+
+// The item's five fields are a grid rather than the run of boxes a feature's
+// are: a mark and a count are read down the list as columns, exactly as they
+// are on the card, and columns line up only when they are the same columns.
+.experiment-ext-dndc-row-item {
+  font-size: 0.85em;
+
+  .experiment-ext-dndc-row-fields {
+    display: grid;
+    grid-template-columns:
+      $dndc-item-mark-width $dndc-item-mark-width $dndc-item-quantity-width
+      minmax(0, 1fr) minmax(0, 1.4fr);
+    align-items: center;
+    gap: 0.4rem 0.5rem;
+  }
+
+  input { padding: 0.35rem 0.5rem; }
+
+  .experiment-ext-dndc-item-quantity {
+    text-align: center;
+    font-family: $exp-mono-font-family;
+  }
+
+  // Five columns don't fit a phone. The marks and the count keep a row of
+  // their own — they are what the card puts side by side — and the name and
+  // the description take a full-width row each under them, where they have
+  // room to be read. The fourth column is what those rows span into; nothing
+  // is placed in it.
+  @include exp-mobile {
+    .experiment-ext-dndc-row-fields {
+      grid-template-columns:
+        $dndc-item-mark-width $dndc-item-mark-width $dndc-item-quantity-width minmax(0, 1fr);
+    }
+
+    .experiment-ext-dndc-item-name,
+    .experiment-ext-dndc-item-description { grid-column: 1 / -1; }
+
+    // The text fields name themselves with their placeholders once they are
+    // on rows of their own; the count's caption stretches over what they
+    // leave, so the strip still fills its row.
+    &.experiment-ext-dndc-row-head {
+      span[data-column="quantity"] { grid-column: 3 / -1; text-align: left; }
+
+      span[data-column="name"],
+      span[data-column="description"] { display: none; }
+    }
+  }
+}
+
+// A mark, mirroring the card: a square for what's worn or held, a triangle for
+// what's attuned, each hollow until it applies. aria-pressed carries the state
+// for anyone not seeing the fill.
+.experiment-ext-dndc-tick {
+  appearance: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: $dndc-tick-size;
+  height: $dndc-tick-size;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+
+  &::before,
+  > span {
+    position: absolute;
+    width: $dndc-tick-mark;
+    height: $dndc-tick-mark;
+    border-radius: $dndc-tick-corner;
+  }
+
+  &::before { content: ""; background: $exp-border; }
+  > span { background: $exp-surface; transform: scale($dndc-tick-hollow); }
+
+  &[data-shape="triangle"] {
+    &::before,
+    > span {
+      border-radius: 0;
+      clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    }
+
+    > span { transform-origin: 50% $dndc-triangle-centroid; }
+  }
+
+  &:hover::before { background: $exp-link; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: -2px; border-radius: 0.3rem; }
+
+  // Filling the mark is a matter of taking its middle away.
+  &[data-on="true"] {
+    &::before { background: $exp-link; }
+    > span { background: transparent; }
+  }
+
+  @include exp-dark {
+    &::before { background: $exp-border-dark; }
+    > span { background: $exp-surface-dark; }
+    &:hover::before { background: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+
+    &[data-on="true"] {
+      &::before { background: $exp-link-dark; }
+      > span { background: transparent; }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Features: a list of what a character can do
+// ---------------------------------------------------------------------------
+// The rows are as wide as the panel gets: a feature's name and its description
+// sit side by side, and halving that would leave neither enough to read.
+.experiment-ext-dndc .experiment-ext-ui-group[data-group="features"] { grid-column: 1 / -1; }
+
+// A feature's fields in the order the card prints them: how many boxes, then
+// what they count. The count is fixed and narrow — it holds two digits — and
+// the text takes what is left.
+.experiment-ext-dndc-row-feature {
+  .experiment-ext-dndc-row-fields > :first-child { flex: 0 0 $dndc-feature-count; }
+
+  // A spellcasting row has one picker where a general row has two text fields,
+  // and a picker holding "1st" has no use for the width of both.
+  select { max-width: $dndc-feature-picker; }
 }
 
 // ---------------------------------------------------------------------------

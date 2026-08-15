@@ -72,6 +72,14 @@
     return stem + "-" + (index + 1) + "-" + slugify(pages[index].kind) + "-" + pixelSuffix(size);
   }
 
+  // What anything a set produces is called. Exported because a saved
+  // configuration is one of those things and is written from elsewhere: a
+  // folder of a character's cards and their settings should be a folder of
+  // files with one name on them.
+  function nameFor(identity, suffix) {
+    return stemFor(identity) + suffix;
+  }
+
   // ---- Drawing and encoding ---------------------------------------------------
 
   // A canvas per run rather than one kept between them: a contact sheet of a
@@ -209,6 +217,7 @@
   }
 
   D.downloads = {
+    name: nameFor,
     page: job(savingBlocker, downloadPage),
     set: job(archivingBlocker, downloadSet),
     sheet: job(savingBlocker, downloadSheet)

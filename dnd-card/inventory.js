@@ -253,20 +253,8 @@
   }
 
   // A count is blank until someone writes one in, and blank is a value of its
-  // own: it prints the box empty. A half-typed number ("1" on its way to "12")
-  // only takes effect while it is already in range, and is clamped and written
-  // back when the field commits.
-  function readQuantity(target, event, apply) {
-    var raw = String(target.value).trim();
-    if (raw === "") { apply(null); return; }
-    var parsed = Number(raw);
-    var usable = isFinite(parsed);
-    if (event.type === "input" &&
-      (!usable || parsed < QUANTITY_RANGE[0] || parsed > QUANTITY_RANGE[1])) return;
-    var value = D.clampR(usable ? Math.round(parsed) : QUANTITY_RANGE[0], QUANTITY_RANGE);
-    if (event.type === "change") target.value = value;
-    apply(value);
-  }
+  // own: the card prints that box empty.
+  var QUANTITY_FIELD_SPEC = { range: QUANTITY_RANGE, blank: true };
 
   // ---- Control markup ------------------------------------------------------------
   // Five controls in a row say no more about themselves than three marks on the
@@ -353,7 +341,7 @@
     if (!row) return false;
 
     if (control.field === QUANTITY_FIELD.field) {
-      readQuantity(target, event, function (value) {
+      U.readNumber(target, event, QUANTITY_FIELD_SPEC, function (value) {
         row.quantity = value;
         ctx.render();
       });
@@ -380,11 +368,29 @@
     return true;
   }
 
+  // A saved page: ten rows again whatever the file held, each mark a mark and
+  // each count a count or the blank that prints an empty box.
+  function load(raw) {
+    var read = D.read;
+    var rows = read.rows(raw.rows, ROW_COUNT).map(function (saved) {
+      var row = blankRow();
+      TICK_FIELDS.forEach(function (tick) { row[tick.field] = read.flag(saved[tick.field]); });
+      row.quantity = read.countOrBlank(saved.quantity, QUANTITY_RANGE);
+      TEXT_FIELDS.forEach(function (field) {
+        row[field.field] = read.text(saved[field.field], "");
+      });
+      return row;
+    });
+    while (rows.length < ROW_COUNT) rows.push(blankRow());
+    return { rows: rows };
+  }
+
   D.pages.register({
     kind: KIND,
     label: "Inventory",
     create: create,
     render: render,
+    load: load,
     controls: {
       html: html,
       sync: sync,

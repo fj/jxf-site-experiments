@@ -92,6 +92,12 @@
   // A zebra stripe sits inside its row, so consecutive stripes stay apart.
   var ROW_INSET = 4;
 
+  // "Fireball — a burst of flame". The share is the most of a line the
+  // description may claim before the name has to start giving room back.
+  var LINE_SEPARATOR = " — ";
+  var LINE_SHARE = 0.55;
+  var ELLIPSIS = "…";
+
   // Tally marks: a square for a thing that's on, a triangle for a second
   // thing that's on, both hollow until they are.
   var TALLY_STROKE_RATIO = 0.22;   // of the radius
@@ -354,6 +360,62 @@
     }
   }
 
+  // As much of `text` as fits, shrunk toward its own floor first and only cut
+  // once the floor isn't enough. An ellipsis is that decision showing, where a
+  // string running off the edge would read as a printing fault.
+  function fitCut(ctx, text, run, room) {
+    run.size = D.draw.fitSize(ctx, text, run, room);
+    if (D.draw.measure(ctx, text, run) <= room) return text;
+    var kept = text;
+    while (kept && D.draw.measure(ctx, kept + ELLIPSIS, run) > room) kept = kept.slice(0, -1);
+    kept = kept.replace(/\s+$/, "");
+    return kept ? kept + ELLIPSIS : "";
+  }
+
+  // A row of a list, on one line: what it is called, and then what it is. The
+  // name takes the ink because it is what the row gets looked up by; the
+  // description follows in the muted tone after an em dash.
+  //
+  // The description is what gives when the pair won't fit. It may claim only
+  // its share of the line, it shrinks into whatever the name leaves, and it is
+  // cut once shrinking reaches its floor. The name gives second, and only once
+  // even the description's share won't hold it. Returns the width the pair
+  // took, so a caller can put something after it.
+  function namedLine(frame, line) {
+    var ctx = frame.ctx;
+    var name = String(line.name == null ? "" : line.name).trim();
+    var description = String(line.description == null ? "" : line.description).trim();
+    if (!name && !description) return 0;
+
+    var nameRun = {
+      family: frame.body, weight: 700, size: line.nameSize,
+      color: frame.tone.ink, minSize: line.nameMinSize
+    };
+    var tailRun = {
+      family: frame.body, weight: 400, size: line.descriptionSize,
+      color: frame.tone.muted, minSize: line.descriptionMinSize
+    };
+    var tail = (name && description ? LINE_SEPARATOR : "") + description;
+    var room = line.right - line.left;
+
+    // What the description asks for, up to its share: a short one leaves the
+    // name nearly the whole line, and a long one is held to its share so the
+    // name shrinks only when it is itself the reason the line won't fit.
+    var reserved = tail ? Math.min(D.draw.measure(ctx, tail, tailRun), room * LINE_SHARE) : 0;
+    var nameWidth = 0;
+    if (name) {
+      var shown = fitCut(ctx, name, nameRun, room - reserved);
+      nameWidth = D.draw.text(ctx, shown, line.left,
+        line.middle + nameRun.size * CENTERED_BASELINE_LIFT, nameRun);
+    }
+    if (!tail) return nameWidth;
+
+    var left = line.left + nameWidth;
+    var rest = fitCut(ctx, tail, tailRun, line.right - left);
+    return nameWidth + D.draw.text(ctx, rest, left,
+      line.middle + tailRun.size * CENTERED_BASELINE_LIFT, tailRun);
+  }
+
   // A box in the paper's own color, holding the value when there is one and
   // nothing at all when there isn't.
   function writeBox(frame, rect, value) {
@@ -466,6 +528,7 @@
     sectionHeader: sectionHeader,
     sectionHeaderHeight: sectionHeaderHeight,
     rows: rows,
+    namedLine: namedLine,
     writeBox: writeBox,
     tickBox: tickBox,
     triangleBox: triangleBox

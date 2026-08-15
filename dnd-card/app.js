@@ -13,7 +13,9 @@
  * anything card-shaped, and it doesn't know it either — it asks the page's kind
  * for its markup and hands its events back. Nothing in this file names a kind:
  * a new one is a new module that registers itself with D.pages and a line in
- * the manifest.
+ * the manifest. The picture is the one thing this file builds into a card's own
+ * region, because only some cards carry one — and which ones is the kind's own
+ * declaration, not a name written down here.
  *
  * This file owns the shared state, the DOM, and the wiring. The widgets come
  * from the shared control kit (ExpUI, ExpFonts); the card-specific work lives
@@ -54,6 +56,14 @@
   var EVERY_TITLE_ID = "experiment-ext-dndc-every-title";
   var PAGE_PANEL_ID = "experiment-ext-dndc-page";
   var TAB_ID_PREFIX = "experiment-ext-dndc-tab-";
+  var CARDS_HINT_ID = "experiment-ext-dndc-cards-hint";
+  var ADD_GLYPH = "+";
+
+  // An arrow alone moves between the cards, which is what a tab strip promises;
+  // held with a modifier it moves the card itself. Ctrl is the one that isn't
+  // already spoken for by the browser or the platform on either.
+  var MOVE_MODIFIER_LABEL = "Ctrl";
+  var DROP_CLASS = "experiment-ext-dndc-tab-over";
 
   // ---- State (what the controls edit) ----------------------------------------
   // Everything here belongs to the whole set. What belongs to one card is on
@@ -86,6 +96,11 @@
     pages: D.pages.initial(),
     active: 0
   };
+
+  // What a setting falls back to when a saved file hasn't got it, or hasn't got
+  // it right: what the panel started with rather than what it happens to hold
+  // now, so the same file always loads the same way.
+  var defaults = JSON.parse(JSON.stringify(state));
 
   // The decoded picture. Kept out of `state` because it isn't a value the
   // controls edit — it's the result of loading one. `loadedUrl` records what
@@ -144,6 +159,23 @@
     if (!D.pages.removable(state.pages[index].kind)) return;
     state.pages.splice(index, 1);
     showPage(Math.min(index, state.pages.length - 1));
+  }
+
+  // A card moved is a card selected: the one that just moved is the one worth
+  // looking at, and it is where the reader's attention already is. Both ends
+  // are a no-op, and nothing is rebuilt for one.
+  function movePage(from, to) {
+    if (from === to || to < 0 || to >= state.pages.length) return false;
+    state.pages.splice(to, 0, state.pages.splice(from, 1)[0]);
+    showPage(to);
+    return true;
+  }
+
+  // Focus follows the card rather than staying at the position it was dragged
+  // from, so moving one three places is the same key pressed three times.
+  function focusTab(index) {
+    var tab = dom.el("#" + tabId(index));
+    if (tab && tab.focus) tab.focus();
   }
 
   // ---- Derived model -----------------------------------------------------------
@@ -283,11 +315,103 @@
     });
   }
 
-  // ---- Portrait ----------------------------------------------------------------------
-  function note(text, kind) {
-    var node = dom.el('[data-out="portrait"]');
+  // ---- Saving and loading the whole set ------------------------------------------------
+  // The file is D.saved's business — what is in it, what it is called in it,
+  // and what a value has to be before it is allowed near a card. This end of it
+  // is the button, the picker, and the sentence saying what happened.
+  var CONFIG_MIME = "text/yaml";
+  var CONFIG_SUFFIX = "-cards.yaml";
+
+  function configNote(text, kind) {
+    var node = dom.el('[data-out="config"]');
     node.textContent = text || "";
     node.classList.toggle("experiment-ext-dndc-note-error", kind === "error");
+  }
+
+  function saveConfig() {
+    var blocked = window.ExpPng.saveBlocker();
+    if (blocked) { configNote(blocked, "error"); return; }
+    try {
+      var text = D.saved.encode(state);
+      window.ExpPng.save(new Blob([text], { type: CONFIG_MIME }),
+        D.downloads.name(buildIdentity(), CONFIG_SUFFIX));
+      configNote("Sent to your downloads · " + cardCount(state.pages.length) + " · " +
+        text.length + " bytes");
+    } catch (err) {
+      configNote(String(err && err.message || err), "error");
+    }
+  }
+
+  function readText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result)); };
+      reader.onerror = function () { reject(new Error("that file could not be read")); };
+      reader.readAsText(file);
+    });
+  }
+
+  function loadConfig(file) {
+    configNote("Reading " + file.name + "…");
+    readText(file).then(function (text) {
+      applyConfig(D.saved.decode(text, defaults), file.name);
+    }).catch(function (err) {
+      configNote(String(err && err.message || err), "error");
+    }).then(function () {
+      // Cleared so that choosing the same file twice is two loads, which is
+      // what someone editing it in another window is doing.
+      dom.ctl("loadConfig").value = "";
+    });
+  }
+
+  // Everything at once: the shared settings, the set, and the picture, which is
+  // the one part that has to be fetched again rather than assigned.
+  function applyConfig(loaded, from) {
+    Object.keys(loaded.settings).forEach(function (field) {
+      state[field] = loaded.settings[field];
+    });
+    state.pages = loaded.pages;
+    state.active = 0;
+
+    syncShared();
+    renderTabs();
+    rebuildPage();
+    loadUrl(state.portraitUrl.trim());
+    sched();
+
+    configNote("Loaded " + cardCount(state.pages.length) + " from " + from +
+      (loaded.ignored.length
+        ? " · ignored " + cardCount(loaded.ignored.length) + " of a kind this doesn't know: " +
+          loaded.ignored.join(", ")
+        : ""));
+  }
+
+  // ---- Portrait ----------------------------------------------------------------------
+  // The state and the decoded picture stay here even though the controls are
+  // built into a card's own region: a picture outlives the tab it was chosen
+  // on, and a fetch can finish long after the reader has moved to another card.
+  // Which is why everything below reaches for its controls rather than assuming
+  // them — on any other card there are none.
+  var PICTURE_GROUP = '[data-group="picture"]';
+
+  function inPicture(target) {
+    return !!(target && target.closest && target.closest(PICTURE_GROUP));
+  }
+
+  function note(text, kind) {
+    var node = dom.el('[data-out="portrait"]');
+    if (!node) return;
+    node.textContent = text || "";
+    node.classList.toggle("experiment-ext-dndc-note-error", kind === "error");
+  }
+
+  function syncPicture() {
+    if (!dom.ctl("portraitUrl")) return;
+    dom.ctl("portraitUrl").value = state.portraitUrl;
+    ["zoom", "panX", "panY"].forEach(function (name) {
+      dom.ctl(name).value = state[name];
+      dom.val(name, state[name] + "%");
+    });
   }
 
   function usePortrait(image, source, description) {
@@ -300,8 +424,8 @@
   function loadFile(file) {
     note("Reading " + file.name + "…");
     D.portrait.fromFile(file).then(function (image) {
-      dom.ctl("portraitUrl").value = "";
       state.portraitUrl = "";
+      syncPicture();
       usePortrait(image, "", file.name);
     }).catch(function (err) {
       note(String(err.message), "error");
@@ -322,8 +446,8 @@
     portraitImage = null;
     loadedUrl = "";
     state.portraitUrl = "";
-    dom.ctl("portraitUrl").value = "";
-    dom.ctl("portraitFile").value = "";
+    syncPicture();
+    if (dom.ctl("portraitFile")) dom.ctl("portraitFile").value = "";
     note("");
     sched();
   }
@@ -341,7 +465,13 @@
   // declines stops here rather than falling through: the region decides whose
   // an edit is, not the kind's cooperation, or a row named `level` would set
   // the character's.
+  //
+  // The picture's group is a region inside that one and is checked first: its
+  // controls sit within a card but the picture is not the card's. Same rule one
+  // level down, which leaves a kind free to call a row of its own `zoom`.
   function onControl(name, target, event) {
+    if (inPicture(target)) { onPicture(name, target, event); return; }
+
     var page = activePage();
     var controls = controlsOf(page);
     if (inPage(target)) {
@@ -349,14 +479,8 @@
       return;
     }
 
-    if (name === "portraitFile") {
-      if (target.files && target.files[0]) loadFile(target.files[0]);
-      return;
-    }
-    if (name === "portraitUrl") {
-      state.portraitUrl = target.value;
-      var url = target.value.trim();
-      if (event.type === "change" && url !== loadedUrl) loadUrl(url);
+    if (name === "loadConfig") {
+      if (target.files && target.files[0]) loadConfig(target.files[0]);
       return;
     }
 
@@ -376,6 +500,22 @@
     sched();
   }
 
+  function onPicture(name, target, event) {
+    if (name === "portraitFile") {
+      if (target.files && target.files[0]) loadFile(target.files[0]);
+      return;
+    }
+    if (name === "portraitUrl") {
+      state.portraitUrl = target.value;
+      var url = target.value.trim();
+      if (event.type === "change" && url !== loadedUrl) loadUrl(url);
+      return;
+    }
+    state[name] = U.readControl(target);
+    syncPicture();
+    sched();
+  }
+
   function applyTheme(key) {
     var theme = D.themeOf(key);
     if (!theme.background) return; // "Custom…" keeps whatever is set
@@ -392,6 +532,10 @@
   }
 
   function onClick(event) {
+    // The picture's own button, before the card is offered the click: it sits
+    // in the card's region but is not the card's, like the rest of the picture.
+    if (inPicture(event.target) && hit(event, '[data-ctl="portraitClear"]')) { clearPortrait(); return; }
+
     var page = activePage();
     var controls = controlsOf(page);
     if (inPage(event.target) && controls.onClick &&
@@ -401,17 +545,91 @@
     if (tab) { showPage(+tab.dataset.page); return; }
     var step = hit(event, "[data-page-step]");
     if (step) { showPage(state.active + (+step.dataset.pageStep)); return; }
+    if (hit(event, "[data-add-open]")) {
+      var menu = addMenu();
+      showAddMenu(!!menu && menu.hidden);
+      return;
+    }
     var add = hit(event, "[data-add]");
     if (add) { addPage(add.dataset.add); return; }
     if (hit(event, "[data-page-remove]")) removePage(state.active);
   }
 
+  // ---- The card list as a list ------------------------------------------------
+  // A drag and the arrow keys do the same thing, so they are bound together and
+  // both end in movePage(). The strip is rebuilt from scratch whenever the set
+  // changes, so these are bound once to the region around it, which isn't.
+  function bindCardList(region) {
+    var from = null;
+
+    function tabAt(target) {
+      var tab = target && target.closest ? target.closest("[data-page]") : null;
+      return tab ? +tab.dataset.page : null;
+    }
+
+    function markDrop(index) {
+      clearDrop();
+      var tab = region.querySelector('[data-page="' + index + '"]');
+      if (tab) tab.classList.add(DROP_CLASS);
+    }
+
+    function clearDrop() {
+      var marked = region.querySelectorAll("." + DROP_CLASS);
+      for (var i = 0; i < marked.length; i++) marked[i].classList.remove(DROP_CLASS);
+    }
+
+    // Which card the pointer is over, and only while a tab is being dragged: a
+    // picture dragged onto the panel is not a reorder.
+    function tabUnder(event) {
+      return from == null ? null : tabAt(event.target);
+    }
+
+    region.addEventListener("keydown", function (event) {
+      var index = tabAt(event.target);
+      if (index == null) return;
+      var step = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+      if (!step) return;
+      event.preventDefault();   // an arrow key on a button scrolls the page
+      if (event.ctrlKey || event.metaKey) movePage(index, index + step);
+      else showPage(index + step);
+      focusTab(state.active);
+    });
+
+    region.addEventListener("dragstart", function (event) {
+      from = tabAt(event.target);
+      if (from == null) return;
+      event.dataTransfer.effectAllowed = "move";
+      // Firefox starts no drag at all unless the transfer carries something.
+      event.dataTransfer.setData("text/plain", String(from));
+    });
+
+    region.addEventListener("dragover", function (event) {
+      var over = tabUnder(event);
+      if (over == null) return;
+      event.preventDefault();   // not preventing the default is how a drop is refused
+      event.dataTransfer.dropEffect = "move";
+      markDrop(over);
+    });
+
+    region.addEventListener("drop", function (event) {
+      var over = tabUnder(event);
+      if (over == null) return;
+      event.preventDefault();
+      var moved = from;
+      clearDrop();
+      from = null;
+      movePage(moved, over);
+    });
+
+    region.addEventListener("dragend", function () {
+      from = null;
+      clearDrop();
+    });
+  }
+
   // ---- Syncing controls and readouts -------------------------------------------------
   function syncReadouts() {
     dom.val("level", String(state.level));
-    dom.val("zoom", state.zoom + "%");
-    dom.val("panX", state.panX + "%");
-    dom.val("panY", state.panY + "%");
     dom.el('[data-out="derived"]').textContent =
       "Proficiency bonus " + D.rules.signed(D.rules.proficiencyBonus(state.level));
   }
@@ -424,8 +642,7 @@
   var fontPickSync = {};
 
   function syncShared() {
-    ["name", "species", "className", "subclass", "background", "portraitUrl",
-      "level", "zoom", "panX", "panY",
+    ["name", "species", "className", "subclass", "background", "level",
       "theme", "paper", "ink", "accent"].forEach(function (name) {
         dom.ctl(name).value = state[name];
       });
@@ -473,19 +690,6 @@
         '<p class="experiment-ext-dndc-note" data-out="derived"></p>'
       ) +
 
-      U.group("Portrait",
-        '<div class="' + U.PREFIX + 'field">' +
-        '<span class="' + U.PREFIX + 'field-label">Picture &mdash; the left third of the character card</span>' +
-        '<input type="file" accept="image/*" class="experiment-ext-dndc-file" data-ctl="portraitFile">' +
-        "</div>" +
-        U.text("portraitUrl", "&hellip;or the address of one", { placeholder: "https://…", spellcheck: false }) +
-        U.range("zoom", "Zoom", D.RANGES.zoom[0], D.RANGES.zoom[1]) +
-        U.range("panX", "Pan across", D.RANGES.pan[0], D.RANGES.pan[1]) +
-        U.range("panY", "Pan down", D.RANGES.pan[0], D.RANGES.pan[1]) +
-        '<button type="button" class="experiment-ext-dndc-clear" data-ctl="portraitClear">Remove picture</button>' +
-        '<p class="experiment-ext-dndc-note" data-out="portrait"></p>'
-      ) +
-
       U.group("Look",
         U.select("theme", "Theme", D.THEMES.map(function (theme) {
           return { value: theme.key, label: theme.label };
@@ -510,34 +714,55 @@
         "dialogs size it correctly instead of guessing.</p>"
       ) +
 
+      U.group("Save and load",
+        '<div class="experiment-ext-dndc-config">' +
+        '<button type="button" class="experiment-ext-dndc-clear" data-ctl="saveConfig">' +
+        "<span>Save as YAML</span></button>" +
+        '<div class="' + U.PREFIX + 'field">' +
+        '<span class="' + U.PREFIX + 'field-label">&hellip;or load one back</span>' +
+        '<input type="file" accept=".yaml,.yml,text/yaml,text/plain" ' +
+        'class="experiment-ext-dndc-file" data-ctl="loadConfig">' +
+        "</div></div>" +
+        '<p class="experiment-ext-dndc-note">Every card and everything above them, as a text ' +
+        "file you can keep, hand-edit and load back. A picture you chose from a file isn’t " +
+        "in it, because the card holds the picture rather than the bytes; one named by a web " +
+        "address is.</p>" +
+        '<p class="experiment-ext-dndc-note" data-out="config"></p>'
+      ) +
+
       "</div></section>";
   }
 
   function tabId(index) { return TAB_ID_PREFIX + index; }
 
-  // One tab per card, and a button for every kind a reader may add. The
-  // steppers are for a set too wide to point at: with one card there is
-  // nowhere for them to go.
+  // One tab per card, then the button that adds another. The steppers are for a
+  // set too wide to point at: with one card there is nowhere for them to go.
+  //
+  // A tab is also the card's handle: dragging one onto another moves the card
+  // there, and so does holding a modifier and pressing an arrow, which is the
+  // same gesture for anyone who isn't holding a mouse.
   function tabsHtml() {
+    // One card is a set with no order to put it in, so nothing says how to.
+    var orderable = state.pages.length > 1;
     var tabs = state.pages.map(function (page, i) {
       return '<button type="button" role="tab" class="experiment-ext-dndc-tab" id="' + tabId(i) +
-        '" data-page="' + i + '" aria-controls="' + PAGE_PANEL_ID +
-        '" aria-selected="' + (i === state.active ? "true" : "false") + '">' +
+        '" data-page="' + i + '" draggable="true" aria-controls="' + PAGE_PANEL_ID + '"' +
+        (orderable ? ' aria-describedby="' + CARDS_HINT_ID + '"' : "") +
+        ' aria-selected="' + (i === state.active ? "true" : "false") + '">' +
         U.esc(D.pages.labelFor(state.pages, i)) + "</button>";
-    }).join("");
-
-    var adders = D.pages.addable().map(function (definition) {
-      return '<button type="button" class="experiment-ext-dndc-add-card" data-add="' +
-        U.esc(definition.kind) + '">+ ' + U.esc(definition.label) + "</button>";
     }).join("");
 
     return '<div class="experiment-ext-dndc-tabs">' +
       stepHtml(-1, "‹", "Previous card") +
       '<div class="experiment-ext-dndc-tablist" role="tablist" aria-label="Cards">' + tabs + "</div>" +
+      addHtml() +
       stepHtml(1, "›", "Next card") +
       "</div>" +
-      (adders ? '<div class="experiment-ext-dndc-add">' +
-        '<span class="experiment-ext-dndc-add-label">Add a card</span>' + adders + "</div>" : "");
+      (orderable
+        ? '<p class="experiment-ext-dndc-note" id="' + CARDS_HINT_ID + '">' +
+          "Drag a tab to reorder the cards, or hold " + MOVE_MODIFIER_LABEL +
+          " and press the left and right arrow keys while one has focus.</p>"
+        : "");
   }
 
   function stepHtml(delta, glyph, label) {
@@ -546,10 +771,68 @@
       glyph + "</button>";
   }
 
+  // One "+" at the end of the list rather than a button per kind: the kinds are
+  // what the reader is choosing between, and a menu is where a choice belongs.
+  // It is markup and not state — the list is rebuilt whenever a card is added,
+  // which is exactly when the menu should be shut anyway.
+  function addHtml() {
+    var kinds = D.pages.addable();
+    if (!kinds.length) return "";
+    return '<div class="experiment-ext-dndc-add">' +
+      '<button type="button" class="experiment-ext-dndc-add-card" data-add-open ' +
+      'aria-haspopup="menu" aria-expanded="false" aria-label="Add a card">' +
+      '<span aria-hidden="true">' + ADD_GLYPH + "</span></button>" +
+      '<div class="experiment-ext-dndc-add-menu" role="menu" data-add-menu hidden>' +
+      kinds.map(function (definition) {
+        return '<button type="button" role="menuitem" class="experiment-ext-dndc-add-choice" ' +
+          'data-add="' + U.esc(definition.kind) + '">' + U.esc(definition.label) + "</button>";
+      }).join("") +
+      "</div></div>";
+  }
+
+  function addMenu() { return dom.el("[data-add-menu]"); }
+
+  function showAddMenu(open) {
+    var menu = addMenu();
+    var button = dom.el("[data-add-open]");
+    if (!menu || !button) return;
+    menu.hidden = !open;
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) return;
+    var first = menu.querySelector("[data-add]");
+    if (first) first.focus();
+  }
+
+  // The picture is on one card, so its controls are on that card's tab rather
+  // than in the block above. Which card that is, the kind says: a kind that
+  // wants the reader to choose the set's picture declares it, so this names no
+  // kind. Asking its renderer instead would tie one answer to the other — a
+  // kind could not reserve the left third for art of its own without also
+  // getting the file picker.
+  function wantsPicture(page) {
+    return !!D.pages.definition(page.kind).picture;
+  }
+
+  function pictureHtml() {
+    return U.group("Picture",
+      '<div class="' + U.PREFIX + 'field">' +
+      '<span class="' + U.PREFIX + 'field-label">A picture &mdash; the left third of this card</span>' +
+      '<input type="file" accept="image/*" class="experiment-ext-dndc-file" data-ctl="portraitFile">' +
+      "</div>" +
+      U.text("portraitUrl", "&hellip;or the address of one", { placeholder: "https://…", spellcheck: false }) +
+      U.range("zoom", "Zoom", D.RANGES.zoom[0], D.RANGES.zoom[1]) +
+      U.range("panX", "Pan across", D.RANGES.pan[0], D.RANGES.pan[1]) +
+      U.range("panY", "Pan down", D.RANGES.pan[0], D.RANGES.pan[1]) +
+      '<button type="button" class="experiment-ext-dndc-clear" data-ctl="portraitClear">Remove picture</button>' +
+      '<p class="experiment-ext-dndc-note" data-out="portrait"></p>',
+      { key: "picture" });
+  }
+
   function pageHtml() {
     var page = activePage();
     var controls = controlsOf(page);
     return '<div class="experiment-ext-dndc-region-body">' +
+      (wantsPicture(page) ? pictureHtml() : "") +
       (controls.html ? controls.html(page, pageContext()) : "") +
       (D.pages.removable(page.kind)
         ? '<div class="experiment-ext-dndc-page-actions">' +
@@ -574,6 +857,7 @@
     var page = activePage();
     var controls = controlsOf(page);
     region.innerHTML = pageHtml();
+    syncPicture();
     syncPage();
     if (controls.mounted) controls.mounted(page, region, pageContext());
   }
@@ -613,10 +897,20 @@
 
     U.bind(root, onControl);
     root.addEventListener("click", onClick);
+    bindCardList(dom.el('[data-out="tabs"]'));
+    // A menu left open over the panel is in the way of the panel. Anything that
+    // isn't a click in it, or Escape from anywhere, shuts it.
+    document.addEventListener("click", function (event) {
+      var inside = event.target.closest ? event.target.closest(".experiment-ext-dndc-add") : null;
+      if (!inside) showAddMenu(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") showAddMenu(false);
+    });
     ACTIONS.forEach(function (action) {
       dom.ctl(action.name).addEventListener("click", function () { download(action); });
     });
-    dom.ctl("portraitClear").addEventListener("click", clearPortrait);
+    dom.ctl("saveConfig").addEventListener("click", saveConfig);
     U.dropTarget(dom.el("[data-preview]"), "image/", loadFile);
 
     render();

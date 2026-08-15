@@ -29,7 +29,9 @@ scripts:
   - ../shared/fonts.js
   - ../shared/png.js
   - ../shared/archive.js
+  - ../shared/yaml.js
   - config.js
+  - read.js
   - data.js
   - rules.js
   - dice.js
@@ -38,6 +40,7 @@ scripts:
   - portrait.js
   - sheet.js
   - pages.js
+  - saved.js
   - card.js
   - inventory.js
   - features.js

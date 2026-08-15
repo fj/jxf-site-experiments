@@ -520,6 +520,9 @@
     { step: 2, label: "expertise" }
   ];
 
+  // None, proficient, expertise — which is also how many times the bonus counts.
+  var PROFICIENCY_RANGE = [0, PROFICIENCY_STEPS.length];
+
   // The numbers typed rather than dragged. `blank` marks the ones the card
   // draws a box for, which is exactly the set a player rubs out mid-session.
   var NUMBER_CONTROLS = {
@@ -540,26 +543,10 @@
   var VALUE_CONTROLS = ["hitPoints", "hitPointsMax", "temporaryHitPoints",
     "armorClass", "deathSuccesses", "deathFailures"];
 
-  // Numbers commit differently from everything else: a half-typed value like
-  // "" or "1" on its way to "18" shouldn't snap to the range's floor, so a
-  // number only takes effect while typing if it's already in range, and is
-  // clamped and written back when the field commits (blur or Enter).
-  //
-  // A `blank` field has one state more: empty, which is not zero. Zero hit
-  // points is a character at nought and dying; an empty box is one nobody has
-  // written in yet, and that's what the card prints.
-  function readNumber(target, event, field, apply) {
-    var raw = target.value.trim();
-    var range = field.range;
-    if (raw === "" && field.blank) { apply(null); return; }
-
-    var parsed = Number(raw);
-    var usable = raw !== "" && isFinite(parsed);
-    if (event.type === "input" && (!usable || parsed < range[0] || parsed > range[1])) return;
-    var value = D.clampR(usable ? Math.round(parsed) : range[0], range);
-    if (event.type === "change") target.value = value;
-    apply(value);
-  }
+  // A `blank` field has one state more than the kit's reader gives every typed
+  // number: empty, which is not zero. Zero hit points is a character at nought
+  // and dying; an empty box is one nobody has written in yet, and that's what
+  // the card prints.
 
   // A character can't have more hit dice than levels, so that field's ceiling
   // moves with the level slider rather than being fixed in the markup.
@@ -729,7 +716,7 @@
   function onControl(page, name, target, event, ctx) {
     if (name.indexOf(ABILITY_CONTROL) === 0) {
       var abilityKey = name.slice(ABILITY_CONTROL.length);
-      readNumber(target, event, { range: D.RANGES.score }, function (value) {
+      U.readNumber(target, event, { range: D.RANGES.score }, function (value) {
         page.abilities[abilityKey] = value;
         syncAbilities(page, ctx.dom, ctx.identity);
         syncSkills(page, ctx.dom, ctx.identity);
@@ -744,7 +731,7 @@
       return true;
     }
     if (NUMBER_CONTROLS[name]) {
-      readNumber(target, event, numberControl(name, ctx.identity), function (value) {
+      U.readNumber(target, event, numberControl(name, ctx.identity), function (value) {
         page[name] = value;
         ctx.render();
       });
@@ -769,15 +756,53 @@
     return true;
   }
 
+  // A saved page, every number checked against the range its own control
+  // offers. Only the skills somebody is actually trained in are kept, which is
+  // the shape a blank page has too: an untrained skill is an absent key, not a
+  // zero.
+  function load(raw) {
+    var read = D.read;
+    var page = create();
+    var abilities = raw.abilities || {};
+    var saves = raw.saves || {};
+    var skills = raw.skills || {};
+
+    page.hitPoints = read.countOrBlank(raw.hitPoints, D.RANGES.hitPoints);
+    page.temporaryHitPoints = read.countOrBlank(raw.temporaryHitPoints, D.RANGES.hitPoints);
+    page.hitDiceRemaining = read.countOrBlank(raw.hitDiceRemaining, D.RANGES.hitDice);
+    page.hitPointsMax = read.whole(raw.hitPointsMax, D.RANGES.hitPoints, page.hitPointsMax);
+    page.armorClass = read.whole(raw.armorClass, D.RANGES.armorClass, page.armorClass);
+    page.hitDie = Number(read.choice(raw.hitDie, D.dice.SIDES.map(String), String(page.hitDie)));
+    page.deathSuccesses = read.whole(raw.deathSuccesses, D.RANGES.deathSaves, 0);
+    page.deathFailures = read.whole(raw.deathFailures, D.RANGES.deathSaves, 0);
+    page.inspiration = read.flag(raw.inspiration);
+
+    D.ABILITIES.forEach(function (ability) {
+      page.abilities[ability.key] =
+        read.whole(abilities[ability.key], D.RANGES.score, page.abilities[ability.key]);
+      page.saves[ability.key] = read.flag(saves[ability.key]);
+    });
+
+    page.skills = {};
+    D.SKILLS.forEach(function (skill) {
+      var trained = read.whole(skills[skill.key], PROFICIENCY_RANGE, 0);
+      if (trained) page.skills[skill.key] = trained;
+    });
+    return page;
+  }
+
   D.pages.register({
     kind: KIND,
     label: "Character",
     // There is exactly one of these and it is where the picture and the badges
     // live, so it can be neither added nor removed.
     addable: false,
+    // The set's one picture is chosen here, on the card that prints it.
+    picture: true,
     create: create,
     frameOptions: frameOptions,
     render: render,
+    load: load,
     controls: {
       html: html,
       sync: sync,

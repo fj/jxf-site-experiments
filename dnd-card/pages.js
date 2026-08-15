@@ -5,7 +5,8 @@
  * the same character needs on the table: what they carry, what they can do,
  * what they can cast. Each of those is a *kind*, and a kind is one module that
  * registers what it is here: how to make a blank page of it, how to draw one,
- * and what controls edit it. Nothing else has to be told a kind exists — the
+ * what controls edit it, and how to read a saved one back. Nothing else has to
+ * be told a kind exists — the
  * panel builds its tabs, its "add a card" buttons and its controls out of this
  * registry, so a new kind is a new file, a line in the manifest, and whatever
  * styles its own controls need in style.scss, which is the one place a kind
@@ -24,11 +25,20 @@
   var KINDS = [];
   var BY_KIND = {};
 
+  // Whether a kind was ever registered — asked with hasOwnProperty, because a
+  // page's kind can come out of a saved file and "constructor" is a name every
+  // object already answers to.
+  function known(kind) {
+    return Object.prototype.hasOwnProperty.call(BY_KIND, kind);
+  }
+
   // A definition is {kind, label, create, render} plus, optionally, `addable`
-  // (default true), `frameOptions` and `controls`. See D.sheet for what a
-  // renderer is given and app.js for when each control hook is called.
+  // (default true), `picture` for the kind that carries the set's picture,
+  // `frameOptions`, `controls`, and `load` for making a page of itself out of
+  // a saved one. See D.sheet for what a renderer is given and app.js for when
+  // each control hook is called.
   function register(definition) {
-    if (BY_KIND[definition.kind]) throw new Error("page kind registered twice: " + definition.kind);
+    if (known(definition.kind)) throw new Error("page kind registered twice: " + definition.kind);
     if (definition.addable == null) definition.addable = true;
     KINDS.push(definition);
     BY_KIND[definition.kind] = definition;
@@ -36,9 +46,8 @@
   }
 
   function definition(kind) {
-    var found = BY_KIND[kind];
-    if (!found) throw new Error("no such page kind: " + kind);
-    return found;
+    if (!known(kind)) throw new Error("no such page kind: " + kind);
+    return BY_KIND[kind];
   }
 
   // The registry stamps the kind onto the page, so a page can always say what
@@ -82,6 +91,31 @@
     return count > 1 ? label + " " + ordinal : label;
   }
 
+  // A page as plain data for a file, its kind first so a reader can tell what
+  // they are looking at from the first line of it. A page is already only what
+  // somebody typed, so a kind that says nothing is written whole.
+  function save(page) {
+    var narrowed = definition(page.kind).save;
+    var body = narrowed ? narrowed(page) : page;
+    var out = { kind: page.kind };
+    Object.keys(body).forEach(function (key) {
+      if (key !== "kind") out[key] = body[key];
+    });
+    return out;
+  }
+
+  // …and back. The kind is asked to make a page of itself out of what a file
+  // held, because only it knows what its own rows are and none of it can be
+  // trusted. A kind nobody registered is null: the caller has to say what it
+  // dropped, and nothing here knows how to.
+  function load(raw) {
+    if (!raw || !known(raw.kind)) return null;
+    var found = BY_KIND[raw.kind];
+    var page = found.load ? found.load(raw) : found.create();
+    page.kind = raw.kind;
+    return page;
+  }
+
   D.pages = {
     KINDS: KINDS,
     register: register,
@@ -90,6 +124,8 @@
     initial: initial,
     addable: addable,
     removable: removable,
-    labelFor: labelFor
+    labelFor: labelFor,
+    save: save,
+    load: load
   };
 })();

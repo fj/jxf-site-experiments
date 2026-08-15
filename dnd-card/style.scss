@@ -41,6 +41,12 @@ $dndc-prof-diamond: 1.35rem;
 // and big enough to be a comfortable touch target.
 $dndc-row-button: 2.2rem;
 
+// A feature row's count box holds two digits and no more; its text fields take
+// what's left, wrapping to their own line before they get narrower than this.
+$dndc-feature-count: 5rem;
+$dndc-feature-field: 11rem;
+$dndc-feature-picker: 12rem;
+
 .experiment-ext-dndc {
   // The card is landscape, so it takes the full width and the controls go
   // underneath rather than alongside.
@@ -150,7 +156,11 @@ $dndc-row-button: 2.2rem;
   border: 1px solid $exp-border;
   background: $exp-surface;
   color: inherit;
-  cursor: pointer;
+  // A tab is also the card's handle, and a grabbing hand is the only thing
+  // that says so before someone tries it.
+  cursor: grab;
+
+  &:active { cursor: grabbing; }
 
   &:hover { border-color: $exp-link; }
   &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
@@ -207,32 +217,36 @@ $dndc-row-button: 2.2rem;
   }
 }
 
-// The kinds a reader may add, dashed because each makes a card that isn't
-// there yet. The row is absent entirely when nothing is addable.
-.experiment-ext-dndc-add {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+// Where a dragged tab would land: a color and an offset outline both, so the
+// target is obvious to anyone who can't tell two borders apart by their tint.
+.experiment-ext-dndc-tab-over {
+  border-color: $exp-link;
+  outline: 2px dashed $exp-link;
+  outline-offset: 2px;
+
+  @include exp-dark {
+    border-color: $exp-link-dark;
+    outline-color: $exp-link-dark;
+  }
 }
 
-.experiment-ext-dndc-add-label {
-  margin-right: 0.2rem;
-  font-family: $exp-mono-font-family;
-  font-size: 0.72em;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: $exp-muted;
-
-  @include exp-dark { color: $exp-muted-dark; }
+// The "+" at the end of the card list, and the kinds it offers. The whole thing
+// is absent when nothing is addable, so the menu is never empty.
+.experiment-ext-dndc-add {
+  position: relative;
+  flex: none;
 }
 
 .experiment-ext-dndc-add-card {
   appearance: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
   font: inherit;
-  font-size: 0.8em;
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
+  font-size: 1.2em;
+  line-height: 1;
+  border-radius: 50%;
   border: 1px dashed $exp-border;
   background: transparent;
   color: inherit;
@@ -246,6 +260,63 @@ $dndc-row-button: 2.2rem;
     &:hover { border-color: $exp-link-dark; color: $exp-link-dark; }
     &:focus-visible { outline-color: $exp-link-dark; }
   }
+}
+
+// Anchored to the button rather than in the flow, so opening it doesn't shove
+// the card's controls down the page. Right-aligned: it hangs off a button at
+// the right-hand end of the strip and would otherwise leave the panel.
+.experiment-ext-dndc-add-menu {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  min-width: 10rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+  border: 1px solid $exp-border;
+  border-radius: 0.5rem;
+  background: $exp-surface;
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.14);
+
+  &[hidden] { display: none; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-panel-dark;
+  }
+}
+
+.experiment-ext-dndc-add-choice {
+  appearance: none;
+  font: inherit;
+  font-size: 0.85em;
+  text-align: left;
+  white-space: nowrap;
+  padding: 0.4rem 0.6rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover { background: $exp-border; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: -2px; }
+
+  @include exp-dark {
+    &:hover { background: $exp-surface-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
+// Saving the set and loading one back sit together: they are the same door.
+.experiment-ext-dndc-config {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+
+  > .experiment-ext-ui-field { flex: 1 1 14rem; min-width: 0; }
 }
 
 // Removing a card is the last thing its controls offer, and the only one that
@@ -697,12 +768,6 @@ $dndc-item-quantity-width: 4.5em;
     border-color: $exp-border-dark;
     background: $exp-surface-dark;
   }
-
-  // A handle and a remove button take their width off the fields between them,
-  // which on a phone is all the width there is: stack the pairs instead.
-  @include exp-mobile {
-    .experiment-ext-ui-grid2 { grid-template-columns: minmax(0, 1fr); }
-  }
 }
 
 // Where a dragged row would land. Both a color and an offset outline, so the
@@ -718,11 +783,22 @@ $dndc-item-quantity-width: 4.5em;
   }
 }
 
+// A row's fields in the order the card prints them: how many boxes, then what
+// they count. The count is fixed and narrow — it holds two digits — and the
+// text takes everything else.
 .experiment-ext-dndc-feature-fields {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: end;
   gap: 0.6rem;
   min-width: 0;
+
+  > * { flex: 1 1 $dndc-feature-field; min-width: 0; }
+  > :first-child { flex: 0 0 $dndc-feature-count; }
+
+  // A spellcasting row has one picker where a general row has two text fields,
+  // and a picker holding "1st" has no use for the width of both.
+  select { max-width: $dndc-feature-picker; }
 }
 
 // The handle and the remove button share a footprint, so every row's fields
@@ -826,16 +902,18 @@ $dndc-item-quantity-width: 4.5em;
 }
 
 // ---------------------------------------------------------------------------
-// Spells: ten rows of a school, a name, and a line about what it does
+// Spells: ten rows of a school, a level, a name, and a line about what it does
 // ---------------------------------------------------------------------------
 // Wide enough for "Transmutation" and the mark beside it in this grid's
 // smaller type. Fixed, so the ten pickers line up with each other.
 $dndc-spell-school-width: 11rem;
+// The level's own picker, wide enough for "Cantrip" and its arrow.
+$dndc-spell-level-width: 6.5rem;
 // The description is the longer of a row's two lines on the card, so it is the
 // wider of the two boxes here.
 $dndc-spell-description-share: 1.6fr;
 
-// Ten rows three controls wide take the panel's whole width, as the skill list
+// Ten rows four controls wide take the panel's whole width, as the skill list
 // does.
 .experiment-ext-dndc .experiment-ext-ui-group[data-group="spells"] { grid-column: 1 / -1; }
 
@@ -844,7 +922,8 @@ $dndc-spell-description-share: 1.6fr;
 .experiment-ext-dndc-spells {
   display: grid;
   grid-template-columns:
-    $dndc-spell-school-width minmax(0, 1fr) minmax(0, $dndc-spell-description-share);
+    $dndc-spell-school-width $dndc-spell-level-width
+    minmax(0, 1fr) minmax(0, $dndc-spell-description-share);
   align-items: center;
   column-gap: 0.5rem;
   row-gap: 0.4rem;
@@ -854,18 +933,19 @@ $dndc-spell-description-share: 1.6fr;
   // Not the shorthand: the select keeps the room its arrow sits in.
   select { padding-top: 0.3rem; padding-bottom: 0.3rem; }
 
-  // Three boxes abreast on a phone is three boxes too narrow to read what's in
-  // them. The picker and the name share a line and the description takes the
-  // next, so a row is two lines — and the air belongs between rows rather than
-  // inside one.
+  // Four boxes abreast on a phone is four boxes too narrow to read what's in
+  // them. The two pickers share a line, then the name, then the description, so
+  // a row is three lines — and the air belongs between rows rather than inside
+  // one.
   @include exp-mobile {
     grid-template-columns: $dndc-spell-school-width minmax(0, 1fr);
     row-gap: 0.3rem;
 
+    .experiment-ext-dndc-spell-name,
     .experiment-ext-dndc-spell-description { grid-column: 1 / -1; }
     .experiment-ext-dndc-spell + .experiment-ext-dndc-spell {
       > .experiment-ext-dndc-spell-school,
-      > .experiment-ext-dndc-spell-name { margin-top: 0.55rem; }
+      > .experiment-ext-dndc-spell-level { margin-top: 0.55rem; }
     }
   }
 }

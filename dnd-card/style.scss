@@ -156,7 +156,11 @@ $dndc-feature-picker: 12rem;
   border: 1px solid $exp-border;
   background: $exp-surface;
   color: inherit;
-  cursor: pointer;
+  // A tab is also the card's handle, and a grabbing hand is the only thing
+  // that says so before someone tries it.
+  cursor: grab;
+
+  &:active { cursor: grabbing; }
 
   &:hover { border-color: $exp-link; }
   &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
@@ -210,6 +214,19 @@ $dndc-feature-picker: 12rem;
 
     &:hover:not(:disabled) { border-color: $exp-link-dark; }
     &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
+// Where a dragged tab would land: a color and an offset outline both, so the
+// target is obvious to anyone who can't tell two borders apart by their tint.
+.experiment-ext-dndc-tab-over {
+  border-color: $exp-link;
+  outline: 2px dashed $exp-link;
+  outline-offset: 2px;
+
+  @include exp-dark {
+    border-color: $exp-link-dark;
+    outline-color: $exp-link-dark;
   }
 }
 

@@ -54,7 +54,14 @@
   var EVERY_TITLE_ID = "experiment-ext-dndc-every-title";
   var PAGE_PANEL_ID = "experiment-ext-dndc-page";
   var TAB_ID_PREFIX = "experiment-ext-dndc-tab-";
+  var CARDS_HINT_ID = "experiment-ext-dndc-cards-hint";
   var ADD_GLYPH = "+";
+
+  // An arrow alone moves between the cards, which is what a tab strip promises;
+  // held with a modifier it moves the card itself. Ctrl is the one that isn't
+  // already spoken for by the browser or the platform on either.
+  var MOVE_MODIFIER_LABEL = "Ctrl";
+  var DROP_CLASS = "experiment-ext-dndc-tab-over";
 
   // ---- State (what the controls edit) ----------------------------------------
   // Everything here belongs to the whole set. What belongs to one card is on
@@ -145,6 +152,23 @@
     if (!D.pages.removable(state.pages[index].kind)) return;
     state.pages.splice(index, 1);
     showPage(Math.min(index, state.pages.length - 1));
+  }
+
+  // A card moved is a card selected: the one that just moved is the one worth
+  // looking at, and it is where the reader's attention already is. Both ends
+  // are a no-op, and nothing is rebuilt for one.
+  function movePage(from, to) {
+    if (from === to || to < 0 || to >= state.pages.length) return false;
+    state.pages.splice(to, 0, state.pages.splice(from, 1)[0]);
+    showPage(to);
+    return true;
+  }
+
+  // Focus follows the card rather than staying at the position it was dragged
+  // from, so moving one three places is the same key pressed three times.
+  function focusTab(index) {
+    var tab = dom.el("#" + tabId(index));
+    if (tab && tab.focus) tab.focus();
   }
 
   // ---- Derived model -----------------------------------------------------------
@@ -412,6 +436,78 @@
     if (hit(event, "[data-page-remove]")) removePage(state.active);
   }
 
+  // ---- The card list as a list ------------------------------------------------
+  // A drag and the arrow keys do the same thing, so they are bound together and
+  // both end in movePage(). The strip is rebuilt from scratch whenever the set
+  // changes, so these are bound once to the region around it, which isn't.
+  function bindCardList(region) {
+    var from = null;
+
+    function tabAt(target) {
+      var tab = target && target.closest ? target.closest("[data-page]") : null;
+      return tab ? +tab.dataset.page : null;
+    }
+
+    function markDrop(index) {
+      clearDrop();
+      var tab = region.querySelector('[data-page="' + index + '"]');
+      if (tab) tab.classList.add(DROP_CLASS);
+    }
+
+    function clearDrop() {
+      var marked = region.querySelectorAll("." + DROP_CLASS);
+      for (var i = 0; i < marked.length; i++) marked[i].classList.remove(DROP_CLASS);
+    }
+
+    // Which card the pointer is over, and only while a tab is being dragged: a
+    // picture dragged onto the panel is not a reorder.
+    function tabUnder(event) {
+      return from == null ? null : tabAt(event.target);
+    }
+
+    region.addEventListener("keydown", function (event) {
+      var index = tabAt(event.target);
+      if (index == null) return;
+      var step = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+      if (!step) return;
+      event.preventDefault();   // an arrow key on a button scrolls the page
+      if (event.ctrlKey || event.metaKey) movePage(index, index + step);
+      else showPage(index + step);
+      focusTab(state.active);
+    });
+
+    region.addEventListener("dragstart", function (event) {
+      from = tabAt(event.target);
+      if (from == null) return;
+      event.dataTransfer.effectAllowed = "move";
+      // Firefox starts no drag at all unless the transfer carries something.
+      event.dataTransfer.setData("text/plain", String(from));
+    });
+
+    region.addEventListener("dragover", function (event) {
+      var over = tabUnder(event);
+      if (over == null) return;
+      event.preventDefault();   // not preventing the default is how a drop is refused
+      event.dataTransfer.dropEffect = "move";
+      markDrop(over);
+    });
+
+    region.addEventListener("drop", function (event) {
+      var over = tabUnder(event);
+      if (over == null) return;
+      event.preventDefault();
+      var moved = from;
+      clearDrop();
+      from = null;
+      movePage(moved, over);
+    });
+
+    region.addEventListener("dragend", function () {
+      from = null;
+      clearDrop();
+    });
+  }
+
   // ---- Syncing controls and readouts -------------------------------------------------
   function syncReadouts() {
     dom.val("level", String(state.level));
@@ -523,11 +619,18 @@
 
   // One tab per card, then the button that adds another. The steppers are for a
   // set too wide to point at: with one card there is nowhere for them to go.
+  //
+  // A tab is also the card's handle: dragging one onto another moves the card
+  // there, and so does holding a modifier and pressing an arrow, which is the
+  // same gesture for anyone who isn't holding a mouse.
   function tabsHtml() {
+    // One card is a set with no order to put it in, so nothing says how to.
+    var orderable = state.pages.length > 1;
     var tabs = state.pages.map(function (page, i) {
       return '<button type="button" role="tab" class="experiment-ext-dndc-tab" id="' + tabId(i) +
-        '" data-page="' + i + '" aria-controls="' + PAGE_PANEL_ID +
-        '" aria-selected="' + (i === state.active ? "true" : "false") + '">' +
+        '" data-page="' + i + '" draggable="true" aria-controls="' + PAGE_PANEL_ID + '"' +
+        (orderable ? ' aria-describedby="' + CARDS_HINT_ID + '"' : "") +
+        ' aria-selected="' + (i === state.active ? "true" : "false") + '">' +
         U.esc(D.pages.labelFor(state.pages, i)) + "</button>";
     }).join("");
 
@@ -536,7 +639,12 @@
       '<div class="experiment-ext-dndc-tablist" role="tablist" aria-label="Cards">' + tabs + "</div>" +
       addHtml() +
       stepHtml(1, "›", "Next card") +
-      "</div>";
+      "</div>" +
+      (orderable
+        ? '<p class="experiment-ext-dndc-note" id="' + CARDS_HINT_ID + '">' +
+          "Drag a tab to reorder the cards, or hold " + MOVE_MODIFIER_LABEL +
+          " and press the left and right arrow keys while one has focus.</p>"
+        : "");
   }
 
   function stepHtml(delta, glyph, label) {
@@ -644,6 +752,7 @@
 
     U.bind(root, onControl);
     root.addEventListener("click", onClick);
+    bindCardList(dom.el('[data-out="tabs"]'));
     // A menu left open over the panel is in the way of the panel. Anything that
     // isn't a click in it, or Escape from anywhere, shuts it.
     document.addEventListener("click", function (event) {

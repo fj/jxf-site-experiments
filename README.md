@@ -55,7 +55,8 @@ same widgets, so they live here rather than being reimplemented per experiment:
   `@import "../shared/controls";` and then only writes rules for what's
   genuinely its own.
 - `ui.js` (`window.ExpUI`) — builders returning HTML strings for labelled
-  inputs, `<datalist>`-backed combos, grouped `<details>` sections, sliders
+  inputs, `<datalist>`-backed combos, prose boxes that wrap what is typed and
+  grow to hold it, grouped `<details>` sections, sliders
   with live readouts, color wells, font pickers, and the preview figure with
   its caption, progress track, download button and any secondary actions
   offered beside it. Every control carries `data-ctl="<name>"`, so one

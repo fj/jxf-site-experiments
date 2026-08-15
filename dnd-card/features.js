@@ -246,7 +246,7 @@
     }
     return countHtml(index, "uses", "Uses", D.RANGES.featureUses) +
       U.text(ctlName(index, "name"), "Feature") +
-      U.text(ctlName(index, "description"), "Description");
+      U.prose(ctlName(index, "description"), "Description");
   }
 
   function rowHtml(page, row, index) {

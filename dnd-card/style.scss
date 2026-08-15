@@ -785,11 +785,13 @@ $dndc-item-quantity-width: 4.5em;
 
 // A row's fields in the order the card prints them: how many boxes, then what
 // they count. The count is fixed and narrow — it holds two digits — and the
-// text takes everything else.
+// text takes everything else. They line up at the top, because the description
+// grows down as it is typed into and the fields beside it belong next to its
+// first line rather than its last.
 .experiment-ext-dndc-feature-fields {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  align-items: start;
   gap: 0.6rem;
   min-width: 0;
 
@@ -929,7 +931,8 @@ $dndc-spell-description-share: 1.6fr;
   row-gap: 0.4rem;
   font-size: 0.85em;
 
-  input { padding: 0.35rem 0.5rem; }
+  input,
+  .experiment-ext-ui-prose { padding: 0.35rem 0.5rem; }
   // Not the shorthand: the select keeps the room its arrow sits in.
   select { padding-top: 0.3rem; padding-bottom: 0.3rem; }
 

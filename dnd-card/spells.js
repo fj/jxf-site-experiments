@@ -271,8 +271,11 @@
         "experiment-ext-dndc-spell-level") +
       fieldHtml(NAME_CONTROL + index, "Spell " + ordinal + " name", "Spell",
         "experiment-ext-dndc-spell-name") +
-      fieldHtml(DESCRIPTION_CONTROL + index, "Spell " + ordinal + " description", "Description",
-        "experiment-ext-dndc-spell-description") +
+      U.proseBox(DESCRIPTION_CONTROL + index, {
+        ariaLabel: "Spell " + ordinal + " description",
+        placeholder: "Description",
+        className: "experiment-ext-dndc-spell-description"
+      }) +
       "</div>";
   }
 

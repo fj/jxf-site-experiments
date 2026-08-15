@@ -54,6 +54,7 @@
   var EVERY_TITLE_ID = "experiment-ext-dndc-every-title";
   var PAGE_PANEL_ID = "experiment-ext-dndc-page";
   var TAB_ID_PREFIX = "experiment-ext-dndc-tab-";
+  var ADD_GLYPH = "+";
 
   // ---- State (what the controls edit) ----------------------------------------
   // Everything here belongs to the whole set. What belongs to one card is on
@@ -401,6 +402,11 @@
     if (tab) { showPage(+tab.dataset.page); return; }
     var step = hit(event, "[data-page-step]");
     if (step) { showPage(state.active + (+step.dataset.pageStep)); return; }
+    if (hit(event, "[data-add-open]")) {
+      var menu = addMenu();
+      showAddMenu(!!menu && menu.hidden);
+      return;
+    }
     var add = hit(event, "[data-add]");
     if (add) { addPage(add.dataset.add); return; }
     if (hit(event, "[data-page-remove]")) removePage(state.active);
@@ -515,9 +521,8 @@
 
   function tabId(index) { return TAB_ID_PREFIX + index; }
 
-  // One tab per card, and a button for every kind a reader may add. The
-  // steppers are for a set too wide to point at: with one card there is
-  // nowhere for them to go.
+  // One tab per card, then the button that adds another. The steppers are for a
+  // set too wide to point at: with one card there is nowhere for them to go.
   function tabsHtml() {
     var tabs = state.pages.map(function (page, i) {
       return '<button type="button" role="tab" class="experiment-ext-dndc-tab" id="' + tabId(i) +
@@ -526,24 +531,50 @@
         U.esc(D.pages.labelFor(state.pages, i)) + "</button>";
     }).join("");
 
-    var adders = D.pages.addable().map(function (definition) {
-      return '<button type="button" class="experiment-ext-dndc-add-card" data-add="' +
-        U.esc(definition.kind) + '">+ ' + U.esc(definition.label) + "</button>";
-    }).join("");
-
     return '<div class="experiment-ext-dndc-tabs">' +
       stepHtml(-1, "‹", "Previous card") +
       '<div class="experiment-ext-dndc-tablist" role="tablist" aria-label="Cards">' + tabs + "</div>" +
+      addHtml() +
       stepHtml(1, "›", "Next card") +
-      "</div>" +
-      (adders ? '<div class="experiment-ext-dndc-add">' +
-        '<span class="experiment-ext-dndc-add-label">Add a card</span>' + adders + "</div>" : "");
+      "</div>";
   }
 
   function stepHtml(delta, glyph, label) {
     return '<button type="button" class="experiment-ext-dndc-step" data-page-step="' + delta +
       '" aria-label="' + label + '"' + (state.pages.length < 2 ? " disabled" : "") + ">" +
       glyph + "</button>";
+  }
+
+  // One "+" at the end of the list rather than a button per kind: the kinds are
+  // what the reader is choosing between, and a menu is where a choice belongs.
+  // It is markup and not state — the list is rebuilt whenever a card is added,
+  // which is exactly when the menu should be shut anyway.
+  function addHtml() {
+    var kinds = D.pages.addable();
+    if (!kinds.length) return "";
+    return '<div class="experiment-ext-dndc-add">' +
+      '<button type="button" class="experiment-ext-dndc-add-card" data-add-open ' +
+      'aria-haspopup="menu" aria-expanded="false" aria-label="Add a card">' +
+      '<span aria-hidden="true">' + ADD_GLYPH + "</span></button>" +
+      '<div class="experiment-ext-dndc-add-menu" role="menu" data-add-menu hidden>' +
+      kinds.map(function (definition) {
+        return '<button type="button" role="menuitem" class="experiment-ext-dndc-add-choice" ' +
+          'data-add="' + U.esc(definition.kind) + '">' + U.esc(definition.label) + "</button>";
+      }).join("") +
+      "</div></div>";
+  }
+
+  function addMenu() { return dom.el("[data-add-menu]"); }
+
+  function showAddMenu(open) {
+    var menu = addMenu();
+    var button = dom.el("[data-add-open]");
+    if (!menu || !button) return;
+    menu.hidden = !open;
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) return;
+    var first = menu.querySelector("[data-add]");
+    if (first) first.focus();
   }
 
   function pageHtml() {
@@ -613,6 +644,15 @@
 
     U.bind(root, onControl);
     root.addEventListener("click", onClick);
+    // A menu left open over the panel is in the way of the panel. Anything that
+    // isn't a click in it, or Escape from anywhere, shuts it.
+    document.addEventListener("click", function (event) {
+      var inside = event.target.closest ? event.target.closest(".experiment-ext-dndc-add") : null;
+      if (!inside) showAddMenu(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") showAddMenu(false);
+    });
     ACTIONS.forEach(function (action) {
       dom.ctl(action.name).addEventListener("click", function () { download(action); });
     });

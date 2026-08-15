@@ -213,32 +213,23 @@ $dndc-feature-picker: 12rem;
   }
 }
 
-// The kinds a reader may add, dashed because each makes a card that isn't
-// there yet. The row is absent entirely when nothing is addable.
+// The "+" at the end of the card list, and the kinds it offers. The whole thing
+// is absent when nothing is addable, so the menu is never empty.
 .experiment-ext-dndc-add {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.experiment-ext-dndc-add-label {
-  margin-right: 0.2rem;
-  font-family: $exp-mono-font-family;
-  font-size: 0.72em;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: $exp-muted;
-
-  @include exp-dark { color: $exp-muted-dark; }
+  position: relative;
+  flex: none;
 }
 
 .experiment-ext-dndc-add-card {
   appearance: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
   font: inherit;
-  font-size: 0.8em;
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
+  font-size: 1.2em;
+  line-height: 1;
+  border-radius: 50%;
   border: 1px dashed $exp-border;
   background: transparent;
   color: inherit;
@@ -250,6 +241,53 @@ $dndc-feature-picker: 12rem;
   @include exp-dark {
     border-color: $exp-border-dark;
     &:hover { border-color: $exp-link-dark; color: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
+// Anchored to the button rather than in the flow, so opening it doesn't shove
+// the card's controls down the page. Right-aligned: it hangs off a button at
+// the right-hand end of the strip and would otherwise leave the panel.
+.experiment-ext-dndc-add-menu {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  min-width: 10rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+  border: 1px solid $exp-border;
+  border-radius: 0.5rem;
+  background: $exp-surface;
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.14);
+
+  &[hidden] { display: none; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-panel-dark;
+  }
+}
+
+.experiment-ext-dndc-add-choice {
+  appearance: none;
+  font: inherit;
+  font-size: 0.85em;
+  text-align: left;
+  white-space: nowrap;
+  padding: 0.4rem 0.6rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover { background: $exp-border; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: -2px; }
+
+  @include exp-dark {
+    &:hover { background: $exp-surface-dark; }
     &:focus-visible { outline-color: $exp-link-dark; }
   }
 }

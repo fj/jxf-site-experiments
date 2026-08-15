@@ -759,6 +759,8 @@
     // There is exactly one of these and it is where the picture and the badges
     // live, so it can be neither added nor removed.
     addable: false,
+    // The set's one picture is chosen here, on the card that prints it.
+    picture: true,
     create: create,
     frameOptions: frameOptions,
     render: render,

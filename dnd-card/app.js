@@ -13,7 +13,9 @@
  * anything card-shaped, and it doesn't know it either — it asks the page's kind
  * for its markup and hands its events back. Nothing in this file names a kind:
  * a new one is a new module that registers itself with D.pages and a line in
- * the manifest.
+ * the manifest. The picture is the one thing this file builds into a card's own
+ * region, because only some cards carry one — and which ones is the kind's own
+ * declaration, not a name written down here.
  *
  * This file owns the shared state, the DOM, and the wiring. The widgets come
  * from the shared control kit (ExpUI, ExpFonts); the card-specific work lives
@@ -309,10 +311,31 @@
   }
 
   // ---- Portrait ----------------------------------------------------------------------
+  // The state and the decoded picture stay here even though the controls are
+  // built into a card's own region: a picture outlives the tab it was chosen
+  // on, and a fetch can finish long after the reader has moved to another card.
+  // Which is why everything below reaches for its controls rather than assuming
+  // them — on any other card there are none.
+  var PICTURE_GROUP = '[data-group="picture"]';
+
+  function inPicture(target) {
+    return !!(target && target.closest && target.closest(PICTURE_GROUP));
+  }
+
   function note(text, kind) {
     var node = dom.el('[data-out="portrait"]');
+    if (!node) return;
     node.textContent = text || "";
     node.classList.toggle("experiment-ext-dndc-note-error", kind === "error");
+  }
+
+  function syncPicture() {
+    if (!dom.ctl("portraitUrl")) return;
+    dom.ctl("portraitUrl").value = state.portraitUrl;
+    ["zoom", "panX", "panY"].forEach(function (name) {
+      dom.ctl(name).value = state[name];
+      dom.val(name, state[name] + "%");
+    });
   }
 
   function usePortrait(image, source, description) {
@@ -325,8 +348,8 @@
   function loadFile(file) {
     note("Reading " + file.name + "…");
     D.portrait.fromFile(file).then(function (image) {
-      dom.ctl("portraitUrl").value = "";
       state.portraitUrl = "";
+      syncPicture();
       usePortrait(image, "", file.name);
     }).catch(function (err) {
       note(String(err.message), "error");
@@ -347,8 +370,8 @@
     portraitImage = null;
     loadedUrl = "";
     state.portraitUrl = "";
-    dom.ctl("portraitUrl").value = "";
-    dom.ctl("portraitFile").value = "";
+    syncPicture();
+    if (dom.ctl("portraitFile")) dom.ctl("portraitFile").value = "";
     note("");
     sched();
   }
@@ -366,22 +389,17 @@
   // declines stops here rather than falling through: the region decides whose
   // an edit is, not the kind's cooperation, or a row named `level` would set
   // the character's.
+  //
+  // The picture's group is a region inside that one and is checked first: its
+  // controls sit within a card but the picture is not the card's. Same rule one
+  // level down, which leaves a kind free to call a row of its own `zoom`.
   function onControl(name, target, event) {
+    if (inPicture(target)) { onPicture(name, target, event); return; }
+
     var page = activePage();
     var controls = controlsOf(page);
     if (inPage(target)) {
       if (controls.onControl) controls.onControl(page, name, target, event, pageContext());
-      return;
-    }
-
-    if (name === "portraitFile") {
-      if (target.files && target.files[0]) loadFile(target.files[0]);
-      return;
-    }
-    if (name === "portraitUrl") {
-      state.portraitUrl = target.value;
-      var url = target.value.trim();
-      if (event.type === "change" && url !== loadedUrl) loadUrl(url);
       return;
     }
 
@@ -401,6 +419,22 @@
     sched();
   }
 
+  function onPicture(name, target, event) {
+    if (name === "portraitFile") {
+      if (target.files && target.files[0]) loadFile(target.files[0]);
+      return;
+    }
+    if (name === "portraitUrl") {
+      state.portraitUrl = target.value;
+      var url = target.value.trim();
+      if (event.type === "change" && url !== loadedUrl) loadUrl(url);
+      return;
+    }
+    state[name] = U.readControl(target);
+    syncPicture();
+    sched();
+  }
+
   function applyTheme(key) {
     var theme = D.themeOf(key);
     if (!theme.background) return; // "Custom…" keeps whatever is set
@@ -417,6 +451,10 @@
   }
 
   function onClick(event) {
+    // The picture's own button, before the card is offered the click: it sits
+    // in the card's region but is not the card's, like the rest of the picture.
+    if (inPicture(event.target) && hit(event, '[data-ctl="portraitClear"]')) { clearPortrait(); return; }
+
     var page = activePage();
     var controls = controlsOf(page);
     if (inPage(event.target) && controls.onClick &&
@@ -511,9 +549,6 @@
   // ---- Syncing controls and readouts -------------------------------------------------
   function syncReadouts() {
     dom.val("level", String(state.level));
-    dom.val("zoom", state.zoom + "%");
-    dom.val("panX", state.panX + "%");
-    dom.val("panY", state.panY + "%");
     dom.el('[data-out="derived"]').textContent =
       "Proficiency bonus " + D.rules.signed(D.rules.proficiencyBonus(state.level));
   }
@@ -526,8 +561,7 @@
   var fontPickSync = {};
 
   function syncShared() {
-    ["name", "species", "className", "subclass", "background", "portraitUrl",
-      "level", "zoom", "panX", "panY",
+    ["name", "species", "className", "subclass", "background", "level",
       "theme", "paper", "ink", "accent"].forEach(function (name) {
         dom.ctl(name).value = state[name];
       });
@@ -573,19 +607,6 @@
           U.combo("subclass", "Subclass", D.subclassesFor(state.className))) +
         U.range("level", "Level", D.RANGES.level[0], D.RANGES.level[1]) +
         '<p class="experiment-ext-dndc-note" data-out="derived"></p>'
-      ) +
-
-      U.group("Portrait",
-        '<div class="' + U.PREFIX + 'field">' +
-        '<span class="' + U.PREFIX + 'field-label">Picture &mdash; the left third of the character card</span>' +
-        '<input type="file" accept="image/*" class="experiment-ext-dndc-file" data-ctl="portraitFile">' +
-        "</div>" +
-        U.text("portraitUrl", "&hellip;or the address of one", { placeholder: "https://…", spellcheck: false }) +
-        U.range("zoom", "Zoom", D.RANGES.zoom[0], D.RANGES.zoom[1]) +
-        U.range("panX", "Pan across", D.RANGES.pan[0], D.RANGES.pan[1]) +
-        U.range("panY", "Pan down", D.RANGES.pan[0], D.RANGES.pan[1]) +
-        '<button type="button" class="experiment-ext-dndc-clear" data-ctl="portraitClear">Remove picture</button>' +
-        '<p class="experiment-ext-dndc-note" data-out="portrait"></p>'
       ) +
 
       U.group("Look",
@@ -685,10 +706,36 @@
     if (first) first.focus();
   }
 
+  // The picture is on one card, so its controls are on that card's tab rather
+  // than in the block above. Which card that is, the kind says: a kind that
+  // wants the reader to choose the set's picture declares it, so this names no
+  // kind. Asking its renderer instead would tie one answer to the other — a
+  // kind could not reserve the left third for art of its own without also
+  // getting the file picker.
+  function wantsPicture(page) {
+    return !!D.pages.definition(page.kind).picture;
+  }
+
+  function pictureHtml() {
+    return U.group("Picture",
+      '<div class="' + U.PREFIX + 'field">' +
+      '<span class="' + U.PREFIX + 'field-label">A picture &mdash; the left third of this card</span>' +
+      '<input type="file" accept="image/*" class="experiment-ext-dndc-file" data-ctl="portraitFile">' +
+      "</div>" +
+      U.text("portraitUrl", "&hellip;or the address of one", { placeholder: "https://…", spellcheck: false }) +
+      U.range("zoom", "Zoom", D.RANGES.zoom[0], D.RANGES.zoom[1]) +
+      U.range("panX", "Pan across", D.RANGES.pan[0], D.RANGES.pan[1]) +
+      U.range("panY", "Pan down", D.RANGES.pan[0], D.RANGES.pan[1]) +
+      '<button type="button" class="experiment-ext-dndc-clear" data-ctl="portraitClear">Remove picture</button>' +
+      '<p class="experiment-ext-dndc-note" data-out="portrait"></p>',
+      { key: "picture" });
+  }
+
   function pageHtml() {
     var page = activePage();
     var controls = controlsOf(page);
     return '<div class="experiment-ext-dndc-region-body">' +
+      (wantsPicture(page) ? pictureHtml() : "") +
       (controls.html ? controls.html(page, pageContext()) : "") +
       (D.pages.removable(page.kind)
         ? '<div class="experiment-ext-dndc-page-actions">' +
@@ -713,6 +760,7 @@
     var page = activePage();
     var controls = controlsOf(page);
     region.innerHTML = pageHtml();
+    syncPicture();
     syncPage();
     if (controls.mounted) controls.mounted(page, region, pageContext());
   }
@@ -765,7 +813,6 @@
     ACTIONS.forEach(function (action) {
       dom.ctl(action.name).addEventListener("click", function () { download(action); });
     });
-    dom.ctl("portraitClear").addEventListener("click", clearPortrait);
     U.dropTarget(dom.el("[data-preview]"), "image/", loadFile);
 
     render();

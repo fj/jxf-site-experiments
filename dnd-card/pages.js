@@ -25,8 +25,9 @@
   var BY_KIND = {};
 
   // A definition is {kind, label, create, render} plus, optionally, `addable`
-  // (default true), `frameOptions` and `controls`. See D.sheet for what a
-  // renderer is given and app.js for when each control hook is called.
+  // (default true), `picture` for the kind that carries the set's picture,
+  // `frameOptions` and `controls`. See D.sheet for what a renderer is given and
+  // app.js for when each control hook is called.
   function register(definition) {
     if (BY_KIND[definition.kind]) throw new Error("page kind registered twice: " + definition.kind);
     if (definition.addable == null) definition.addable = true;

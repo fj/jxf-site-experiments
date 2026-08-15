@@ -40,6 +40,7 @@ scripts:
   - portrait.js
   - sheet.js
   - pages.js
+  - rowlist.js
   - saved.js
   - card.js
   - inventory.js

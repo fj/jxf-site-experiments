@@ -37,14 +37,15 @@ $dndc-skill-column-width: 24rem;
 $dndc-prof-size: 2rem;
 $dndc-prof-diamond: 1.35rem;
 
-// A feature row's two buttons — the drag handle and the remove button. Square,
+// A list row's two buttons — the drag handle and the remove button. Square,
 // and big enough to be a comfortable touch target.
 $dndc-row-button: 2.2rem;
+// A row's fields take what the buttons leave, wrapping to a line of their own
+// before they get narrower than this.
+$dndc-row-field: 11rem;
 
-// A feature row's count box holds two digits and no more; its text fields take
-// what's left, wrapping to their own line before they get narrower than this.
+// A feature row's count box holds two digits and no more.
 $dndc-feature-count: 5rem;
-$dndc-feature-field: 11rem;
 $dndc-feature-picker: 12rem;
 
 .experiment-ext-dndc {
@@ -590,6 +591,199 @@ $dndc-feature-picker: 12rem;
 }
 
 // ---------------------------------------------------------------------------
+// Lists: rows the reader adds, removes and puts in order
+// ---------------------------------------------------------------------------
+// What the features and the items have in common. A page's own fields go in
+// the middle of a row; everything around one is here.
+
+// A list is its hint, its rows and the bar that adds one, held together so
+// each can be reached by the list it belongs to. It is no box of its own: the
+// three stay children of the panel's column, spaced as the kit spaces them.
+.experiment-ext-dndc-list { display: contents; }
+
+.experiment-ext-dndc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+// A row is a box of its own, because it's a thing that can be picked up and
+// put down somewhere else — the handle to the left, what it moves in the
+// middle, and the button that takes it away on the right.
+.experiment-ext-dndc-row {
+  display: grid;
+  grid-template-columns: $dndc-row-button minmax(0, 1fr) $dndc-row-button;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  border: 1px solid $exp-border;
+  border-radius: 0.5rem;
+  background: $exp-surface;
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+  }
+}
+
+// Where a dragged row would land. Both a color and an offset outline, so the
+// target is obvious to anyone who can't tell the two borders apart.
+.experiment-ext-dndc-row-over {
+  border-color: $exp-link;
+  outline: 2px dashed $exp-link;
+  outline-offset: 2px;
+
+  @include exp-dark {
+    border-color: $exp-link-dark;
+    outline-color: $exp-link-dark;
+  }
+}
+
+// A row's fields, side by side while the panel is wide enough to hold them.
+// They line up at the top, because a box that grows down as it is typed into
+// belongs beside its first line rather than its last.
+.experiment-ext-dndc-row-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 0.6rem;
+  min-width: 0;
+
+  > * { flex: 1 1 $dndc-row-field; min-width: 0; }
+}
+
+// The words over a list whose fields say nothing about themselves. It is built
+// as a row with its handle and its remove button left empty, which is what
+// keeps the captions over the columns they name; it just isn't drawn as one.
+// Only the captions are set small — the strip itself stays in the type a row
+// is set in, because a column measured in a smaller em would come out a
+// different width from the one under it.
+.experiment-ext-dndc-row-head {
+  padding-block: 0;
+  border-color: transparent;
+  background: none;
+
+  span[data-column] {
+    font-family: $exp-mono-font-family;
+    font-size: 0.68em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: $exp-muted;
+    text-align: center;
+
+    @include exp-dark { color: $exp-muted-dark; }
+  }
+
+  span[data-column="name"],
+  span[data-column="description"] { text-align: left; }
+
+  @include exp-dark {
+    border-color: transparent;
+    background: none;
+  }
+}
+
+// The handle and the remove button share a footprint, so every row's fields
+// start and end on the same line however long the row's contents are.
+.experiment-ext-dndc-handle,
+.experiment-ext-dndc-remove {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: $dndc-row-button;
+  height: $dndc-row-button;
+  padding: 0;
+  font: inherit;
+  line-height: 1;
+  border-radius: 0.4rem;
+  border: 1px solid $exp-border;
+  background: transparent;
+  color: $exp-muted;
+
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    color: $exp-muted-dark;
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
+// Grabbable, and visibly so: the cursor is the only thing that says this one
+// is for dragging rather than pressing.
+.experiment-ext-dndc-handle {
+  cursor: grab;
+  &:active { cursor: grabbing; }
+  &:hover { border-color: $exp-link; color: $exp-link; }
+
+  @include exp-dark {
+    &:hover { border-color: $exp-link-dark; color: $exp-link-dark; }
+  }
+}
+
+.experiment-ext-dndc-remove {
+  cursor: pointer;
+  font-size: 1.1em;
+  &:hover { border-color: $exp-error; color: $exp-error; }
+
+  @include exp-dark {
+    &:hover { border-color: $exp-error-dark; color: $exp-error-dark; }
+  }
+}
+
+// Adding a row, which is the same offer the tab strip makes for a whole card
+// and so is dashed the same way. It gets classes of its own all the same: one
+// is a control of the page being edited and the other belongs to the panel
+// around it, and they are free to diverge.
+.experiment-ext-dndc-add-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.experiment-ext-dndc-add-row-label {
+  margin-right: 0.2rem;
+  font-family: $exp-mono-font-family;
+  font-size: 0.72em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $exp-muted;
+
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+.experiment-ext-dndc-add-row-button {
+  appearance: none;
+  font: inherit;
+  font-size: 0.8em;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px dashed $exp-border;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover { border-color: $exp-link; color: $exp-link; }
+  &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
+
+  // A full card still shows every button, greyed: the row of things you could
+  // add is also what says how many kinds of row there are.
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+    &:hover { border-color: $exp-border; color: inherit; }
+  }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    &:hover { border-color: $exp-link-dark; color: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+    &:disabled:hover { border-color: $exp-border-dark; color: inherit; }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Inventory: ten rows of two marks, a count and the item
 // ---------------------------------------------------------------------------
 // The mark's footprint, and the mark inside it. Its outline is drawn as the
@@ -739,168 +933,21 @@ $dndc-item-quantity-width: 4.5em;
 }
 
 // ---------------------------------------------------------------------------
-// Features: rows the reader adds, removes and puts in order
+// Features: a list of what a character can do
 // ---------------------------------------------------------------------------
 // The rows are as wide as the panel gets: a feature's name and its description
 // sit side by side, and halving that would leave neither enough to read.
 .experiment-ext-dndc .experiment-ext-ui-group[data-group="features"] { grid-column: 1 / -1; }
 
-.experiment-ext-dndc-features {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-// A row is a box of its own, because it's a thing that can be picked up and
-// put down somewhere else — the handle to the left, what it moves in the
-// middle, and the button that takes it away on the right.
-.experiment-ext-dndc-feature {
-  display: grid;
-  grid-template-columns: $dndc-row-button minmax(0, 1fr) $dndc-row-button;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem;
-  border: 1px solid $exp-border;
-  border-radius: 0.5rem;
-  background: $exp-surface;
-
-  @include exp-dark {
-    border-color: $exp-border-dark;
-    background: $exp-surface-dark;
-  }
-}
-
-// Where a dragged row would land. Both a color and an offset outline, so the
-// target is obvious to anyone who can't tell the two borders apart.
-.experiment-ext-dndc-feature-over {
-  border-color: $exp-link;
-  outline: 2px dashed $exp-link;
-  outline-offset: 2px;
-
-  @include exp-dark {
-    border-color: $exp-link-dark;
-    outline-color: $exp-link-dark;
-  }
-}
-
-// A row's fields in the order the card prints them: how many boxes, then what
-// they count. The count is fixed and narrow — it holds two digits — and the
-// text takes everything else. They line up at the top, because the description
-// grows down as it is typed into and the fields beside it belong next to its
-// first line rather than its last.
-.experiment-ext-dndc-feature-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: start;
-  gap: 0.6rem;
-  min-width: 0;
-
-  > * { flex: 1 1 $dndc-feature-field; min-width: 0; }
-  > :first-child { flex: 0 0 $dndc-feature-count; }
+// A feature's fields in the order the card prints them: how many boxes, then
+// what they count. The count is fixed and narrow — it holds two digits — and
+// the text takes what is left.
+.experiment-ext-dndc-row-feature {
+  .experiment-ext-dndc-row-fields > :first-child { flex: 0 0 $dndc-feature-count; }
 
   // A spellcasting row has one picker where a general row has two text fields,
   // and a picker holding "1st" has no use for the width of both.
   select { max-width: $dndc-feature-picker; }
-}
-
-// The handle and the remove button share a footprint, so every row's fields
-// start and end on the same line however long the row's contents are.
-.experiment-ext-dndc-handle,
-.experiment-ext-dndc-remove {
-  appearance: none;
-  display: grid;
-  place-items: center;
-  width: $dndc-row-button;
-  height: $dndc-row-button;
-  padding: 0;
-  font: inherit;
-  line-height: 1;
-  border-radius: 0.4rem;
-  border: 1px solid $exp-border;
-  background: transparent;
-  color: $exp-muted;
-
-  &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
-
-  @include exp-dark {
-    border-color: $exp-border-dark;
-    color: $exp-muted-dark;
-    &:focus-visible { outline-color: $exp-link-dark; }
-  }
-}
-
-// Grabbable, and visibly so: the cursor is the only thing that says this one
-// is for dragging rather than pressing.
-.experiment-ext-dndc-handle {
-  cursor: grab;
-  &:active { cursor: grabbing; }
-  &:hover { border-color: $exp-link; color: $exp-link; }
-
-  @include exp-dark {
-    &:hover { border-color: $exp-link-dark; color: $exp-link-dark; }
-  }
-}
-
-.experiment-ext-dndc-remove {
-  cursor: pointer;
-  font-size: 1.1em;
-  &:hover { border-color: $exp-error; color: $exp-error; }
-
-  @include exp-dark {
-    &:hover { border-color: $exp-error-dark; color: $exp-error-dark; }
-  }
-}
-
-// Adding a row, which is the same offer the tab strip makes for a whole card
-// and so is dashed the same way. It gets classes of its own all the same: one
-// is a control of the page being edited and the other belongs to the panel
-// around it, and they are free to diverge.
-.experiment-ext-dndc-add-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.experiment-ext-dndc-add-row-label {
-  margin-right: 0.2rem;
-  font-family: $exp-mono-font-family;
-  font-size: 0.72em;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: $exp-muted;
-
-  @include exp-dark { color: $exp-muted-dark; }
-}
-
-.experiment-ext-dndc-add-row-button {
-  appearance: none;
-  font: inherit;
-  font-size: 0.8em;
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
-  border: 1px dashed $exp-border;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-
-  &:hover { border-color: $exp-link; color: $exp-link; }
-  &:focus-visible { outline: 2px solid $exp-link; outline-offset: 1px; }
-
-  // A full card still shows both buttons, greyed: the row of things you could
-  // add is also what says how many kinds of row there are.
-  &:disabled {
-    opacity: 0.45;
-    cursor: default;
-    &:hover { border-color: $exp-border; color: inherit; }
-  }
-
-  @include exp-dark {
-    border-color: $exp-border-dark;
-    &:hover { border-color: $exp-link-dark; color: $exp-link-dark; }
-    &:focus-visible { outline-color: $exp-link-dark; }
-    &:disabled:hover { border-color: $exp-border-dark; color: inherit; }
-  }
 }
 
 // ---------------------------------------------------------------------------

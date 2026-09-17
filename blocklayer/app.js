@@ -16,7 +16,6 @@
   var state = {
     level: loadLevel(),
     view: B.view.create(),
-    scale: B.ZOOM_DEFAULT,
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
     selected: null,
@@ -107,17 +106,18 @@
   }
 
   // ---- Frame and picking ---------------------------------------------------
-  function devicePixelRatio() {
+  function dpr() {
     return window.devicePixelRatio || 1;
   }
 
-  function syncScale() {
-    state.scale = state.view.zoom * devicePixelRatio();
+  // Visible-canvas pixels per base-scale pixel.
+  function scale() {
+    return state.view.zoom * dpr();
   }
 
   function resize() {
-    var w = Math.round(canvas.clientWidth * devicePixelRatio());
-    var h = Math.round(canvas.clientHeight * devicePixelRatio());
+    var w = Math.round(canvas.clientWidth * dpr());
+    var h = Math.round(canvas.clientHeight * dpr());
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== h) canvas.height = h;
     sched();
@@ -134,11 +134,11 @@
     var cssW = canvas.clientWidth;
     var cssH = canvas.clientHeight;
     if (!cssW || !cssH) return null;
-    syncScale();
+    var s = scale();
     var rect = canvas.getBoundingClientRect();
-    var frame = B.view.frame(canvas, state.scale);
-    var bx = (clientX - rect.left - canvas.clientLeft) * (canvas.width / cssW) / state.scale;
-    var by = (clientY - rect.top - canvas.clientTop) * (canvas.height / cssH) / state.scale;
+    var frame = B.view.frame(canvas, s);
+    var bx = (clientX - rect.left - canvas.clientLeft) * (canvas.width / cssW) / s;
+    var by = (clientY - rect.top - canvas.clientTop) * (canvas.height / cssH) / s;
     return B.view.pick(state.view, state.level, bx - frame.ox, by - frame.oy);
   }
 
@@ -146,8 +146,7 @@
   var rafId = null;
 
   function render() {
-    syncScale();
-    B.render.draw(canvas, state);
+    B.render.draw(canvas, state, scale());
   }
 
   function sched() {

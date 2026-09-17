@@ -2,7 +2,8 @@
  * Blocklayer — drawing the scene. Everything is drawn once, at base scale, on
  * an offscreen canvas: the columns back to front with what stands on them,
  * then the ghost and the compass. That bitmap is blitted to the visible canvas
- * at the view's zoom with smoothing off, so every pixel stays a crisp square.
+ * at `scale` (the view's zoom times the device pixel ratio) with smoothing
+ * off, so every pixel stays a crisp square.
  */
 (function () {
   "use strict";
@@ -107,8 +108,8 @@
     B.pixel.draw(ctx, compass, COMPASS_MARGIN + compass.ox, COMPASS_MARGIN + compass.oy);
   }
 
-  function draw(canvas, state) {
-    var frame = B.view.frame(canvas, state.scale);
+  function draw(canvas, state, scale) {
+    var frame = B.view.frame(canvas, scale);
     if (!frame.w || !frame.h) return;
     var scene = baseCanvas(frame);
     var ctx = B.pixel.context(scene);
@@ -123,7 +124,7 @@
     var out = canvas.getContext("2d");
     out.imageSmoothingEnabled = false;
     out.clearRect(0, 0, canvas.width, canvas.height);
-    out.drawImage(scene, 0, 0, scene.width * state.scale, scene.height * state.scale);
+    out.drawImage(scene, 0, 0, scene.width * scale, scene.height * scale);
   }
 
   B.render = { draw: draw };

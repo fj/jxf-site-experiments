@@ -1,0 +1,114 @@
+"use strict";
+
+const { describe, it } = require("node:test");
+const assert = require("node:assert/strict");
+const { inspect } = require("node:util");
+const { load } = require("./load");
+
+const B = load(["config.js", "level.js", "file.js"]);
+const F = B.file;
+const L = B.level;
+
+const TWO_SPACE_INDENT = 2;
+
+function goodTile(overrides = {}) {
+  return {
+    x: 1, y: 2, elev: 0, shape: "block", facing: "N", decor: null, marks: [], ...overrides
+  };
+}
+
+describe("file: names", () => {
+  it("saves as level.blocklayer.json", () => {
+    assert.equal(F.EXTENSION, ".blocklayer.json");
+    assert.equal(F.FILE_NAME, "level.blocklayer.json");
+  });
+});
+
+describe("file: serialize", () => {
+  const demo = L.demo();
+  const text = F.serialize(demo);
+
+  it("writes valid JSON equal to the level's toJSON", () => {
+    assert.deepEqual(JSON.parse(text), L.toJSON(demo));
+  });
+
+  it("pretty-prints with a two-space indent", () => {
+    assert.equal(text, JSON.stringify(L.toJSON(demo), null, TWO_SPACE_INDENT) + "\n");
+    assert.match(text, /^\{\n {2}"version": 1,\n {2}"tiles": \[\n {4}\{\n {6}"x": /);
+  });
+
+  it("ends with exactly one newline", () => {
+    assert.ok(text.endsWith("\n"), "ends with a newline");
+    assert.ok(!text.endsWith("\n\n"), "and only one");
+  });
+
+  it("writes an empty level", () => {
+    assert.equal(F.serialize(L.create()), '{\n  "version": 1,\n  "tiles": []\n}\n');
+  });
+});
+
+describe("file: parse", () => {
+  it("round-trips the demo level", () => {
+    const level = F.parse(F.serialize(L.demo()));
+    assert.deepEqual(L.toJSON(level), L.toJSON(L.demo()));
+  });
+
+  it("round-trips an empty level", () => {
+    assert.deepEqual(F.parse(F.serialize(L.create())), L.create());
+  });
+
+  it("returns null for text that is not JSON", () => {
+    for (const text of ["", "not json", "{", "{tiles: []}", "{'tiles': []}"]) {
+      assert.equal(F.parse(text), null, inspect(text));
+    }
+  });
+
+  it("returns null for JSON that is not a level", () => {
+    for (const text of ["[]", "1", "null", '"level"', "{}", '{"tiles": 1}', '{"tiles": {}}']) {
+      assert.equal(F.parse(text), null, text);
+    }
+  });
+
+  it("never throws, whatever it is handed", () => {
+    for (const junk of [undefined, null, 42, {}, [], () => {}, " ", "\u0000"]) {
+      assert.doesNotThrow(() => F.parse(junk), inspect(junk));
+      assert.equal(F.parse(junk), null, inspect(junk));
+    }
+  });
+
+  it("keeps the good tiles of a file that also holds bad ones", () => {
+    const text = JSON.stringify({
+      version: 1,
+      tiles: [
+        goodTile({ x: 0 }),
+        goodTile({ x: 1, elev: B.ELEV_MAX + 1 }),
+        goodTile({ x: 2, shape: "dome" }),
+        "tile",
+        goodTile({ x: 3, marks: ["rope", "arrow-up", "rope"] })
+      ]
+    });
+    const level = F.parse(text);
+    assert.equal(L.count(level), 2);
+    assert.deepEqual(L.get(level, 0, 2), goodTile({ x: 0 }));
+    assert.deepEqual(L.get(level, 3, 2), goodTile({ x: 3, marks: ["rope"] }));
+  });
+
+  it("reads a hand-written file without the version or the optional fields", () => {
+    const level = F.parse('{"tiles":[{"x":0,"y":0,"elev":1,"shape":"block","facing":"N"}]}');
+    assert.deepEqual(L.get(level, 0, 0), goodTile({ x: 0, y: 0, elev: 1 }));
+  });
+});
+
+describe("file: isLevelFile", () => {
+  it("accepts the level extension and plain .json in any case", () => {
+    const names = [
+      "x.blocklayer.json", "X.BLOCKLAYER.JSON", "x.json", "level.JSON", "dir.d/level.blocklayer.json"
+    ];
+    for (const name of names) assert.equal(F.isLevelFile(name), true, name);
+  });
+
+  it("refuses other names, an empty name and non-strings", () => {
+    const names = ["x.txt", "x.json.txt", "json", "x.jsonx", "", undefined, null, 3, {}, ["x.json"]];
+    for (const name of names) assert.equal(F.isLevelFile(name), false, inspect(name));
+  });
+});

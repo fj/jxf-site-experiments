@@ -37,7 +37,8 @@ not the host.
 An experiment's pure modules — the ones with no DOM or canvas in them — can
 carry `node:test` files in a `tests/` directory beside them. The host runs every
 such directory with `task test:experiments`; on its own, `node --test
-<experiment>/tests/` does the same. Everything that draws is checked by eye.
+'<experiment>/tests/*.test.js'` does the same (a bare directory is not a test
+pattern to node). Everything that draws is checked by eye.
 
 Because the app runs in the host page's document, it inherits the site's fonts,
 colours, and dark mode while bringing its own scoped component styles. Anything

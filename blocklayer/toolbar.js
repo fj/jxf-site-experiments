@@ -16,7 +16,6 @@
   var HOLD_VAR = "--" + B.PREFIX + "hold";             // the fill animation's length
   var HOLDING_CLASS = "is-holding";
   var PRIMARY_BUTTON = 0;
-  var FLAT_SHAPE = "block";                            // the one shape with no facing
   var HOLD_KEYS = [" ", "Enter"];
   var FILE_ACCEPT = ".json";
   var UNTURNED = 0;                                    // the rotation icons are built for
@@ -317,7 +316,7 @@
       B.SHAPES.forEach(function (shape) {
         syncToggle(refs.shapes[shape], tile, tile && tile.shape === shape);
       });
-      refs.facing.disabled = !tile || tile.shape === FLAT_SHAPE;
+      refs.facing.disabled = !tile || !B.level.sloped(tile);
       var facing = tile ? tile.facing : B.FACINGS[0];
       setSprite(refs.facingIcon, B.marks.arrow(B.facingDir(rot, facing)));
       B.DECOR.forEach(function (d) {

@@ -77,16 +77,18 @@ describe("level: tiles", () => {
   });
 });
 
-describe("level: top and maxElev", () => {
-  it("a block tops out at its elevation and can reach the max", () => {
+describe("level: sloped, top and maxElev", () => {
+  it("a block is flat, tops out at its elevation and can reach the max", () => {
     const block = tile({ elev: 2 });
+    assert.equal(L.sloped(block), false);
     assert.equal(L.top(block), 2);
     assert.equal(L.maxElev(block), B.ELEV_MAX);
   });
 
-  it("a ramp or stairs tops out one block higher and so stops one lower", () => {
+  it("a ramp or stairs is sloped, tops out one block higher and so stops one lower", () => {
     for (const shape of ["ramp", "stairs"]) {
       const sloped = tile({ elev: 2, shape });
+      assert.equal(L.sloped(sloped), true);
       assert.equal(L.top(sloped), 3);
       assert.equal(L.maxElev(sloped), B.ELEV_MAX - 1);
     }

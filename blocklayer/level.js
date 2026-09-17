@@ -195,6 +195,7 @@
     add: add,
     remove: remove,
     clear: clear,
+    sloped: sloped,
     top: top,
     maxElev: maxElev,
     raise: raise,

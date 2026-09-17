@@ -222,7 +222,10 @@
       editSelected(function (x, y) { B.level.setShape(state.level, x, y, shape); });
     },
     cycleFacing: function () {
-      editSelected(function (x, y) { B.level.cycleFacing(state.level, x, y); });
+      editSelected(function (x, y) {
+        if (!B.level.sloped(B.level.get(state.level, x, y))) return false;
+        B.level.cycleFacing(state.level, x, y);
+      });
     },
     setDecor: function (key) {
       editSelected(function (x, y) { B.level.setDecor(state.level, x, y, key); });

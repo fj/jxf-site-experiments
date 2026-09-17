@@ -57,42 +57,43 @@
     }
   }
 
-  function drawTile(ctx, state, tile, ox, oy) {
+  // Where a tile's anchor (the centre of its top diamond) lands on the base
+  // canvas.
+  function place(state, frame, tile) {
+    var P = B.view.project(state.view, tile.x, tile.y, tile.elev);
+    return { x: frame.ox + P.sx, y: frame.oy + P.sy };
+  }
+
+  function drawTile(ctx, state, tile, at) {
     var view = state.view;
     var viewFacing = B.view.viewFacing(view.rot, tile.facing);
-    var P = B.view.project(view, tile.x, tile.y, tile.elev);
-    var px = ox + P.sx;
-    var py = oy + P.sy;
-    var top = wedge(tile, viewFacing);
+    var slope = wedge(tile, viewFacing);
 
     ctx.globalAlpha = state.opaque ? 1 : B.TRANSPARENT_ALPHA;
-    B.pixel.draw(ctx, B.tiles.column(tile.elev), px, py);
-    if (top) B.pixel.draw(ctx, top, px, py);
+    B.pixel.draw(ctx, B.tiles.column(tile.elev), at.x, at.y);
+    if (slope) B.pixel.draw(ctx, slope, at.x, at.y);
     ctx.globalAlpha = 1;
 
     if (B.sameCell(state.hold, tile.x, tile.y)) {
-      B.pixel.draw(ctx, B.tiles.holdMask(state.hold.progress), px, py);
+      B.pixel.draw(ctx, B.tiles.holdMask(state.hold.progress), at.x, at.y);
     }
     var kind = outlineKind(state, tile);
-    if (kind) B.pixel.draw(ctx, B.tiles.outline(tile.shape, viewFacing, kind), px, py);
+    if (kind) B.pixel.draw(ctx, B.tiles.outline(tile.shape, viewFacing, kind), at.x, at.y);
 
-    var Q = B.view.project(view, tile.x, tile.y, B.level.top(tile));
-    var qx = ox + Q.sx;
-    var qy = oy + Q.sy;
+    // What stands on the tile stands on its top, a block up on a slope.
+    var topY = at.y - (B.level.top(tile) - tile.elev) * B.BLOCK_H;
     var decor = state.layers.decor && tile.decor ? B.decor.sprite(tile.decor) : null;
-    if (decor) B.pixel.draw(ctx, decor, qx, qy);
+    if (decor) B.pixel.draw(ctx, decor, at.x, topY);
     if (state.layers.marks && tile.marks.length) {
-      drawMarks(ctx, view.rot, tile.marks, qx, decor ? qy - decor.oy - MARK_ABOVE_DECOR : qy);
+      drawMarks(ctx, view.rot, tile.marks, at.x, decor ? topY - decor.oy - MARK_ABOVE_DECOR : topY);
     }
   }
 
   // Labels go over every column, so no tile in front can cover another's.
-  function drawLabels(ctx, state, tiles, ox, oy) {
+  function drawLabels(ctx, state, tiles, at) {
     if (!state.layers.elevation) return;
     for (var i = 0; i < tiles.length; i++) {
-      var tile = tiles[i];
-      var P = B.view.project(state.view, tile.x, tile.y, tile.elev);
-      B.pixel.draw(ctx, B.tiles.label(elevText(tile.elev)), ox + P.sx, oy + P.sy + LABEL_DY);
+      B.pixel.draw(ctx, B.tiles.label(elevText(tiles[i].elev)), at[i].x, at[i].y + LABEL_DY);
     }
   }
 
@@ -116,8 +117,9 @@
     ctx.clearRect(0, 0, frame.w, frame.h);
 
     var tiles = B.view.order(state.view, B.level.all(state.level));
-    for (var i = 0; i < tiles.length; i++) drawTile(ctx, state, tiles[i], frame.ox, frame.oy);
-    drawLabels(ctx, state, tiles, frame.ox, frame.oy);
+    var at = tiles.map(function (tile) { return place(state, frame, tile); });
+    for (var i = 0; i < tiles.length; i++) drawTile(ctx, state, tiles[i], at[i]);
+    drawLabels(ctx, state, tiles, at);
     drawGhost(ctx, state, frame.ox, frame.oy);
     drawCompass(ctx, state);
 

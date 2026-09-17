@@ -182,20 +182,22 @@ describe("view: hit", () => {
 
   it("is true inside the top diamond and on its upper outline", () => {
     const inside = [[0, 0], [0, -7], [10, 0], [-10, 0], [15, 0], [8, -3], [0, 7]];
-    const upperEdge = [[0, -8], [8, -4], [-8, -4], [16, 0], [-16, 0]];
+    const upperEdge = [[0, -8], [8, -4], [-8, -4]];
     for (const [dx, dy] of [...inside, ...upperEdge]) {
       assert.equal(V.hit(view, block, dx, dy), true, `${dx},${dy}`);
     }
   });
 
   it("is true on the side faces down to the floor", () => {
-    for (const [dx, dy] of [[0, 40], [-15, 20], [15, 20], [0, columnH + 8], [16, columnH]]) {
+    for (const [dx, dy] of [[0, 40], [-15, 20], [15, 20], [0, columnH + 8], [15, columnH]]) {
       assert.equal(V.hit(view, block, dx, dy), true, `${dx},${dy}`);
     }
   });
 
-  it("is false just outside the silhouette", () => {
-    for (const [dx, dy] of [[17, 0], [-17, 0], [0, -9], [10, -4], [-10, -4], [16, -1]]) {
+  it("is false just outside the silhouette, its side vertices included", () => {
+    const outside = [[17, 0], [-17, 0], [0, -9], [10, -4], [-10, -4], [16, -1]];
+    const sideVertices = [[16, 0], [-16, 0], [16, columnH]];
+    for (const [dx, dy] of [...outside, ...sideVertices]) {
       assert.equal(V.hit(view, block, dx, dy), false, `${dx},${dy}`);
     }
   });
@@ -255,6 +257,18 @@ describe("view: pick", () => {
     const only = L.add(level, 2, -3, -1);
     const p = V.project(view, 2, -3, -1);
     assert.deepEqual(V.pick(view, level, p.sx + 4, p.sy + 20), { tile: only });
+  });
+
+  it("gives the empty cell beside a lone tile its own centre, and the tile one pixel in", () => {
+    const view = V.create();
+    const level = L.create();
+    const lone = L.add(level, 0, 0, 0);
+    for (const [x, y] of [[1, 0], [0, 1]]) {
+      const p = V.project(view, x, y, B.NEW_TILE_ELEV);
+      const inward = p.sx > 0 ? -1 : 1;
+      assert.deepEqual(V.pick(view, level, p.sx, p.sy), { cell: { x, y } }, `(${x},${y})`);
+      assert.deepEqual(V.pick(view, level, p.sx + inward, p.sy), { tile: lone }, `(${x},${y})`);
+    }
   });
 
   it("returns the empty cell on the new-tile plane", () => {

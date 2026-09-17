@@ -89,7 +89,7 @@
     var dx = Math.abs(sx - centre.sx);
     var dy = sy - centre.sy;
     var edge = HALF_TILE_H * (1 - dx / HALF_TILE_W);
-    return dx <= HALF_TILE_W && dy >= -edge && dy <= height + edge;
+    return dx < HALF_TILE_W && dy >= -edge && dy <= height + edge;
   }
 
   function pick(view, level, sx, sy) {

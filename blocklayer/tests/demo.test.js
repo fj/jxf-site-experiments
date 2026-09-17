@@ -26,22 +26,31 @@ describe("demo: the first level", () => {
     assert.equal(L.count(demo), tiles.length);
   });
 
-  it("has a plateau at 0, a raised 2x2 at +1 and a sunken row at -1", () => {
+  it("has a plateau at 2, a raised 2x2 at 3, a sunken row at 1 and flat ground at 0", () => {
     const at = (elev) => tiles.filter((t) => t.elev === elev && t.shape === "block");
-    assert.ok(at(0).length >= 30);
-    assert.equal(at(1).length, 4);
-    assert.ok(at(-1).length >= 6);
-    assert.equal(new Set(at(-1).map((t) => t.y)).size, 1);
+    assert.ok(at(2).length >= 28);
+    assert.equal(at(3).length, 4);
+    for (const elev of [1, 0]) {
+      assert.ok(at(elev).length >= 6, `the row at ${elev}`);
+      assert.equal(new Set(at(elev).map((t) => t.y)).size, 1, `the row at ${elev}`);
+    }
+  });
+
+  it("reaches both ends of the elevation range and a step between, so each is in sight", () => {
+    const elevs = tiles.map((t) => t.elev);
+    assert.equal(Math.min(...elevs), B.ELEV_MIN);
+    assert.equal(Math.max(...elevs), B.ELEV_MAX);
+    assert.ok(elevs.some((e) => e > 3 && e < B.ELEV_MAX), "a step above the raised square");
   });
 
   it("climbs the raised square by a ramp and by stairs that face it", () => {
-    const raised = new Set(tiles.filter((t) => t.elev === 1).map((t) => L.key(t.x, t.y)));
+    const raised = new Set(tiles.filter((t) => t.elev === 3).map((t) => L.key(t.x, t.y)));
     const step = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
     for (const shape of ["ramp", "stairs"]) {
       const ways = tiles.filter((t) => t.shape === shape);
       assert.equal(ways.length, 1, shape);
       const [dx, dy] = step[ways[0].facing];
-      assert.equal(ways[0].elev, 0);
+      assert.equal(ways[0].elev, 2);
       assert.ok(raised.has(L.key(ways[0].x + dx, ways[0].y + dy)), `${shape} faces the top`);
     }
   });

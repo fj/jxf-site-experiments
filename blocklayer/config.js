@@ -12,10 +12,10 @@
   B.PREFIX = "experiment-ext-blk-";
   B.STORAGE_KEY = "experiment-ext-blk-level";
 
-  B.ELEV_MIN = -3;
-  B.ELEV_MAX = 3;
-  B.FLOOR = -4;            // the ground the lowest column stands on
-  B.NEW_TILE_ELEV = 0;
+  B.ELEV_MIN = 0;
+  B.ELEV_MAX = 7;
+  B.FLOOR = B.ELEV_MIN;    // a tile at ELEV_MIN has no blocks: its top is the ground
+  B.NEW_TILE_ELEV = 1;
 
   B.TILE_W = 32;           // base-scale pixels: the top diamond's width
   B.TILE_H = 16;           // ...and its height
@@ -56,16 +56,17 @@
     { key: "jump", label: "Jump" }
   ];
 
-  // The top face's colour at each elevation: cool and dark below ground,
-  // warm and bright up high, so height reads without a label.
+  // The top face's colour at each elevation: cool and dark on the floor, warm
+  // and bright up high, so height reads without a label.
   B.ELEVATION_COLORS = {
-    "-3": "#5e7ce2",
-    "-2": "#4fa3e0",
-    "-1": "#4cc9b0",
-    "0": "#7ed957",
-    "1": "#b8e05a",
-    "2": "#f2d55c",
-    "3": "#f29e4c"
+    "0": "#4fa3e0",
+    "1": "#7ed957",
+    "2": "#a6de56",
+    "3": "#cfe25a",
+    "4": "#f2d55c",
+    "5": "#f2ae4f",
+    "6": "#ef8a42",
+    "7": "#e05038"
   };
 
   B.COLORS = {

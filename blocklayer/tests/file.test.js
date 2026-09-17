@@ -21,7 +21,7 @@ function sampleLevel() {
   L.setDecor(level, 1, 0, "chest");
   L.toggleMark(level, 1, 0, "arrow-n");
   L.toggleMark(level, 1, 0, "rope");
-  L.add(level, -2, 3, -3);
+  L.add(level, -2, 3, B.ELEV_MIN);
   return level;
 }
 

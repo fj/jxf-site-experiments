@@ -55,8 +55,7 @@
     "7": ["###", "..#", "..#", "..#", "..#"],
     "8": ["###", "#.#", "###", "#.#", "###"],
     "9": ["###", "#.#", "###", "..#", "###"],
-    "+": ["...", ".#.", "###", ".#.", "..."],
-    "-": ["...", "...", "###", "...", "..."]
+    "+": ["...", ".#.", "###", ".#.", "..."]
   };
 
   function topColor(elev) {
@@ -342,13 +341,16 @@
   }
 
   // The two side faces of a column `blocks` tall and its top, filled on a
-  // canvas that fits them; the top's centre is at (HALF_W, HALF_H).
+  // canvas that fits them; the top's centre is at (HALF_W, HALF_H). A column
+  // of no blocks is its top alone, lying on the floor.
   function columnShape(blocks, left, right, top) {
     var c = P.canvas(W, H * (blocks + 1));
     var ctx = P.context(c);
     var bottom = -blocks * BLOCK;
-    fillFace(ctx, HALF_W, HALF_H, leftFace(bottom, 0), left);
-    fillFace(ctx, HALF_W, HALF_H, rightFace(bottom, 0), right);
+    if (blocks) {
+      fillFace(ctx, HALF_W, HALF_H, leftFace(bottom, 0), left);
+      fillFace(ctx, HALF_W, HALF_H, rightFace(bottom, 0), right);
+    }
     fillFace(ctx, HALF_W, HALF_H, diamond(0), top);
     return c;
   }
@@ -389,15 +391,17 @@
 
   // The column a click would add, up to `elev`, as a dotted outline: the
   // silhouette's ring, the seam under the top and the edge between the faces,
-  // with a "+" on the top face.
+  // with a "+" on the top face. A tile of no blocks is the ring and the "+".
   function ghost(elev) {
     var blocks = elev - B.FLOOR;
     var ink = B.COLORS.outline;
     var c = ring(columnShape(blocks, ink, ink, ink), 1, ink);
     var ctx = P.context(c);
-    drawSeam(ctx, 0, ink, ink);
-    ctx.fillStyle = ink;
-    ctx.fillRect(FRONT_EDGE_X, H, 1, blocks * BLOCK);
+    if (blocks) {
+      drawSeam(ctx, 0, ink, ink);
+      ctx.fillStyle = ink;
+      ctx.fillRect(FRONT_EDGE_X, H, 1, blocks * BLOCK);
+    }
     dot(c, B.COLORS.ghost);
     drawPlus(ctx, HALF_W, HALF_H);
     return P.sprite(c, HALF_W, HALF_H);

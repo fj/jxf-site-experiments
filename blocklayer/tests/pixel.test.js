@@ -7,7 +7,7 @@ const { load } = require("./load");
 const B = load(["config.js", "pixel.js"]);
 const P = B.pixel;
 
-const GREEN = "#7ed957";        // 126, 217, 87: the top face at elevation 0
+const GREEN = "#7ed957";        // 126, 217, 87: the top face at elevation 1
 
 describe("pixel: parseHex and toHex", () => {
   it("parses a hex colour into its three channels, whatever the case", () => {

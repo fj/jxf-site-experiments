@@ -14,6 +14,7 @@ function stage() {
   const B = load(["config.js", "level.js", "view.js", "render.js"]);
   const draws = [];
   const ghostElevs = [];
+  const labels = [];
   const tag = (name) => ({ name, ox: 0, oy: 0 });
   const ctx = { globalAlpha: 1, imageSmoothingEnabled: true, clearRect() {}, drawImage() {} };
   B.pixel = {
@@ -28,7 +29,7 @@ function stage() {
     ghost: (elev) => { ghostElevs.push(elev); return tag("ghost"); },
     outline: () => tag("outline"),
     holdMask: () => tag("hold"),
-    label: () => tag("label")
+    label: (text) => { labels.push(text); return tag("label"); }
   };
   B.icons = { compass: () => tag("compass") };
   B.decor = { sprite: () => tag("decor") };
@@ -48,12 +49,31 @@ function stage() {
     state,
     draws,
     ghostElevs,
-    add: (x, y) => B.level.add(state.level, x, y),
+    labels,
+    add: (x, y, elev) => B.level.add(state.level, x, y, elev),
     draw: () => B.render.draw(canvas, state, SCALE),
     names: () => draws.map((d) => d[0]),
     frame: () => B.view.frame(canvas, SCALE)
   };
 }
+
+describe("render: the elevation labels", () => {
+  it("labels each column with its elevation, as a plain number", () => {
+    const s = stage();
+    s.add(0, 0, s.B.ELEV_MIN);
+    s.add(1, 1, s.B.ELEV_MAX);
+    s.draw();
+    assert.deepEqual(s.labels, [String(s.B.ELEV_MIN), String(s.B.ELEV_MAX)]);
+  });
+
+  it("draws no label while the elevation layer is off", () => {
+    const s = stage();
+    s.add(0, 0, s.B.ELEV_MIN);
+    s.state.layers.elevation = false;
+    s.draw();
+    assert.deepEqual(s.labels, []);
+  });
+});
 
 describe("render: the ghost", () => {
   it("takes its turn in depth order: after the column behind it, before the one in front", () => {

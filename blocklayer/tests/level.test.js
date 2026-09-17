@@ -44,7 +44,7 @@ describe("level: tiles", () => {
     const level = L.create();
     const first = L.add(level, 0, 0, 2);
     L.toggleMark(level, 0, 0, "rope");
-    const again = L.add(level, 0, 0, -3);
+    const again = L.add(level, 0, 0, B.ELEV_MAX);
     assert.equal(again, first);
     assert.equal(again.elev, 2);
     assert.deepEqual(again.marks, ["rope"]);
@@ -77,6 +77,16 @@ describe("level: tiles", () => {
   });
 });
 
+describe("level: the elevation range", () => {
+  it("runs from flat ground to seven blocks, and a new tile is one block high", () => {
+    assert.deepEqual([B.ELEV_MIN, B.ELEV_MAX, B.NEW_TILE_ELEV], [0, 7, 1]);
+  });
+
+  it("puts the floor at the lowest elevation, where a tile carries no block", () => {
+    assert.equal(B.FLOOR, B.ELEV_MIN);
+  });
+});
+
 describe("level: sloped, top and maxElev", () => {
   it("a block is flat, tops out at its elevation and can reach the max", () => {
     const block = tile({ elev: 2 });
@@ -98,10 +108,10 @@ describe("level: sloped, top and maxElev", () => {
 describe("level: raise", () => {
   it("moves the elevation by the delta and returns it", () => {
     const level = L.create();
-    L.add(level, 0, 0, 0);
-    assert.equal(L.raise(level, 0, 0, 1), 1);
-    assert.equal(L.raise(level, 0, 0, -2), -1);
-    assert.equal(L.get(level, 0, 0).elev, -1);
+    L.add(level, 0, 0, 2);
+    assert.equal(L.raise(level, 0, 0, 1), 3);
+    assert.equal(L.raise(level, 0, 0, -2), 1);
+    assert.equal(L.get(level, 0, 0).elev, 1);
   });
 
   it("clamps at the top and the bottom", () => {
@@ -253,7 +263,7 @@ describe("level: toJSON", () => {
     const level = L.create();
     L.add(level, 2, 1);
     L.add(level, 0, 1);
-    L.add(level, 5, 0, -2);
+    L.add(level, 5, 0, 4);
     L.setShape(level, 5, 0, "stairs");
     L.setFacing(level, 5, 0, "S");
     L.setDecor(level, 5, 0, "rock");
@@ -261,9 +271,9 @@ describe("level: toJSON", () => {
     assert.deepEqual(L.toJSON(level), {
       version: 1,
       tiles: [
-        { x: 5, y: 0, elev: -2, shape: "stairs", facing: "S", decor: "rock", marks: ["teleport"] },
-        { x: 0, y: 1, elev: 0, shape: "block", facing: "N", decor: null, marks: [] },
-        { x: 2, y: 1, elev: 0, shape: "block", facing: "N", decor: null, marks: [] }
+        { x: 5, y: 0, elev: 4, shape: "stairs", facing: "S", decor: "rock", marks: ["teleport"] },
+        { x: 0, y: 1, elev: B.NEW_TILE_ELEV, shape: "block", facing: "N", decor: null, marks: [] },
+        { x: 2, y: 1, elev: B.NEW_TILE_ELEV, shape: "block", facing: "N", decor: null, marks: [] }
       ]
     });
   });
@@ -288,7 +298,7 @@ describe("level: toJSON", () => {
     data.tiles[0].marks.push("jump");
     data.tiles[0].elev = 3;
     assert.deepEqual(tile.marks, ["rope"]);
-    assert.equal(tile.elev, 0);
+    assert.equal(tile.elev, B.NEW_TILE_ELEV);
   });
 });
 
@@ -310,7 +320,7 @@ describe("level: fromJSON", () => {
 
   it("reads a good tile in full", () => {
     const raw = tile({
-      elev: -2, shape: "stairs", facing: "W", decor: "chest", marks: ["jump"]
+      elev: 5, shape: "stairs", facing: "W", decor: "chest", marks: ["jump"]
     });
     const level = L.fromJSON({ version: 1, tiles: [raw] });
     assert.deepEqual(L.get(level, 1, 2), raw);
@@ -376,7 +386,7 @@ describe("level: fromJSON", () => {
     L.setDecor(level, -2, 3, "crystal-yellow");
     L.toggleMark(level, -2, 3, "arrow-sw");
     L.toggleMark(level, -2, 3, "teleport");
-    L.add(level, 4, 0, -3);
+    L.add(level, 4, 0, B.ELEV_MIN);
     assert.deepEqual(L.fromJSON(JSON.parse(JSON.stringify(L.toJSON(level)))), level);
   });
 });

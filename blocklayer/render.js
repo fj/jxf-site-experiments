@@ -25,10 +25,6 @@
     return base;
   }
 
-  function sameCell(a, x, y) {
-    return !!a && a.x === x && a.y === y;
-  }
-
   function hoveredTile(state) {
     return state.hover && state.hover.tile ? state.hover.tile : null;
   }
@@ -44,8 +40,8 @@
   }
 
   function outlineKind(state, tile) {
-    if (sameCell(state.selected, tile.x, tile.y)) return "select";
-    if (sameCell(hoveredTile(state), tile.x, tile.y)) return "hover";
+    if (B.sameCell(state.selected, tile.x, tile.y)) return "select";
+    if (B.sameCell(hoveredTile(state), tile.x, tile.y)) return "hover";
     return null;
   }
 
@@ -73,7 +69,7 @@
     if (top) B.pixel.draw(ctx, top, px, py);
     ctx.globalAlpha = 1;
 
-    if (sameCell(state.hold, tile.x, tile.y)) {
+    if (B.sameCell(state.hold, tile.x, tile.y)) {
       B.pixel.draw(ctx, B.tiles.holdMask(state.hold.progress), px, py);
     }
     var kind = outlineKind(state, tile);

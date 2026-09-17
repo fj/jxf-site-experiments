@@ -91,4 +91,7 @@
   };
 
   B.clamp = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };
+
+  // Whether `a` (a tile, a cell, or nothing) sits at the cell (x, y).
+  B.sameCell = function (a, x, y) { return !!a && a.x === x && a.y === y; };
 })();

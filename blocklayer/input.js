@@ -22,10 +22,6 @@
     return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
   }
 
-  function sameCell(a, b) {
-    return !!a && !!b && a.x === b.x && a.y === b.y;
-  }
-
   function attach(canvas, handlers) {
     var dragging = false;
     var lastCell = null;
@@ -102,11 +98,11 @@
 
     function onMove(e) {
       var hit = pick(e);
+      var cell = hit && hit.cell;
+      var tile = hit && hit.tile;
       handlers.hover(hit);
-      if (dragging && hit && hit.cell && !hit.edge && !sameCell(lastCell, hit.cell)) {
-        addCell(hit.cell);
-      }
-      if (hold && !(hit && hit.tile && sameCell(hold, hit.tile))) cancelHold();
+      if (dragging && cell && !hit.edge && !B.sameCell(lastCell, cell.x, cell.y)) addCell(cell);
+      if (hold && !(tile && B.sameCell(hold, tile.x, tile.y))) cancelHold();
     }
 
     function onUp(e) {
@@ -127,7 +123,7 @@
     function onWheel(e) {
       var hit = pick(e);
       var selected = handlers.selected();
-      if (!e.deltaY || !hit || !hit.tile || !sameCell(hit.tile, selected)) return;
+      if (!e.deltaY || !hit || !hit.tile || !B.sameCell(selected, hit.tile.x, hit.tile.y)) return;
       e.preventDefault();
       handlers.raise(e.deltaY < 0 ? 1 : -1);
       handlers.hover(pick(e));

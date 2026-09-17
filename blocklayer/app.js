@@ -166,10 +166,6 @@
   }
 
   // ---- Mutations -----------------------------------------------------------
-  function sameCell(a, x, y) {
-    return !!a && a.x === x && a.y === y;
-  }
-
   function editSelected(mutate) {
     if (!state.selected) return;
     mutate(state.selected.x, state.selected.y);
@@ -178,7 +174,7 @@
 
   function remove(x, y) {
     if (!B.level.remove(state.level, x, y)) return;
-    if (sameCell(state.selected, x, y)) state.selected = null;
+    if (B.sameCell(state.selected, x, y)) state.selected = null;
     edited();
   }
 

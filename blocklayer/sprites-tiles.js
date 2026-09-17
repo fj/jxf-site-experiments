@@ -298,26 +298,6 @@
     return P.sprite(c, HALF_W, HALF_H);
   }
 
-  function top(elev) {
-    var c = P.canvas(W, H);
-    fillFace(P.context(c), HALF_W, HALF_H, diamond(0), topColor(elev));
-    outlinePass(c);
-    return P.sprite(c, HALF_W, HALF_H);
-  }
-
-  // One block's faces alone: the single-block column below its top.
-  function band(elev) {
-    var whole = column(B.FLOOR + 1).canvas;
-    var c = P.canvas(W, BLOCK + HALF_H);
-    var ctx = P.context(c);
-    ctx.drawImage(whole, 0, -HALF_H);
-    for (var y = 0; y < HALF_H; y++) {
-      var k = HALF_H - 1 - y;
-      ctx.clearRect(HALF_W - 2 - 2 * k, y, 4 + 4 * k, 1);
-    }
-    return P.sprite(c, HALF_W, 0);
-  }
-
   // ---- Overlays ------------------------------------------------------------
 
   function diamondRing(width, color) {
@@ -401,8 +381,6 @@
   var memoHold = P.memo(holdStep);
 
   B.tiles = {
-    top: P.memo(top),
-    band: P.memo(band),
     column: P.memo(column),
     ramp: P.memo(function (elev, viewFacing) { return wedge(elev, rampFaces(viewFacing)); }),
     stairs: P.memo(function (elev, viewFacing) { return wedge(elev, stairsFaces(viewFacing)); }),

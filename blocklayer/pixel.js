@@ -54,13 +54,6 @@
     ctx.drawImage(s.canvas, Math.round(x - s.ox), Math.round(y - s.oy));
   }
 
-  function scaled(s, factor) {
-    var c = canvas(s.canvas.width * factor, s.canvas.height * factor);
-    var ctx = context(c);
-    ctx.drawImage(s.canvas, 0, 0, c.width, c.height);
-    return sprite(c, s.ox * factor, s.oy * factor);
-  }
-
   function parseHex(hex) {
     var n = parseInt(hex.slice(1), HEX_RADIX);
     return [(n >> 16) & CHANNEL_MAX, (n >> 8) & CHANNEL_MAX, n & CHANNEL_MAX];
@@ -116,7 +109,6 @@
     sprite: sprite,
     fromRows: fromRows,
     draw: draw,
-    scaled: scaled,
     parseHex: parseHex,
     toHex: toHex,
     shade: shade,

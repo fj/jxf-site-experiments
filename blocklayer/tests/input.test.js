@@ -464,9 +464,9 @@ describe("input: keys on the selected tile", () => {
     ].map((mark) => ["toggleMark", mark]));
   });
 
-  it("reads a shifted key by its lowercase letter, so Caps Lock changes nothing", () => {
-    const r = pressOnSelected([["w", SHIFT]]);
-    assert.deepEqual(r.calls, [["toggleMark", "arrow-n"]]);
+  it("reads a key by its lowercase letter, so Caps Lock changes nothing", () => {
+    const r = pressOnSelected([["W"], ["w", SHIFT]]);
+    assert.deepEqual(r.calls, [["raise", 1], ["toggleMark", "arrow-n"]]);
   });
 
   it("q, e, z and c do nothing without Shift", () => {
@@ -478,12 +478,13 @@ describe("input: keys on the selected tile", () => {
     assert.deepEqual(r.calls, []);
   });
 
-  it("Shift with a key that has no mark does nothing", () => {
+  it("Shift with an unbound key is not swallowed; Shift with a view key still works", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
-    for (const key of ["R", "X", "!", "ArrowUp"]) {
-      r.fire("keydown", { key, shiftKey: true });
+    for (const key of ["R", "X", "!"]) {
+      assert.equal(r.fire("keydown", { key, shiftKey: true }).prevented, false, key);
     }
+    assert.equal(r.fire("keydown", { key: "ArrowUp", shiftKey: true }).prevented, true);
     assert.deepEqual(r.calls, [["pan", "N"]]);
   });
 

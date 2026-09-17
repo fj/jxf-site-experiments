@@ -321,32 +321,44 @@
     return { x: HALF_W - ROW_STEP * (k + 1), w: 2 * ROW_STEP * (k + 1) };
   }
 
-  // Between two stacked blocks, a darker line along the diamond's lower edge:
-  // the ROW_STEP pixels at each end of a row that the row below leaves bare.
+  // A line along the diamond's lower edges, `dy` pixels down: the ROW_STEP
+  // pixels at each end of a lower row, which the row below leaves bare.
+  function drawSeam(ctx, dy, left, right) {
+    for (var y = HALF_H; y < H; y++) {
+      var row = diamondRow(y);
+      ctx.fillStyle = left;
+      ctx.fillRect(row.x, y + dy, ROW_STEP, 1);
+      ctx.fillStyle = right;
+      ctx.fillRect(row.x + row.w - ROW_STEP, y + dy, ROW_STEP, 1);
+    }
+  }
+
+  // Between two stacked blocks, a darker seam.
   function drawSeams(ctx, elev, blocks) {
     var left = P.shade(faceColor(elev, "left"), SEAM_SHADE);
     var right = P.shade(faceColor(elev, "right"), SEAM_SHADE);
-    for (var k = 1; k < blocks; k++) {
-      for (var y = HALF_H; y < H; y++) {
-        var row = diamondRow(y);
-        ctx.fillStyle = left;
-        ctx.fillRect(row.x, y + BLOCK * k, ROW_STEP, 1);
-        ctx.fillStyle = right;
-        ctx.fillRect(row.x + row.w - ROW_STEP, y + BLOCK * k, ROW_STEP, 1);
-      }
-    }
+    for (var k = 1; k < blocks; k++) drawSeam(ctx, BLOCK * k, left, right);
+  }
+
+  // The two side faces of a column `blocks` tall and its top, filled on a
+  // canvas that fits them; the top's centre is at (HALF_W, HALF_H).
+  function columnShape(blocks, left, right, top) {
+    var c = P.canvas(W, H * (blocks + 1));
+    var ctx = P.context(c);
+    var bottom = -blocks * BLOCK;
+    fillFace(ctx, HALF_W, HALF_H, leftFace(bottom, 0), left);
+    fillFace(ctx, HALF_W, HALF_H, rightFace(bottom, 0), right);
+    fillFace(ctx, HALF_W, HALF_H, diamond(0), top);
+    return c;
   }
 
   function column(elev) {
     var blocks = elev - B.FLOOR;
-    var c = P.canvas(W, H * (blocks + 1));
-    var ctx = P.context(c);
-    var bottom = -blocks * BLOCK;
-    fillFace(ctx, HALF_W, HALF_H, leftFace(bottom, 0), faceColor(elev, "left"));
-    fillFace(ctx, HALF_W, HALF_H, rightFace(bottom, 0), faceColor(elev, "right"));
-    fillFace(ctx, HALF_W, HALF_H, diamond(0), topColor(elev));
+    var left = faceColor(elev, "left");
+    var right = faceColor(elev, "right");
+    var c = columnShape(blocks, left, right, topColor(elev));
     outlinePass(c);
-    drawSeams(ctx, elev, blocks);
+    drawSeams(P.context(c), elev, blocks);
     return P.sprite(c, HALF_W, HALF_H);
   }
 

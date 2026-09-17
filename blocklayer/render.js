@@ -33,15 +33,9 @@
   // The floor lattice under the whole canvas, with a lattice point where cell
   // (0, 0) stands on the floor, so the grid moves with the level.
   function drawGrid(ctx, state, frame) {
-    var tile = B.tiles.grid();
     var floor = B.view.project(state.view, 0, 0, B.FLOOR);
-    var x = Math.round(frame.ox + floor.sx) - tile.ox;
-    var y = Math.round(frame.oy + floor.sy) - tile.oy;
-    ctx.save();
-    ctx.fillStyle = ctx.createPattern(tile.canvas, "repeat");
-    ctx.translate(x, y);
-    ctx.fillRect(-x, -y, frame.w, frame.h);
-    ctx.restore();
+    B.pixel.drawTiled(ctx, B.tiles.grid(),
+      frame.ox + floor.sx, frame.oy + floor.sy, frame.w, frame.h);
   }
 
   function hoveredTile(state) {

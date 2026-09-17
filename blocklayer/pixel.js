@@ -11,6 +11,7 @@
   var HEX_RADIX = 16;
   var CHANNEL_MAX = 255;
   var TRANSPARENT = ".";
+  var REPEAT = "repeat";
 
   function canvas(w, h) {
     var c = document.createElement("canvas");
@@ -52,6 +53,18 @@
 
   function draw(ctx, s, x, y) {
     ctx.drawImage(s.canvas, Math.round(x - s.ox), Math.round(y - s.oy));
+  }
+
+  // `s` repeated over a w by h rect of the canvas, its anchor on (x, y). The
+  // transform carries the offset, so the pattern starts on a whole pixel.
+  function drawTiled(ctx, s, x, y, w, h) {
+    var ox = Math.round(x - s.ox);
+    var oy = Math.round(y - s.oy);
+    ctx.save();
+    ctx.fillStyle = ctx.createPattern(s.canvas, REPEAT);
+    ctx.translate(ox, oy);
+    ctx.fillRect(-ox, -oy, w, h);
+    ctx.restore();
   }
 
   // String-art rows mirrored left to right, top to bottom, or across the
@@ -132,6 +145,7 @@
     sprite: sprite,
     fromRows: fromRows,
     draw: draw,
+    drawTiled: drawTiled,
     hflip: hflip,
     vflip: vflip,
     transpose: transpose,

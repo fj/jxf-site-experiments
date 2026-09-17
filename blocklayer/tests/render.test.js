@@ -11,10 +11,9 @@ const PANS = [{ x: 0, y: 0 }, { x: 7, y: -3 }, { x: -40, y: 120 }];
 const COMPASS_SIZE = 24;        // the stand-in compass, which the badge sits under
 
 // render.js over a recording pixel layer: every sprite module answers a
-// tagged stand-in, and each draw of one is logged with its name and where the
-// context's transform puts it. A pattern fill is logged too, by the name of
-// the tile it repeats, and clearing the scene empties the log, as clearing a
-// canvas empties it.
+// tagged stand-in, and each draw of one is logged with its name and where it
+// lands. A tiled fill is logged the same way, with the rect it covers, and
+// clearing the scene empties the log, as clearing a canvas empties it.
 function stage() {
   const B = load(["config.js", "level.js", "view.js", "render.js"]);
   const draws = [];
@@ -22,28 +21,21 @@ function stage() {
   const ghostElevs = [];
   const labels = [];
   const tag = (name, size = 0) => ({ name, ox: 0, oy: 0, canvas: { width: size, height: size } });
-  const gridTile = { name: "grid", canvas: { name: "grid" }, ox: 0, oy: 0 };
-  const saved = [];
-  let at = { x: 0, y: 0 };
+  const gridTile = tag("grid");
   const scene = {
     globalAlpha: 1,
-    fillStyle: null,
     imageSmoothingEnabled: true,
-    clearRect() { draws.length = 0; fills.length = 0; },
-    save() { saved.push(at); },
-    restore() { if (saved.length) at = saved.pop(); },
-    translate(x, y) { at = { x: at.x + x, y: at.y + y }; },
-    createPattern: (image, repeat) => ({ image, repeat }),
-    fillRect(x, y, w, h) {
-      fills.push({ pattern: scene.fillStyle, at, x: at.x + x, y: at.y + y, w, h });
-      draws.push([scene.fillStyle.image.name, at.x + x, at.y + y]);
-    }
+    clearRect() { draws.length = 0; fills.length = 0; }
   };
   const out = { imageSmoothingEnabled: true, clearRect() {}, drawImage() {} };
   B.pixel = {
     canvas: (w, h) => ({ width: w, height: h }),
     context: () => scene,
-    draw: (c, sprite, x, y) => { draws.push([sprite.name, at.x + x, at.y + y]); }
+    draw: (c, sprite, x, y) => { draws.push([sprite.name, x, y]); },
+    drawTiled: (c, sprite, x, y, w, h) => {
+      draws.push([sprite.name, x, y]);
+      fills.push({ sprite, x, y, w, h });
+    }
   };
   B.tiles = {
     grid: () => gridTile,
@@ -157,37 +149,29 @@ describe("render: the floor grid", () => {
     assert.deepEqual(s.names(),
       ["grid", "column", "ghost", "label", "compass", "label"]);
     assert.equal(s.fills.length, 1);
-    assert.deepEqual(s.fills[0].pattern, { image: s.B.tiles.grid().canvas, repeat: "repeat" });
+    assert.equal(s.fills[0].sprite, s.B.tiles.grid());
   });
 
-  it("covers the whole base canvas, whichever way it is aligned", () => {
+  it("covers the whole base canvas", () => {
+    const s = stage();
+    s.draw();
+    const frame = s.frame();
+    assert.deepEqual([s.fills[0].w, s.fills[0].h], [frame.w, frame.h]);
+  });
+
+  // Any lattice point aligns the pattern, so the test asks for a cell centre
+  // rather than for cell (0, 0) itself.
+  it("anchors the pattern where a cell stands on the floor, as the view pans", () => {
     for (const pan of PANS) {
       const s = stage();
       s.state.view.pan = { ...pan };
       s.draw();
       const frame = s.frame();
       const fill = s.fills[0];
-      const where = `pan ${pan.x}, ${pan.y}`;
-      assert.ok(fill.x <= 0 && fill.y <= 0, where);
-      assert.ok(fill.x + fill.w >= frame.w && fill.y + fill.h >= frame.h, where);
-    }
-  });
-
-  // Any lattice point aligns the pattern, so the test asks for a cell centre
-  // rather than for cell (0, 0) itself.
-  it("starts the pattern on whole pixels where a cell stands on the floor, as the view pans", () => {
-    for (const pan of PANS) {
-      const s = stage();
-      s.state.view.pan = { ...pan };
-      s.draw();
-      const frame = s.frame();
-      const at = s.fills[0].at;
-      const start = { sx: at.x - frame.ox, sy: at.y - frame.oy };
+      const start = { sx: fill.x - frame.ox, sy: fill.y - frame.oy };
       const cell = s.B.view.cellAt(s.state.view, start.sx, start.sy, s.B.FLOOR);
       const stands = s.B.view.project(s.state.view, cell.x, cell.y, s.B.FLOOR);
-      const where = `pan ${pan.x}, ${pan.y}`;
-      assert.ok(Number.isInteger(at.x) && Number.isInteger(at.y), where);
-      assert.deepEqual([stands.sx, stands.sy], [start.sx, start.sy], where);
+      assert.deepEqual([stands.sx, stands.sy], [start.sx, start.sy], `pan ${pan.x}, ${pan.y}`);
     }
   });
 });

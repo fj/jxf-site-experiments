@@ -96,6 +96,53 @@ describe("pixel: hflip, vflip and transpose", () => {
   });
 });
 
+describe("pixel: drawTiled", () => {
+  const RECT = { w: 40, h: 30 };
+  const SPRITE = { canvas: { width: 32, height: 16 }, ox: 4, oy: 2 };
+
+  // A context that remembers its transform, so a fill is logged where it lands
+  // on the canvas and a leaked translate shows up.
+  function recorder() {
+    const fills = [];
+    const saved = [];
+    let at = { x: 0, y: 0 };
+    const ctx = {
+      fillStyle: null,
+      createPattern: (image, repeat) => ({ image, repeat }),
+      save() { saved.push(at); },
+      restore() { at = saved.pop(); },
+      translate(x, y) { at = { x: at.x + x, y: at.y + y }; },
+      fillRect(x, y, w, h) {
+        fills.push({ pattern: ctx.fillStyle, x: at.x + x, y: at.y + y, w, h, start: at });
+      }
+    };
+    return { ctx, fills, saved, transform: () => at };
+  }
+
+  it("fills the rect the caller asks for with the sprite's canvas, repeated", () => {
+    const r = recorder();
+    P.drawTiled(r.ctx, SPRITE, 0, 0, RECT.w, RECT.h);
+    assert.equal(r.fills.length, 1);
+    assert.deepEqual(r.fills[0].pattern, { image: SPRITE.canvas, repeat: "repeat" });
+    assert.deepEqual([r.fills[0].x, r.fills[0].y], [0, 0]);
+    assert.deepEqual([r.fills[0].w, r.fills[0].h], [RECT.w, RECT.h]);
+  });
+
+  it("starts the pattern on the sprite's anchor, rounded to a whole pixel", () => {
+    const r = recorder();
+    P.drawTiled(r.ctx, SPRITE, 10.4, -3.2, RECT.w, RECT.h);
+    assert.deepEqual(r.fills[0].start,
+      { x: Math.round(10.4 - SPRITE.ox), y: Math.round(-3.2 - SPRITE.oy) });
+  });
+
+  it("leaves the transform as it found it", () => {
+    const r = recorder();
+    P.drawTiled(r.ctx, SPRITE, 7, 9, RECT.w, RECT.h);
+    assert.deepEqual(r.transform(), { x: 0, y: 0 });
+    assert.equal(r.saved.length, 0);
+  });
+});
+
 describe("pixel: translucent", () => {
   it("writes a colour's channels with the alpha the caller asks for", () => {
     assert.equal(P.translucent(GREEN, 0.5), "rgba(126,217,87,0.5)");

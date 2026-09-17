@@ -38,7 +38,7 @@
   }
 
   function loadLevel() {
-    return stored() || B.level.demo();
+    return stored() || B.demo.level();
   }
 
   function save() {

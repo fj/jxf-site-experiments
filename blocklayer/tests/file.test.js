@@ -17,6 +17,20 @@ function goodTile(overrides = {}) {
   };
 }
 
+// A few tiles that between them use every field a tile can carry.
+function sampleLevel() {
+  const level = L.create();
+  L.add(level, 0, 0, 0);
+  L.add(level, 1, 0, 2);
+  L.setShape(level, 1, 0, "ramp");
+  L.setFacing(level, 1, 0, "E");
+  L.setDecor(level, 1, 0, "chest");
+  L.toggleMark(level, 1, 0, "arrow-n");
+  L.toggleMark(level, 1, 0, "rope");
+  L.add(level, -2, 3, -3);
+  return level;
+}
+
 describe("file: names", () => {
   it("saves as level.blocklayer.json", () => {
     assert.equal(F.EXTENSION, ".blocklayer.json");
@@ -25,15 +39,15 @@ describe("file: names", () => {
 });
 
 describe("file: serialize", () => {
-  const demo = L.demo();
-  const text = F.serialize(demo);
+  const level = sampleLevel();
+  const text = F.serialize(level);
 
   it("writes valid JSON equal to the level's toJSON", () => {
-    assert.deepEqual(JSON.parse(text), L.toJSON(demo));
+    assert.deepEqual(JSON.parse(text), L.toJSON(level));
   });
 
   it("pretty-prints with a two-space indent", () => {
-    assert.equal(text, JSON.stringify(L.toJSON(demo), null, TWO_SPACE_INDENT) + "\n");
+    assert.equal(text, JSON.stringify(L.toJSON(level), null, TWO_SPACE_INDENT) + "\n");
     assert.match(text, /^\{\n {2}"version": 1,\n {2}"tiles": \[\n {4}\{\n {6}"x": /);
   });
 
@@ -48,9 +62,9 @@ describe("file: serialize", () => {
 });
 
 describe("file: parse", () => {
-  it("round-trips the demo level", () => {
-    const level = F.parse(F.serialize(L.demo()));
-    assert.deepEqual(L.toJSON(level), L.toJSON(L.demo()));
+  it("round-trips a level that uses every field", () => {
+    const level = F.parse(F.serialize(sampleLevel()));
+    assert.deepEqual(level, sampleLevel());
   });
 
   it("round-trips an empty level", () => {

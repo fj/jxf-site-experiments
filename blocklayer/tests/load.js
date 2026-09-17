@@ -10,7 +10,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const MODULE_DIR = path.join(__dirname, "..");
-const PURE_MODULES = ["config.js", "level.js", "view.js"];
+const PURE_MODULES = ["config.js", "level.js", "view.js", "demo.js"];
 
 function load(names = PURE_MODULES) {
   const window = {};

@@ -186,48 +186,6 @@
     return level;
   }
 
-  var DEMO_SIZE = 6;                              // the plateau is this many tiles square
-  var DEMO_MESA = { x: 3, y: 1, size: 2 };        // the raised square on it, one step up
-  var DEMO_DECOR = [
-    { x: 4, y: 1, decor: "chest" },
-    { x: 0, y: 4, decor: "rock" },
-    { x: 1, y: 0, decor: "crystal-blue" },
-    { x: 5, y: 5, decor: "crystal-yellow" },
-    { x: 2, y: 6, decor: "crystal-red" }
-  ];
-  var DEMO_MARKS = [
-    { x: 1, y: 1, mark: "arrow-e" },
-    { x: 4, y: 4, mark: "arrow-n" },
-    { x: 0, y: 2, mark: "teleport" },
-    { x: 3, y: 5, mark: "rope" },
-    { x: 1, y: 5, mark: "jump" }
-  ];
-
-  function demo() {
-    var level = create();
-    var sunkenRow = DEMO_SIZE;
-    var x, y;
-    for (y = 0; y < DEMO_SIZE; y++) {
-      for (x = 0; x < DEMO_SIZE; x++) add(level, x, y, 0);
-    }
-    for (x = 0; x < DEMO_SIZE; x++) add(level, x, sunkenRow, -1);
-    for (y = 0; y < DEMO_MESA.size; y++) {
-      for (x = 0; x < DEMO_MESA.size; x++) raise(level, DEMO_MESA.x + x, DEMO_MESA.y + y, 1);
-    }
-    // Up onto the mesa: a ramp from the east and stairs from the south. Both
-    // rise away from the first view's camera, so both slopes are in sight.
-    var rampX = DEMO_MESA.x + DEMO_MESA.size;
-    var stairsX = DEMO_MESA.x + DEMO_MESA.size - 1;
-    var stairsY = DEMO_MESA.y + DEMO_MESA.size;
-    setShape(level, rampX, DEMO_MESA.y, "ramp");
-    setFacing(level, rampX, DEMO_MESA.y, "W");
-    setShape(level, stairsX, stairsY, "stairs");
-    setFacing(level, stairsX, stairsY, "N");
-    DEMO_DECOR.forEach(function (d) { setDecor(level, d.x, d.y, d.decor); });
-    DEMO_MARKS.forEach(function (m) { toggleMark(level, m.x, m.y, m.mark); });
-    return level;
-  }
-
   B.level = {
     create: create,
     key: key,
@@ -246,7 +204,6 @@
     setDecor: setDecor,
     toggleMark: toggleMark,
     toJSON: toJSON,
-    fromJSON: fromJSON,
-    demo: demo
+    fromJSON: fromJSON
   };
 })();

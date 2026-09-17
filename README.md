@@ -229,11 +229,12 @@ The scene is drawn at the sprites' own scale on an offscreen canvas and blitted
 up by a whole number, so pixels stay square. Every sprite is built in code from
 the palette in `config.js` — nothing is a bitmap file. Modules on the
 `BlockLayer` namespace, in load order: `config.js`, `pixel.js` (anchored
-sprites, string-art, shading, memoizing), `level.js`, `file.js` and `view.js`
-(the pure models: tiles and their edits and validation; the
+sprites, string-art, shading, memoizing), `level.js`, `file.js`, `view.js` and
+`demo.js` (the pure models: tiles and their edits and validation; the
 `*.blocklayer.json` file a level is saved to and opened from; rotation,
-projection, picking, the frame — all unit-tested under `tests/`),
-`sprites-tiles.js`, `sprites-decor.js`, `sprites-marks.js`,
-`sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`, and `app.js` last.
+projection, picking, the frame; the level a first visit starts with — all
+unit-tested under `tests/`), `sprites-tiles.js`, `sprites-decor.js`,
+`sprites-marks.js`, `sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`,
+and `app.js` last.
 The level autosaves to `localStorage`, and a `.blocklayer.json` dropped on the
 canvas opens.

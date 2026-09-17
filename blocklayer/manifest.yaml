@@ -22,6 +22,7 @@ scripts:
   - level.js
   - file.js
   - view.js
+  - demo.js
   - sprites-tiles.js
   - sprites-decor.js
   - sprites-marks.js

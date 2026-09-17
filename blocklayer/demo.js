@@ -1,0 +1,58 @@
+/*
+ * Blocklayer — the level a first visit starts with: a plateau with a raised
+ * square reached by a ramp and by stairs, a sunken row, every decor object and
+ * a few marks, so the first screenshot shows every feature. The slopes face
+ * the way the first view sees them, which is why this loads after view.js.
+ */
+(function () {
+  "use strict";
+
+  var B = window.BlockLayer = window.BlockLayer || {};
+
+  var PLATEAU_SIZE = 6;                           // the plateau is this many tiles square
+  var PLATEAU_ELEV = 0;
+  var SUNKEN_ELEV = -1;
+  var MESA = { x: 3, y: 1, size: 2 };             // the raised square on it, one step up
+  var DECOR_AT = [
+    { x: 4, y: 1, decor: "chest" },
+    { x: 0, y: 4, decor: "rock" },
+    { x: 1, y: 0, decor: "crystal-blue" },
+    { x: 5, y: 5, decor: "crystal-yellow" },
+    { x: 2, y: 6, decor: "crystal-red" }
+  ];
+  var MARKS_AT = [
+    { x: 1, y: 1, mark: "arrow-e" },
+    { x: 4, y: 4, mark: "arrow-n" },
+    { x: 0, y: 2, mark: "teleport" },
+    { x: 3, y: 5, mark: "rope" },
+    { x: 1, y: 5, mark: "jump" }
+  ];
+
+  function level() {
+    var L = B.level;
+    var lvl = L.create();
+    var sunkenRow = PLATEAU_SIZE;
+    var x, y;
+    for (y = 0; y < PLATEAU_SIZE; y++) {
+      for (x = 0; x < PLATEAU_SIZE; x++) L.add(lvl, x, y, PLATEAU_ELEV);
+    }
+    for (x = 0; x < PLATEAU_SIZE; x++) L.add(lvl, x, sunkenRow, SUNKEN_ELEV);
+    for (y = 0; y < MESA.size; y++) {
+      for (x = 0; x < MESA.size; x++) L.raise(lvl, MESA.x + x, MESA.y + y, 1);
+    }
+    // Up onto the mesa: a ramp from the east and stairs from the south. Both
+    // rise away from the first view's camera, so both slopes are in sight.
+    var rampX = MESA.x + MESA.size;
+    var stairsX = MESA.x + MESA.size - 1;
+    var stairsY = MESA.y + MESA.size;
+    L.setShape(lvl, rampX, MESA.y, "ramp");
+    L.setFacing(lvl, rampX, MESA.y, "W");
+    L.setShape(lvl, stairsX, stairsY, "stairs");
+    L.setFacing(lvl, stairsX, stairsY, "N");
+    DECOR_AT.forEach(function (d) { L.setDecor(lvl, d.x, d.y, d.decor); });
+    MARKS_AT.forEach(function (m) { L.toggleMark(lvl, m.x, m.y, m.mark); });
+    return lvl;
+  }
+
+  B.demo = { level: level };
+})();

@@ -26,7 +26,6 @@
 
   var canvas = null;
   var toolbar = null;
-  var status = null;
 
   // ---- Persistence ---------------------------------------------------------
   function stored() {
@@ -59,9 +58,9 @@
   var statusTimer = null;
 
   function showStatus(text) {
-    status.textContent = text;
+    toolbar.status.textContent = text;
     clearTimeout(statusTimer);
-    statusTimer = setTimeout(function () { status.textContent = ""; }, B.STATUS_MS);
+    statusTimer = setTimeout(function () { toolbar.status.textContent = ""; }, B.STATUS_MS);
   }
 
   function saveFile() {
@@ -282,11 +281,9 @@
     canvas = el("canvas", "canvas");
     canvas.tabIndex = 0;
     canvas.setAttribute("aria-label", "Level");
-    status = el("div", "status");
-    status.setAttribute("role", "status");
     stage.appendChild(canvas);
     stage.appendChild(toolbar.hint);
-    stage.appendChild(status);
+    stage.appendChild(toolbar.status);
     layout.appendChild(toolbar.el);
     layout.appendChild(stage);
     mount.appendChild(layout);

@@ -20,6 +20,7 @@ scripts:
   - config.js
   - pixel.js
   - level.js
+  - file.js
   - view.js
   - sprites-tiles.js
   - sprites-decor.js

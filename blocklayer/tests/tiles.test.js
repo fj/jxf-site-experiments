@@ -8,10 +8,19 @@ const { INK, canvasDocument, rows } = require("./sprite");
 const FLAT_TONES = 2;              // the top face and the outline
 const BLOCK_TONES = 4;             // and a face on each side
 const SEAM_TONES = 6;              // and a darker tone where two blocks meet
+const ROTS = [0, 1, 2, 3];
+const ROW_STEP = 2;                // px an isometric line steps across in a row
+const LINES_PER_ROW = 2;           // cell boundaries any row of the lattice crosses
+const NEIGHBOURS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [2, -3]];
+const CELLS = [[0, 0], [1, 0], [0, 1], [-1, 2], [3, -2], [5, 5]];
 
-const B = load(["config.js", "pixel.js", "sprites-tiles.js"], { document: canvasDocument() });
+const B = load(["config.js", "pixel.js", "view.js", "sprites-tiles.js"],
+  { document: canvasDocument() });
 const P = B.pixel;
 const T = B.tiles;
+
+const HALF_W = B.TILE_W / 2;
+const HALF_H = B.TILE_H / 2;
 
 const ELEVATIONS = [];
 for (let elev = B.ELEV_MIN; elev <= B.ELEV_MAX; elev++) ELEVATIONS.push(elev);
@@ -92,19 +101,116 @@ describe("tiles: label", () => {
 });
 
 describe("tiles: ghost", () => {
-  const centre = `${B.TILE_W / 2},${B.TILE_H / 2}`;
+  const middle = `${HALF_W},${HALF_H}`;
 
   it("ghosts a tile with no blocks as the ring of its top face, with a '+' on it", () => {
     const flat = T.ghost(B.ELEV_MIN);
     assert.equal(flat.canvas.height, B.TILE_H);
     assert.deepEqual(colours(flat), new Set([B.COLORS.outline, B.COLORS.ghost]));
-    assert.equal(flat.canvas.filled.get(centre), B.COLORS.ghost);
+    assert.equal(flat.canvas.filled.get(middle), B.COLORS.ghost);
   });
 
   it("ghosts a taller tile with a front edge down the column under its top", () => {
     const tall = T.ghost(B.ELEV_MIN + 1);
     assert.equal(tall.canvas.height, B.TILE_H + B.BLOCK_H);
-    assert.equal(tall.canvas.filled.get(centre), B.COLORS.ghost);
+    assert.equal(tall.canvas.filled.get(middle), B.COLORS.ghost);
     assert.ok(rows(tall).slice(B.TILE_H).some((row) => row.includes(INK)));
+  });
+});
+
+const art = rows(T.grid());
+const wrap = (n, size) => ((n % size) + size) % size;
+
+// The pattern tiled over the whole floor plane, its anchor on the lattice
+// point where cell (0, 0) stands.
+const lit = (x, y) => art[wrap(y, B.TILE_H)].charAt(wrap(x, B.TILE_W)) === INK;
+
+// Where cell (x, y) stands on the floor, in the tiled pattern's own pixels.
+function cellCentre(view, x, y) {
+  const origin = B.view.project(view, 0, 0, B.FLOOR);
+  const p = B.view.project(view, x, y, B.FLOOR);
+  return { x: p.sx - origin.sx, y: p.sy - origin.sy };
+}
+
+function turned(rot) {
+  const view = B.view.create();
+  view.rot = rot;
+  return view;
+}
+
+// The one translucent colour a sprite's pixels carry, as its channels and its
+// alpha.
+function oneColour(sprite) {
+  const found = [...new Set(sprite.canvas.filled.values())];
+  assert.equal(found.length, 1, found.join(" "));
+  const rgba = /^rgba\((\d+,\d+,\d+),([\d.]+)\)$/.exec(found[0]);
+  assert.ok(rgba, found[0]);
+  return { channels: rgba[1], alpha: Number(rgba[2]) };
+}
+
+describe("tiles: grid", () => {
+  it("answers one pattern tile, a cell wide and a cell tall, anchored on a lattice point", () => {
+    const tile = T.grid();
+    assert.deepEqual([tile.canvas.width, tile.canvas.height], [B.TILE_W, B.TILE_H]);
+    assert.deepEqual([tile.ox, tile.oy], [0, 0]);
+    assert.equal(T.grid(), tile);
+  });
+
+  it("draws every line in the grid colour, part way to the canvas behind it", () => {
+    const colour = oneColour(T.grid());
+    assert.equal(colour.channels, P.parseHex(B.COLORS.grid).join(","));
+    assert.ok(colour.alpha > 0 && colour.alpha < 1, String(colour.alpha));
+  });
+
+  it("repeats along the lattice: a step to another cell leaves the pattern as it was", () => {
+    for (const rot of ROTS) {
+      for (const [x, y] of NEIGHBOURS) {
+        const step = cellCentre(turned(rot), x, y);
+        for (let j = 0; j < B.TILE_H; j++) {
+          for (let i = 0; i < B.TILE_W; i++) {
+            assert.equal(lit(i + step.x, j + step.y), lit(i, j),
+              `(${i}, ${j}) stepped to cell (${x}, ${y}) at rot ${rot}`);
+          }
+        }
+      }
+    }
+  });
+
+  it("lays a line on every cell's four corners and none across its middle", () => {
+    for (const rot of ROTS) {
+      for (const [x, y] of CELLS) {
+        const c = cellCentre(turned(rot), x, y);
+        const at = `cell (${x}, ${y}) at rot ${rot}`;
+        assert.equal(lit(c.x, c.y - HALF_H), true, `${at}: its top corner`);
+        assert.equal(lit(c.x, c.y + HALF_H), true, `${at}: its bottom corner`);
+        assert.equal(lit(c.x - HALF_W, c.y), true, `${at}: its left corner`);
+        assert.equal(lit(c.x + HALF_W, c.y), true, `${at}: its right corner`);
+        for (let d = ROW_STEP - HALF_W; d < HALF_W - ROW_STEP; d++) {
+          assert.equal(lit(c.x + d, c.y), false, `${at}: ${d} px across its middle`);
+        }
+      }
+    }
+  });
+
+  it("crosses every row of the tile with two boundaries, each ROW_STEP px wide", () => {
+    for (const row of art) {
+      assert.equal([...row].filter((ch) => ch === INK).length, LINES_PER_ROW * ROW_STEP, row);
+    }
+  });
+
+  // A cell's lower edges fall on the same pixels as its neighbour's upper ones,
+  // so drawing both would lay the translucent colour twice and darken the line.
+  it("paints each pixel of a line once, so an edge two cells share does not double", () => {
+    for (const [at, paints] of T.grid().canvas.paints) {
+      assert.equal(paints, 1, `painted ${paints} times at (${at})`);
+    }
+  });
+});
+
+describe("tiles: holdMask", () => {
+  it("fills a held tile with the hold colour, part way to the tile under it", () => {
+    const colour = oneColour(T.holdMask(1));
+    assert.equal(colour.channels, P.parseHex(B.COLORS.hold).join(","));
+    assert.ok(colour.alpha > 0 && colour.alpha < 1, String(colour.alpha));
   });
 });

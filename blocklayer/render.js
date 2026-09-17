@@ -1,10 +1,10 @@
 /*
  * Blocklayer — drawing the scene. Everything is drawn once, at base scale, on
- * an offscreen canvas: the columns back to front with what stands on them and
- * the ghost among them at its depth, then the labels and the compass. That
- * bitmap is blitted to the visible canvas at `scale` (the view's zoom times
- * the device pixel ratio) with smoothing off, so every pixel stays a crisp
- * square.
+ * an offscreen canvas: the floor grid, then the columns back to front with
+ * what stands on them and the ghost among them at its depth, then the labels
+ * and the compass. That bitmap is blitted to the visible canvas at `scale`
+ * (the view's zoom times the device pixel ratio) with smoothing off, so every
+ * pixel stays a crisp square.
  */
 (function () {
   "use strict";
@@ -26,6 +26,20 @@
     if (base.width !== frame.w) base.width = frame.w;
     if (base.height !== frame.h) base.height = frame.h;
     return base;
+  }
+
+  // The floor lattice under the whole canvas, with a lattice point where cell
+  // (0, 0) stands on the floor, so the grid moves with the level.
+  function drawGrid(ctx, state, frame) {
+    var tile = B.tiles.grid();
+    var floor = B.view.project(state.view, 0, 0, B.FLOOR);
+    var x = Math.round(frame.ox + floor.sx) - tile.ox;
+    var y = Math.round(frame.oy + floor.sy) - tile.oy;
+    ctx.save();
+    ctx.fillStyle = ctx.createPattern(tile.canvas, "repeat");
+    ctx.translate(x, y);
+    ctx.fillRect(-x, -y, frame.w, frame.h);
+    ctx.restore();
   }
 
   function hoveredTile(state) {
@@ -113,6 +127,7 @@
     var scene = baseCanvas(frame);
     var ctx = B.pixel.context(scene);
     ctx.clearRect(0, 0, frame.w, frame.h);
+    drawGrid(ctx, state, frame);
 
     var ghost = ghostEntry(state);
     var columns = B.level.all(state.level).concat(ghost ? [ghost] : []);

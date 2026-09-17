@@ -1,8 +1,8 @@
 /*
- * Helpers for the sprite tests. canvasDocument() is a document whose
- * canvases remember every pixel filled on them and with what, so a module
- * that draws can run in node; rows() reads a sprite's art back as string
- * art; headHeavy() tells an arrow's head from its tail.
+ * Helpers for the sprite tests. canvasDocument() is a document whose canvases
+ * remember every pixel filled on them, with what and how many times, so a
+ * module that draws can run in node; rows() reads a sprite's art back as
+ * string art; headHeavy() tells an arrow's head from its tail.
  */
 "use strict";
 
@@ -10,7 +10,7 @@ const INK = "#";
 const BLANK = ".";
 
 function fakeCanvas() {
-  const canvas = { width: 0, height: 0, filled: new Map() };
+  const canvas = { width: 0, height: 0, filled: new Map(), paints: new Map() };
   // A reader of the pixels asks only whether one is filled and whether two
   // match, so each fill style gets a key of its own and the background keeps 0.
   const keys = new Map();
@@ -22,7 +22,11 @@ function fakeCanvas() {
     const ctx = { fillStyle: "", imageSmoothingEnabled: true };
     ctx.fillRect = (x, y, w, h) => {
       for (let j = y; j < y + h; j++) {
-        for (let i = x; i < x + w; i++) canvas.filled.set(`${i},${j}`, ctx.fillStyle);
+        for (let i = x; i < x + w; i++) {
+          const at = `${i},${j}`;
+          canvas.filled.set(at, ctx.fillStyle);
+          canvas.paints.set(at, (canvas.paints.get(at) || 0) + 1);
+        }
       }
     };
     ctx.getImageData = (x, y, w, h) => {

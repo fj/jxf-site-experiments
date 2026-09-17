@@ -76,7 +76,8 @@
     hover: "#ffffff",
     hold: "#ff4d3d",
     label: "#1f1a2e",
-    labelText: "#ffffff"
+    labelText: "#ffffff",
+    grid: "#838a96"          // the floor lattice, drawn part way to the canvas
   };
 
   // How far each side face of a block or a decor object is shaded from its

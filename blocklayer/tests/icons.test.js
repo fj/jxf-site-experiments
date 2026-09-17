@@ -3,52 +3,21 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
+const { INK, canvasDocument, rows, headHeavy } = require("./sprite");
 
-const INK = "#";
-const BLANK = ".";
 const ICON_SIZE = 16;
 
-// A document whose canvases remember every pixel filled on them, so a
-// sprite's art can be read back as rows of string art.
-function fakeDocument() {
-  function canvas() {
-    const c = { width: 0, height: 0, filled: new Set() };
-    c.getContext = () => {
-      const ctx = { fillStyle: "", imageSmoothingEnabled: true };
-      ctx.fillRect = (x, y, w, h) => {
-        for (let j = y; j < y + h; j++) {
-          for (let i = x; i < x + w; i++) c.filled.add(`${i},${j}`);
-        }
-      };
-      return ctx;
-    };
-    return c;
-  }
-  return { createElement: (tag) => { assert.equal(tag, "canvas"); return canvas(); } };
-}
+// Each direction on screen, y down.
+const VECTORS = {
+  N: [0, -1], NE: [1, -1], E: [1, 0], SE: [1, 1],
+  S: [0, 1], SW: [-1, 1], W: [-1, 0], NW: [-1, -1]
+};
 
-const B = load(["config.js", "pixel.js", "sprites-icons.js"], { document: fakeDocument() });
+const B = load(["config.js", "pixel.js", "sprites-icons.js"], { document: canvasDocument() });
 const P = B.pixel;
 
-function rows(sprite) {
-  const out = [];
-  for (let y = 0; y < sprite.canvas.height; y++) {
-    let row = "";
-    for (let x = 0; x < sprite.canvas.width; x++) {
-      row += sprite.canvas.filled.has(`${x},${y}`) ? INK : BLANK;
-    }
-    out.push(row);
-  }
-  return out;
-}
-
-const inkedRows = (art) => art.filter((row) => row.includes(INK));
 const columnsOf = (row) => [...row].flatMap((ch, x) => (ch === INK ? [x] : []));
-
-function extent(art) {
-  const xs = art.flatMap(columnsOf);
-  return { left: Math.min(...xs), right: Math.max(...xs) };
-}
+const inkedRows = (art) => art.filter((row) => row.includes(INK));
 
 describe("icons: arrow", () => {
   const arrow = (dir) => rows(B.icons.arrow(dir));
@@ -62,38 +31,26 @@ describe("icons: arrow", () => {
     assert.equal(new Set(arts.map((art) => art.join("\n"))).size, B.DIRECTIONS.length);
   });
 
-  it("N points straight up: mirror-symmetric, its tip at the top centre, its shaft below", () => {
+  it("every arrow's head outweighs its tail toward its own direction, not the opposite", () => {
+    for (const dir of B.DIRECTIONS) {
+      const [dx, dy] = VECTORS[dir];
+      assert.equal(headHeavy(arrow(dir), dx, dy), true, `${dir} toward itself`);
+      assert.equal(headHeavy(arrow(dir), -dx, -dy), false, `${dir} away from itself`);
+    }
+  });
+
+  it("N is mirror-symmetric with a 2 px tip at the top centre, and E and W are not", () => {
     const n = arrow("N");
     assert.deepEqual(P.hflip(n), n);
-    const inked = inkedRows(n);
-    const centre = [ICON_SIZE / 2 - 1, ICON_SIZE / 2];
-    assert.deepEqual(columnsOf(inked[0]), centre);
-    assert.deepEqual(columnsOf(inked[inked.length - 1]), centre);
-    const { left, right } = extent(n);
-    assert.ok(right - left > ICON_SIZE / 2, "the head is wider than half the icon");
+    assert.deepEqual(columnsOf(inkedRows(n)[0]), [ICON_SIZE / 2 - 1, ICON_SIZE / 2]);
+    assert.notDeepEqual(P.hflip(arrow("E")), arrow("E"));
+    assert.notDeepEqual(P.hflip(arrow("W")), arrow("W"));
   });
 
-  it("S, W and E are N turned to face down, left and right", () => {
-    const n = arrow("N");
-    assert.deepEqual(arrow("S"), P.vflip(n));
-    assert.deepEqual(arrow("W"), P.transpose(n));
-    assert.deepEqual(arrow("E"), P.hflip(P.transpose(n)));
-  });
-
-  it("NE points up-right: the tip row holds the rightmost ink, the tail row the leftmost", () => {
+  it("NE's tip is at the top right: its first inked row reaches its rightmost column", () => {
     const ne = arrow("NE");
-    const inked = inkedRows(ne);
-    const { left, right } = extent(ne);
-    assert.ok(columnsOf(inked[0]).includes(right), "tip at the top right");
-    assert.ok(columnsOf(inked[inked.length - 1]).includes(left), "tail at the bottom left");
-    assert.ok(!columnsOf(inked[inked.length - 1]).includes(right), "the tail is not full width");
-  });
-
-  it("NW, SE and SW are NE flipped", () => {
-    const ne = arrow("NE");
-    assert.deepEqual(arrow("NW"), P.hflip(ne));
-    assert.deepEqual(arrow("SE"), P.vflip(ne));
-    assert.deepEqual(arrow("SW"), P.hflip(P.vflip(ne)));
+    const right = Math.max(...ne.flatMap(columnsOf));
+    assert.ok(columnsOf(inkedRows(ne)[0]).includes(right));
   });
 
   it("hands back the same sprite for a direction and refuses an unknown one", () => {

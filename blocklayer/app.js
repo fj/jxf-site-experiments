@@ -44,7 +44,7 @@
 
   function save() {
     try {
-      window.localStorage.setItem(B.STORAGE_KEY, JSON.stringify(B.level.toJSON(state.level)));
+      window.localStorage.setItem(B.STORAGE_KEY, B.file.serialize(state.level));
     } catch (err) {
       // Storage refused the level; it lives on in memory until the next edit.
     }

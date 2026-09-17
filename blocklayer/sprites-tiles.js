@@ -65,6 +65,10 @@
     return color;
   }
 
+  function translucent(hex, alpha) {
+    return "rgba(" + P.parseHex(hex).join(",") + "," + alpha + ")";
+  }
+
   function faceColor(elev, kind) {
     var color = topColor(elev);
     if (kind === "left") return P.shade(color, B.FACE_SHADES.left);
@@ -424,8 +428,7 @@
   function holdStep(step) {
     var c = P.canvas(W, H);
     var ctx = P.context(c);
-    var rgb = P.parseHex(B.COLORS.hold);
-    ctx.fillStyle = "rgba(" + rgb.join(",") + "," + HOLD_ALPHA + ")";
+    ctx.fillStyle = translucent(B.COLORS.hold, HOLD_ALPHA);
     var rows = Math.round(H * step / HOLD_STEPS);
     for (var y = H - rows; y < H; y++) {
       var row = diamondRow(y);

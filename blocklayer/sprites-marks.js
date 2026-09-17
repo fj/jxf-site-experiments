@@ -36,15 +36,15 @@
     "..www.."
   ];
 
+  // Up-right runs along the 2:1 line: the shaft steps two across per one
+  // up, and the head's barbs are the other two world directions as seen.
   var ARROW_UP_RIGHT = [
-    ".wwwwwww",
-    "...wwwww",
-    ".....www",
-    "....ww..",
-    "..wwww..",
-    "wwwwww..",
-    "wwww....",
-    "ww......"
+    "....wwwwww",
+    ".......www",
+    ".....wwwww",
+    "...wwww..w",
+    ".wwww.....",
+    ".ww......."
   ];
 
   // Indexed by screen direction: up-right, right, down-right, down,

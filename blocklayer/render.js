@@ -11,7 +11,7 @@
 
   var MARKS_PER_ROW = 3;
   var MARK_PITCH = 11;          // base px between marks in a row
-  var MARK_ROW_PITCH = 8;       // base px between rows, which stack upward
+  var MARK_ROW_PITCH = 12;      // base px between rows, which stack upward
   var MARK_ABOVE_DECOR = 6;     // base px between a decor's top and the first row
   var LABEL_DY = 4;             // the label's centre below the top face's centre
   var COMPASS_MARGIN = 6;       // base px from the top-left corner

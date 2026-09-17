@@ -88,6 +88,14 @@ describe("pixel: memo", () => {
     assert.equal(m.fn(1), results[0]);
   });
 
+  it("keeps a cache per memoized function", () => {
+    const a = counted();
+    const b = counted();
+    assert.notEqual(a.fn(0), b.fn(0));
+    assert.equal(a.calls(), 1);
+    assert.equal(b.calls(), 1);
+  });
+
   it("keys by value, so equal arrays and objects share a result", () => {
     const m = counted();
     assert.equal(m.fn([1, 2], { a: 1 }), m.fn([1, 2], { a: 1 }));

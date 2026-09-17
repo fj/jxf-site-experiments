@@ -18,6 +18,7 @@
   var LABEL_DY = 4;             // the label's centre below the top face's centre
   var COMPASS_MARGIN = 6;       // base px from the top-left corner
   var BADGE_MARGIN = 4;         // base px between the compass and the badge under it
+  var BADGE_SIGN = "+";         // so the badge reads as a height, not as a count
   var TRANSPARENT_ALPHA = 0.45; // how solid a see-through tile is drawn
 
   var base = null;
@@ -45,12 +46,6 @@
 
   function hoveredTile(state) {
     return state.hover && state.hover.tile ? state.hover.tile : null;
-  }
-
-  // The badge's height always carries its sign, so the chip reads as a height
-  // and not as a count of anything.
-  function newElevText(elev) {
-    return elev < 0 ? String(elev) : "+" + elev;
   }
 
   function wedge(tile, viewFacing) {
@@ -127,7 +122,7 @@
   // the elevation keys move with nothing hovered to show it on.
   function drawCorner(ctx, state) {
     var compass = B.icons.compass(state.view.rot);
-    var badge = B.tiles.label(newElevText(state.newElev));
+    var badge = B.tiles.label(BADGE_SIGN + state.newElev);
     var badgeY = COMPASS_MARGIN + compass.canvas.height + BADGE_MARGIN;
     B.pixel.draw(ctx, compass, COMPASS_MARGIN + compass.ox, COMPASS_MARGIN + compass.oy);
     B.pixel.draw(ctx, badge, COMPASS_MARGIN + badge.ox, badgeY + badge.oy);

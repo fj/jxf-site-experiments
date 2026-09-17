@@ -205,13 +205,13 @@ describe("render: the new-tile badge", () => {
     assert.ok(badge[2] > compass[2] + COMPASS_SIZE, "below the compass");
   });
 
-  it("signs the height once, so a below-ground height still reads as a height", () => {
-    const s = stage();
-    s.state.newElev = s.B.ELEV_MIN;
-    s.draw();
-    const text = s.labels.pop();
-    assert.ok(!text.includes("+-"), text);
-    assert.ok(text.endsWith(String(s.B.ELEV_MIN)), text);
+  it("spells every height in the range with a sign, so the chip reads as a height", () => {
+    for (const bound of ["ELEV_MIN", "ELEV_MAX"]) {
+      const s = stage();
+      s.state.newElev = s.B[bound];
+      s.draw();
+      assert.equal(s.labels.pop(), "+" + s.B[bound], bound);
+    }
   });
 
   it("is drawn over a hovered tile too, and follows the height as it moves", () => {

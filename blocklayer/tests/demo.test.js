@@ -36,10 +36,11 @@ describe("demo: the first level", () => {
     }
   });
 
-  it("reaches both ends of the elevation range, so the first view shows each", () => {
+  it("reaches both ends of the elevation range and a step between, so each is in sight", () => {
     const elevs = tiles.map((t) => t.elev);
     assert.equal(Math.min(...elevs), B.ELEV_MIN);
     assert.equal(Math.max(...elevs), B.ELEV_MAX);
+    assert.ok(elevs.some((e) => e > 3 && e < B.ELEV_MAX), "a step above the raised square");
   });
 
   it("climbs the raised square by a ramp and by stairs that face it", () => {

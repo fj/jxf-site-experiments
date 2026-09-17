@@ -33,6 +33,25 @@ describe("tiles: the elevation colours", () => {
       assert.ok(T.column(elev).canvas.filled.size > 0, `elevation ${elev}`);
     }
   });
+
+  it("sinks a tile with no blocks into a cool blue", () => {
+    const [r, g, b] = P.parseHex(top(B.ELEV_MIN));
+    assert.ok(b > r && b > g, top(B.ELEV_MIN));
+  });
+
+  it("warms every step of the climb, from green at the foot to red at the top", () => {
+    // Red leads green once a colour turns warm, so the difference climbs too.
+    const warmth = (elev) => {
+      const [r, g] = P.parseHex(top(elev));
+      return r - g;
+    };
+    const foot = B.ELEV_MIN + 1;
+    for (let elev = foot + 1; elev <= B.ELEV_MAX; elev++) {
+      assert.ok(warmth(elev) > warmth(elev - 1), `elevation ${elev} over ${elev - 1}`);
+    }
+    assert.ok(warmth(foot) < 0, `green at ${foot}`);
+    assert.ok(warmth(B.ELEV_MAX) > 0, `red at ${B.ELEV_MAX}`);
+  });
 });
 
 describe("tiles: column", () => {
@@ -60,7 +79,7 @@ describe("tiles: column", () => {
 });
 
 describe("tiles: label", () => {
-  it("spells every elevation in the range, and a '+' before one", () => {
+  it("spells every elevation, and keeps the '+' that a change badge spells with", () => {
     for (const elev of ELEVATIONS) {
       assert.ok(T.label(String(elev)).canvas.filled.size > 0, `elevation ${elev}`);
       assert.ok(T.label(`+${elev}`).canvas.filled.size > 0, `+${elev}`);

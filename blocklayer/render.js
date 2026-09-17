@@ -1,10 +1,10 @@
 /*
  * Blocklayer — drawing the scene. Everything is drawn once, at base scale, on
  * an offscreen canvas: the floor grid, then the columns back to front with
- * what stands on them and the ghost among them at its depth, then the labels
- * and the compass. That bitmap is blitted to the visible canvas at `scale`
- * (the view's zoom times the device pixel ratio) with smoothing off, so every
- * pixel stays a crisp square.
+ * what stands on them and the ghost among them at its depth, then the labels,
+ * the compass and the badge that names the height a new tile gets. That bitmap
+ * is blitted to the visible canvas at `scale` (the view's zoom times the device
+ * pixel ratio) with smoothing off, so every pixel stays a crisp square.
  */
 (function () {
   "use strict";
@@ -17,6 +17,7 @@
   var MARK_ABOVE_DECOR = 6;     // base px between a decor's top and the first row
   var LABEL_DY = 4;             // the label's centre below the top face's centre
   var COMPASS_MARGIN = 6;       // base px from the top-left corner
+  var BADGE_MARGIN = 4;         // base px between the compass and the badge under it
   var TRANSPARENT_ALPHA = 0.45; // how solid a see-through tile is drawn
 
   var base = null;
@@ -44,6 +45,12 @@
 
   function hoveredTile(state) {
     return state.hover && state.hover.tile ? state.hover.tile : null;
+  }
+
+  // The badge's height always carries its sign, so the chip reads as a height
+  // and not as a count of anything.
+  function newElevText(elev) {
+    return elev < 0 ? String(elev) : "+" + elev;
   }
 
   function wedge(tile, viewFacing) {
@@ -113,12 +120,17 @@
   // takes its turn in depth order and a column in front of it covers it.
   function ghostEntry(state) {
     var cell = state.hover && state.hover.cell;
-    return cell ? { x: cell.x, y: cell.y, elev: B.NEW_TILE_ELEV } : null;
+    return cell ? { x: cell.x, y: cell.y, elev: state.newElev } : null;
   }
 
-  function drawCompass(ctx, state) {
+  // The corner: the compass, and under it the height a new tile gets, which
+  // the elevation keys move with nothing hovered to show it on.
+  function drawCorner(ctx, state) {
     var compass = B.icons.compass(state.view.rot);
+    var badge = B.tiles.label(newElevText(state.newElev));
+    var badgeY = COMPASS_MARGIN + compass.canvas.height + BADGE_MARGIN;
     B.pixel.draw(ctx, compass, COMPASS_MARGIN + compass.ox, COMPASS_MARGIN + compass.oy);
+    B.pixel.draw(ctx, badge, COMPASS_MARGIN + badge.ox, badgeY + badge.oy);
   }
 
   function draw(canvas, state, scale) {
@@ -144,7 +156,7 @@
       at.push(p);
     });
     drawLabels(ctx, state, tiles, at);
-    drawCompass(ctx, state);
+    drawCorner(ctx, state);
 
     var out = canvas.getContext("2d");
     out.imageSmoothingEnabled = false;

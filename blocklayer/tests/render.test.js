@@ -8,6 +8,7 @@ const WIDTH = 400;
 const HEIGHT = 300;
 const SCALE = 2;
 const PANS = [{ x: 0, y: 0 }, { x: 7, y: -3 }, { x: -40, y: 120 }];
+const COMPASS_SIZE = 24;        // the stand-in compass, which the badge sits under
 
 // render.js over a recording pixel layer: every sprite module answers a
 // tagged stand-in, and each draw of one is logged with its name and where the
@@ -20,7 +21,7 @@ function stage() {
   const fills = [];
   const ghostElevs = [];
   const labels = [];
-  const tag = (name) => ({ name, ox: 0, oy: 0 });
+  const tag = (name, size = 0) => ({ name, ox: 0, oy: 0, canvas: { width: size, height: size } });
   const gridTile = { name: "grid", canvas: { name: "grid" }, ox: 0, oy: 0 };
   const saved = [];
   let at = { x: 0, y: 0 };
@@ -54,7 +55,7 @@ function stage() {
     holdMask: () => tag("hold"),
     label: (text) => { labels.push(text); return tag("label"); }
   };
-  B.icons = { compass: () => tag("compass") };
+  B.icons = { compass: () => tag("compass", COMPASS_SIZE) };
   B.decor = { sprite: () => tag("decor") };
   B.marks = { sprite: () => tag("mark") };
   const canvas = { width: WIDTH, height: HEIGHT, getContext: () => out };
@@ -63,6 +64,7 @@ function stage() {
     view: B.view.create(),
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
+    newElev: B.NEW_TILE_ELEV,
     selected: null,
     hover: null,
     hold: null
@@ -81,13 +83,16 @@ function stage() {
   };
 }
 
+// The new-tile badge is a label too, and always the last one drawn.
+const columnLabels = (s) => s.labels.slice(0, -1);
+
 describe("render: the elevation labels", () => {
   it("labels each column with its elevation, as a plain number", () => {
     const s = stage();
     s.add(0, 0, s.B.ELEV_MIN);
     s.add(1, 1, s.B.ELEV_MAX);
     s.draw();
-    assert.deepEqual(s.labels, [String(s.B.ELEV_MIN), String(s.B.ELEV_MAX)]);
+    assert.deepEqual(columnLabels(s), [String(s.B.ELEV_MIN), String(s.B.ELEV_MAX)]);
   });
 
   it("draws no label while the elevation layer is off", () => {
@@ -95,7 +100,7 @@ describe("render: the elevation labels", () => {
     s.add(0, 0, s.B.ELEV_MIN);
     s.state.layers.elevation = false;
     s.draw();
-    assert.deepEqual(s.labels, []);
+    assert.deepEqual(columnLabels(s), []);
   });
 });
 
@@ -106,19 +111,21 @@ describe("render: the ghost", () => {
     s.add(2, 2);
     s.state.hover = { cell: { x: 1, y: 1 } };
     s.draw();
-    assert.deepEqual(s.names(),
-      ["grid", "column", "ghost", "column", "label", "label", "compass"]);
+    assert.deepEqual(s.names(), [
+      "grid", "column", "ghost", "column", "label", "label", "compass", "label"
+    ]);
   });
 
-  it("is the new-tile column, with its top centre where that tile's would be", () => {
+  it("is a column at the height a new tile gets, where that tile's top would be", () => {
     const s = stage();
+    s.state.newElev = s.B.ELEV_MAX;
     s.state.hover = { cell: { x: 1, y: 1 } };
     s.draw();
     const frame = s.frame();
-    const top = s.B.view.project(s.state.view, 1, 1, s.B.NEW_TILE_ELEV);
+    const top = s.B.view.project(s.state.view, 1, 1, s.B.ELEV_MAX);
     const ghost = s.draws.find((d) => d[0] === "ghost");
     assert.deepEqual(ghost, ["ghost", frame.ox + top.sx, frame.oy + top.sy]);
-    assert.deepEqual(s.ghostElevs, [s.B.NEW_TILE_ELEV]);
+    assert.deepEqual(s.ghostElevs, [s.B.ELEV_MAX]);
   });
 
   it("is not drawn over a hovered tile, nor with nothing hovered", () => {
@@ -147,7 +154,8 @@ describe("render: the floor grid", () => {
     s.add(0, 0);
     s.state.hover = { cell: { x: 1, y: 1 } };
     s.draw();
-    assert.deepEqual(s.names(), ["grid", "column", "ghost", "label", "compass"]);
+    assert.deepEqual(s.names(),
+      ["grid", "column", "ghost", "label", "compass", "label"]);
     assert.equal(s.fills.length, 1);
     assert.deepEqual(s.fills[0].pattern, { image: s.B.tiles.grid().canvas, repeat: "repeat" });
   });
@@ -181,5 +189,38 @@ describe("render: the floor grid", () => {
       assert.ok(Number.isInteger(at.x) && Number.isInteger(at.y), where);
       assert.deepEqual([stands.sx, stands.sy], [start.sx, start.sy], where);
     }
+  });
+});
+
+describe("render: the new-tile badge", () => {
+  it("chips the height a new tile gets under the compass, with nothing hovered", () => {
+    const s = stage();
+    s.state.newElev = s.B.ELEV_MAX;
+    s.draw();
+    const compass = s.draws.find((d) => d[0] === "compass");
+    const badge = s.draws[s.draws.length - 1];
+    assert.equal(s.labels.pop(), "+" + s.B.ELEV_MAX);
+    assert.equal(badge[0], "label");
+    assert.equal(badge[1], compass[1]);
+    assert.ok(badge[2] > compass[2] + COMPASS_SIZE, "below the compass");
+  });
+
+  it("signs the height once, so a below-ground height still reads as a height", () => {
+    const s = stage();
+    s.state.newElev = s.B.ELEV_MIN;
+    s.draw();
+    const text = s.labels.pop();
+    assert.ok(!text.includes("+-"), text);
+    assert.ok(text.endsWith(String(s.B.ELEV_MIN)), text);
+  });
+
+  it("is drawn over a hovered tile too, and follows the height as it moves", () => {
+    const s = stage();
+    s.add(0, 0);
+    s.state.hover = { tile: { x: 0, y: 0 } };
+    s.state.newElev = s.B.ELEV_MAX - 1;
+    s.draw();
+    assert.equal(s.names().pop(), "label");
+    assert.equal(s.labels.pop(), "+" + (s.B.ELEV_MAX - 1));
   });
 });

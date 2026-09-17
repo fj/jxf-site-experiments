@@ -137,6 +137,51 @@ describe("level: raise", () => {
   });
 });
 
+describe("level: raiseAll", () => {
+  it("moves every tile by the delta and reports that it moved", () => {
+    const level = L.create();
+    L.add(level, 0, 0, B.ELEV_MIN);
+    L.add(level, 1, 0, B.NEW_TILE_ELEV);
+    assert.equal(L.raiseAll(level, 1), true);
+    assert.equal(L.get(level, 0, 0).elev, B.ELEV_MIN + 1);
+    assert.equal(L.get(level, 1, 0).elev, B.NEW_TILE_ELEV + 1);
+    assert.equal(L.raiseAll(level, -1), true);
+    assert.equal(L.get(level, 0, 0).elev, B.ELEV_MIN);
+    assert.equal(L.get(level, 1, 0).elev, B.NEW_TILE_ELEV);
+  });
+
+  // The tile that refuses is added last, so a level left half-moved shows.
+  it("moves nothing when one tile is already at the end of the range", () => {
+    for (const [delta, edge] of [[1, B.ELEV_MAX], [-1, B.ELEV_MIN]]) {
+      const level = L.create();
+      L.add(level, 0, 0, B.NEW_TILE_ELEV);
+      L.add(level, 1, 0, edge);
+      assert.equal(L.raiseAll(level, delta), false, String(delta));
+      assert.equal(L.get(level, 0, 0).elev, B.NEW_TILE_ELEV, String(delta));
+      assert.equal(L.get(level, 1, 0).elev, edge, String(delta));
+    }
+  });
+
+  it("moves nothing when a ramp or stairs is at its own ceiling, though a block could rise", () => {
+    for (const shape of ["ramp", "stairs"]) {
+      const level = L.create();
+      L.add(level, 0, 0, B.ELEV_MIN + 1);
+      L.add(level, 1, 0, B.ELEV_MAX - 1);
+      L.setShape(level, 1, 0, shape);
+      assert.equal(L.raiseAll(level, 1), false, shape);
+      assert.equal(L.get(level, 0, 0).elev, B.ELEV_MIN + 1, shape);
+      assert.equal(L.get(level, 1, 0).elev, B.ELEV_MAX - 1, shape);
+      assert.equal(L.raiseAll(level, -1), true, shape);
+      assert.equal(L.get(level, 0, 0).elev, B.ELEV_MIN, shape);
+      assert.equal(L.get(level, 1, 0).elev, B.ELEV_MAX - 2, shape);
+    }
+  });
+
+  it("reports that an empty level did not move", () => {
+    assert.equal(L.raiseAll(L.create(), 1), false);
+  });
+});
+
 describe("level: setShape", () => {
   it("changes the shape and returns the tile", () => {
     const level = L.create();

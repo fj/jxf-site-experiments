@@ -2,9 +2,9 @@
  * Blocklayer — the pointer, wheel and keyboard on the canvas, read as editing
  * gestures: click or drag over empty cells to add, click a tile to select it,
  * wheel over the selection to elevate it, hold the right button to remove,
- * and keys that move the view or edit the selected tile. Nothing here knows
- * the level; every gesture ends in one of the handlers. keyFor() names the
- * key bound to a handler call, for the toolbar's tooltips.
+ * and keys that move the view, move the level, or edit the selected tile.
+ * Nothing here knows the level; every gesture ends in one of the handlers.
+ * keyFor() names the key bound to a handler call, for the toolbar's tooltips.
  */
 (function () {
   "use strict";
@@ -15,8 +15,8 @@
   var SECONDARY_BUTTON = 2;
 
   // Each key names the handler it calls and what it passes. The view keys go
-  // by e.key, the tile keys by its lowercase form, and each tile key needs a
-  // selected tile.
+  // by e.key and the rest by its lowercase form. A level key acts whatever is
+  // selected; a tile key needs a selected tile.
   var VIEW_KEYS = {
     ArrowUp: ["pan", "N"],
     ArrowRight: ["pan", "E"],
@@ -30,9 +30,14 @@
     Escape: ["deselect"]
   };
 
-  var TILE_KEYS = {
+  // The elevation keys raise and lower the selected tile, or the height a new
+  // tile gets when none is selected.
+  var LEVEL_KEYS = {
     w: ["raise", 1],
-    s: ["raise", -1],
+    s: ["raise", -1]
+  };
+
+  var TILE_KEYS = {
     a: ["cycleFacing", -1],
     d: ["cycleFacing", 1],
     b: ["setShape", "block"],
@@ -40,22 +45,27 @@
     t: ["setShape", "stairs"],
     p: ["toggleMark", "teleport"],
     l: ["toggleMark", "rope"],
-    j: ["toggleMark", "jump"]
+    // Y to the comma are a compass rose under the right hand, around the J
+    // that marks a jump; each of the eight toggles an arrow.
+    y: ["toggleMark", "arrow-nw"],
+    u: ["toggleMark", "arrow-n"],
+    i: ["toggleMark", "arrow-ne"],
+    h: ["toggleMark", "arrow-w"],
+    j: ["toggleMark", "jump"],
+    k: ["toggleMark", "arrow-e"],
+    n: ["toggleMark", "arrow-sw"],
+    m: ["toggleMark", "arrow-s"],
+    ",": ["toggleMark", "arrow-se"]
   };
 
   // 1 to 5 toggle the decor, in toolbar order.
   B.DECOR.forEach(function (d, i) { TILE_KEYS[String(i + 1)] = ["setDecor", d.key]; });
 
-  // With Shift, the keys around S mirror the compass; each toggles an arrow.
-  var SHIFT_MARK_KEYS = {
-    q: ["toggleMark", "arrow-nw"],
-    w: ["toggleMark", "arrow-n"],
-    e: ["toggleMark", "arrow-ne"],
-    a: ["toggleMark", "arrow-w"],
-    d: ["toggleMark", "arrow-e"],
-    z: ["toggleMark", "arrow-sw"],
-    s: ["toggleMark", "arrow-s"],
-    c: ["toggleMark", "arrow-se"]
+  // Shift makes the elevation keys act on every tile at once; no other key
+  // does anything with Shift held.
+  var SHIFT_LEVEL_KEYS = {
+    w: ["raiseAll", 1],
+    s: ["raiseAll", -1]
   };
 
   var REMOVE_KEYS = ["Delete", "Backspace"];      // swallowed even with no selection
@@ -81,9 +91,11 @@
   // The key bound to a handler call, as a tooltip names it: "R", "]", "Up",
   // "Shift+W"; null when none is.
   function keyFor(handler, arg) {
-    var key = boundKey(VIEW_KEYS, handler, arg) || boundKey(TILE_KEYS, handler, arg);
+    var key = boundKey(VIEW_KEYS, handler, arg) ||
+      boundKey(LEVEL_KEYS, handler, arg) ||
+      boundKey(TILE_KEYS, handler, arg);
     if (key) return keyName(key);
-    key = boundKey(SHIFT_MARK_KEYS, handler, arg);
+    key = boundKey(SHIFT_LEVEL_KEYS, handler, arg);
     return key ? SHIFT_NAME + keyName(key) : null;
   }
 
@@ -202,14 +214,22 @@
       handlers[action[0]].apply(null, action.slice(1));
     }
 
-    // Whether the key edited the selected tile.
-    function editSelected(e) {
-      if (!handlers.selected()) return false;
+    // Whether there was an action to run.
+    function run(action) {
+      if (!action) return false;
+      call(action);
+      return true;
+    }
+
+    // Whether the key edited the level or the selected tile.
+    function edit(e) {
       var key = e.key.toLowerCase();
-      var action = (e.shiftKey ? SHIFT_MARK_KEYS : TILE_KEYS)[key];
-      if (action) call(action);
-      else if (!e.shiftKey && key === REMOVE_SELECTED_KEY) removeSelected();
-      else return false;
+      if (e.shiftKey) return run(SHIFT_LEVEL_KEYS[key]);
+      if (LEVEL_KEYS[key]) return run(LEVEL_KEYS[key]);
+      if (!handlers.selected()) return false;
+      if (TILE_KEYS[key]) return run(TILE_KEYS[key]);
+      if (key !== REMOVE_SELECTED_KEY) return false;
+      removeSelected();
       return true;
     }
 
@@ -218,7 +238,7 @@
       var view = VIEW_KEYS[e.key];
       if (view) call(view);
       else if (REMOVE_KEYS.indexOf(e.key) !== -1) removeSelected();
-      else if (!editSelected(e)) return;
+      else if (!edit(e)) return;
       e.preventDefault();
     }
 

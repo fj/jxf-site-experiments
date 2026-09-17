@@ -35,10 +35,12 @@
     hover: { width: 1, color: B.COLORS.hover }
   };
   var PLUS_ARM = 2;                      // the ghost's "+" reaches this far from its centre
-  var CHIP_PAD = 1;
-  var GLYPH_W = 3;
+  var CHIP_PAD = 1;                      // px of chip around a label's glyphs
   var GLYPH_H = 5;
   var GLYPH_GAP = 1;
+  var GLYPH_INK = "#";                   // a lit pixel in FONT; anything else is chip
+  var CHIP = "c";
+  var TEXT = "t";
 
   var FONT = {
     "0": ["###", "#.#", "#.#", "#.#", "###"],
@@ -407,27 +409,38 @@
     return P.sprite(c, HALF_W, HALF_H);
   }
 
+  function repeat(ch, n) {
+    var s = "";
+    while (s.length < n) s += ch;
+    return s;
+  }
+
+  function chipChar(ch) {
+    return ch === GLYPH_INK ? TEXT : CHIP;
+  }
+
+  // The glyphs side by side with a gap between, on a chip that pads them.
   function label(text) {
     var glyphs = text.split("").map(function (ch) {
       if (!FONT[ch]) throw new Error("no glyph for '" + ch + "'");
       return FONT[ch];
     });
-    var width = CHIP_PAD * 2 + glyphs.length * GLYPH_W + (glyphs.length - 1) * GLYPH_GAP;
+    var pad = repeat(CHIP, CHIP_PAD);
+    var gap = repeat(CHIP, GLYPH_GAP);
     var rows = [];
-    for (var y = 0; y < GLYPH_H + CHIP_PAD * 2; y++) {
-      var row = "";
-      for (var x = 0; x < width; x++) {
-        var gx = x - CHIP_PAD;
-        var gy = y - CHIP_PAD;
-        var g = Math.floor(gx / (GLYPH_W + GLYPH_GAP));
-        var col = gx - g * (GLYPH_W + GLYPH_GAP);
-        var lit = gy >= 0 && gy < GLYPH_H && gx >= 0 && g < glyphs.length && col < GLYPH_W &&
-          glyphs[g][gy].charAt(col) === "#";
-        row += lit ? "t" : "c";
-      }
-      rows.push(row);
+    for (var y = 0; y < GLYPH_H; y++) {
+      var art = glyphs.map(function (g) { return g[y]; }).join(gap);
+      rows.push(pad + art.replace(/./g, chipChar) + pad);
     }
-    return P.fromRows(rows, { c: B.COLORS.label, t: B.COLORS.labelText });
+    var blank = repeat(CHIP, rows[0].length);
+    for (var i = 0; i < CHIP_PAD; i++) {
+      rows.unshift(blank);
+      rows.push(blank);
+    }
+    var palette = {};
+    palette[CHIP] = B.COLORS.label;
+    palette[TEXT] = B.COLORS.labelText;
+    return P.fromRows(rows, palette);
   }
 
   var memoHold = P.memo(holdStep);

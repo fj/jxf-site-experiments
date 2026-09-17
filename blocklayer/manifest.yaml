@@ -1,0 +1,31 @@
+# Manifest for the Blocklayer experiment.
+#
+# The host (jxf-site) reads this to assemble the page: it compiles the styles
+# and loads the local scripts in order. The experiment is the source of truth
+# for its own composition — the host hardcodes nothing.
+
+name: blocklayer
+
+# id of the element the app builds itself into (config.js owns the same id).
+mount: experiment-ext-blk
+
+# Stylesheets (relative to this dir). .scss is compiled to CSS by the host;
+# style.scss imports ../shared/_theme.scss for the tokens and mixins.
+styles:
+  - style.scss
+
+# Local scripts, in dependency order. Each attaches one module to the
+# window.BlockLayer namespace; app.js wires them together and comes last.
+scripts:
+  - config.js
+  - pixel.js
+  - level.js
+  - view.js
+  - sprites-tiles.js
+  - sprites-decor.js
+  - sprites-marks.js
+  - sprites-icons.js
+  - render.js
+  - toolbar.js
+  - input.js
+  - app.js

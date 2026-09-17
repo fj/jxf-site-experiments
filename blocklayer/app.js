@@ -183,16 +183,11 @@
     edited();
   }
 
-  var viewActions = {
+  // Everything the toolbar and the pointer can do; each reads the keys it needs.
+  var handlers = {
     pan: function (facing) { B.view.pan(state.view, facing, B.PAN_STEP); changed(); },
     rotate: function (turns) { B.view.rotate(state.view, turns); changed(); },
-    zoom: function (delta) { B.view.zoom(state.view, delta); changed(); }
-  };
-
-  var toolbarHandlers = {
-    pan: viewActions.pan,
-    rotate: viewActions.rotate,
-    zoom: viewActions.zoom,
+    zoom: function (delta) { B.view.zoom(state.view, delta); changed(); },
     toggleLayer: function (name) {
       if (!(name in state.layers)) return;
       state.layers[name] = !state.layers[name];
@@ -214,12 +209,6 @@
     toggleMark: function (key) {
       editSelected(function (x, y) { B.level.toggleMark(state.level, x, y, key); });
     },
-    save: saveFile,
-    open: openFile,
-    clear: clear
-  };
-
-  var inputHandlers = {
     pick: pick,
     selected: function () { return state.selected; },
     hover: function (hit) {
@@ -246,9 +235,9 @@
       sched();
     },
     remove: remove,
-    pan: viewActions.pan,
-    rotate: viewActions.rotate,
-    zoom: viewActions.zoom
+    save: saveFile,
+    open: openFile,
+    clear: clear
   };
 
   // ---- Skeleton ------------------------------------------------------------
@@ -294,9 +283,9 @@
   }
 
   // ---- Boot ----------------------------------------------------------------
-  toolbar = B.toolbar.build(toolbarHandlers);
+  toolbar = B.toolbar.build(handlers);
   var stage = buildSkeleton(root);
-  B.input.attach(canvas, inputHandlers);
+  B.input.attach(canvas, handlers);
   watchDrops(stage);
   watchSize(stage);
   changed();

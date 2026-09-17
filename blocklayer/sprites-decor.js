@@ -8,8 +8,6 @@
 
   var B = window.BlockLayer = window.BlockLayer || {};
 
-  var MID_SHADE = -0.22;        // the left (south-west) face
-  var DARK_SHADE = -0.42;       // the right (south-east) face
   var HIGHLIGHT_SHADE = 0.5;
 
   var WOOD = "#c8843e";
@@ -20,13 +18,14 @@
   var YELLOW = "#f6d048";
   var RED = "#f25c7a";
 
-  // l: the lit face, m: mid, d: dark, h: a highlight, #: outline.
+  // l: the lit face, m: the left (mid) face, d: the right (dark) face,
+  // h: a highlight, #: outline.
   function facets(base, extra) {
     var palette = {
       "#": B.COLORS.outline,
       "l": base,
-      "m": B.pixel.shade(base, MID_SHADE),
-      "d": B.pixel.shade(base, DARK_SHADE),
+      "m": B.pixel.shade(base, B.FACE_SHADES.left),
+      "d": B.pixel.shade(base, B.FACE_SHADES.right),
       "h": B.pixel.shade(base, HIGHLIGHT_SHADE)
     };
     Object.keys(extra || {}).forEach(function (ch) { palette[ch] = extra[ch]; });

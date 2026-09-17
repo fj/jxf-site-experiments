@@ -23,8 +23,6 @@
   var U_SCALE = HALF_W + 0.5;
   var V_SCALE = HALF_H + 0.25;
   var PIXEL_CENTRE = 0.5;
-  var LEFT_SHADE = -0.22;
-  var RIGHT_SHADE = -0.42;
   var SLOPE_SHADE = -0.08;
   var SEAM_SHADE = -0.18;                // between two stacked blocks
   var WEDGE_H = H + BLOCK;
@@ -62,8 +60,8 @@
 
   function faceColor(elev, kind) {
     var color = topColor(elev);
-    if (kind === "left") return P.shade(color, LEFT_SHADE);
-    if (kind === "right") return P.shade(color, RIGHT_SHADE);
+    if (kind === "left") return P.shade(color, B.FACE_SHADES.left);
+    if (kind === "right") return P.shade(color, B.FACE_SHADES.right);
     if (kind === "slope") return P.shade(color, SLOPE_SHADE);
     return color;
   }

@@ -81,6 +81,10 @@
     inkDark: "#e8e8f0"     // ...and on a dark one
   };
 
+  // How far each side face of a block or a decor object is shaded from its
+  // top colour: the light falls from the upper left.
+  B.FACE_SHADES = { left: -0.22, right: -0.42 };
+
   var SCREEN_DIRS = B.DIRECTIONS.length;
   var DIRS_PER_FACING = SCREEN_DIRS / B.FACINGS.length;   // and per quarter turn
 

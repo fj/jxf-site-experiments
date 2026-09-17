@@ -59,7 +59,9 @@ describe("pixel: shade", () => {
   });
 
   it("darkens more the further from 0, so the two side faces stay in order", () => {
-    const [mid, dark] = [P.shade(GREEN, -0.22), P.shade(GREEN, -0.42)].map(P.parseHex);
+    const { left, right } = B.FACE_SHADES;
+    assert.ok(right < left && left < 0);
+    const [mid, dark] = [P.shade(GREEN, left), P.shade(GREEN, right)].map(P.parseHex);
     const top = P.parseHex(GREEN);
     for (let i = 0; i < 3; i++) assert.ok(top[i] > mid[i] && mid[i] > dark[i], `channel ${i}`);
   });

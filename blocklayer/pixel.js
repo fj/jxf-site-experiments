@@ -54,6 +54,11 @@
     ctx.drawImage(s.canvas, Math.round(x - s.ox), Math.round(y - s.oy));
   }
 
+  // String-art rows mirrored left to right.
+  function hflip(rows) {
+    return rows.map(function (row) { return row.split("").reverse().join(""); });
+  }
+
   function parseHex(hex) {
     var n = parseInt(hex.slice(1), HEX_RADIX);
     return [(n >> 16) & CHANNEL_MAX, (n >> 8) & CHANNEL_MAX, n & CHANNEL_MAX];
@@ -109,6 +114,7 @@
     sprite: sprite,
     fromRows: fromRows,
     draw: draw,
+    hflip: hflip,
     parseHex: parseHex,
     toHex: toHex,
     shade: shade,

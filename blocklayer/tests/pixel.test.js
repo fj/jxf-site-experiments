@@ -67,6 +67,15 @@ describe("pixel: shade", () => {
   });
 });
 
+describe("pixel: hflip", () => {
+  it("mirrors each row left to right and leaves the input alone", () => {
+    const rows = ["#..", "##.", "..#"];
+    assert.deepEqual(P.hflip(rows), ["..#", ".##", "#.."]);
+    assert.deepEqual(rows, ["#..", "##.", "..#"]);
+    assert.deepEqual(P.hflip(P.hflip(rows)), rows);
+  });
+});
+
 describe("pixel: memo", () => {
   function counted() {
     let calls = 0;

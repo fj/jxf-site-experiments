@@ -50,14 +50,14 @@
   // Indexed by screen direction: up-right, right, down-right, down,
   // down-left, left, up-left, up.
   var ARROW_BY_SCREEN_DIR = [
-    function () { return ARROW_UP_RIGHT; },
-    function () { return hflip(transpose(ARROW_UP)); },
-    function () { return vflip(ARROW_UP_RIGHT); },
-    function () { return vflip(ARROW_UP); },
-    function () { return hflip(vflip(ARROW_UP_RIGHT)); },
-    function () { return transpose(ARROW_UP); },
-    function () { return hflip(ARROW_UP_RIGHT); },
-    function () { return ARROW_UP; }
+    ARROW_UP_RIGHT,
+    B.pixel.hflip(transpose(ARROW_UP)),
+    vflip(ARROW_UP_RIGHT),
+    vflip(ARROW_UP),
+    B.pixel.hflip(vflip(ARROW_UP_RIGHT)),
+    transpose(ARROW_UP),
+    B.pixel.hflip(ARROW_UP_RIGHT),
+    ARROW_UP
   ];
 
   var STILL = {
@@ -94,10 +94,6 @@
       "GG.....GG"
     ]
   };
-
-  function hflip(rows) {
-    return rows.map(function (row) { return row.split("").reverse().join(""); });
-  }
 
   function vflip(rows) {
     return rows.slice().reverse();
@@ -151,7 +147,7 @@
   var arrow = B.pixel.memo(function (screenDir) {
     var rows = ARROW_BY_SCREEN_DIR[screenDir];
     if (!rows) throw new Error("unknown screen direction: " + screenDir);
-    return B.pixel.fromRows(outlined(rows()), PALETTE);
+    return B.pixel.fromRows(outlined(rows), PALETTE);
   });
 
   var still = B.pixel.memo(function (key) {

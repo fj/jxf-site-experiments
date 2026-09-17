@@ -342,11 +342,7 @@
     ]
   };
 
-  ROWS["rotate-ccw"] = ROWS["rotate-cw"].map(mirror);
-
-  function mirror(row) {
-    return row.split("").reverse().join("");
-  }
+  ROWS["rotate-ccw"] = B.pixel.hflip(ROWS["rotate-cw"]);
 
   // A glyph is a mask: only its alpha counts, so the ink is opaque black and
   // the tone is the same at half the alpha.

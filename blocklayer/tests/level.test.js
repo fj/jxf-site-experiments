@@ -410,6 +410,15 @@ describe("level: demo", () => {
     }
   });
 
+  it("rises away from the first view's camera on both slopes, so each is in sight", () => {
+    const slopes = tiles.filter((t) => t.shape !== "block");
+    assert.equal(slopes.length, 2);
+    for (const t of slopes) {
+      const seen = B.view.viewFacing(0, t.facing);
+      assert.ok(seen === "ur" || seen === "ul", `${t.shape} facing ${t.facing} is seen ${seen}`);
+    }
+  });
+
   it("shows every decor object once", () => {
     const placed = tiles.map((t) => t.decor).filter(Boolean);
     assert.deepEqual(new Set(placed), new Set(DECOR_KEYS));

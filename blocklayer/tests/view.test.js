@@ -276,13 +276,30 @@ describe("view: pick", () => {
     const level = L.create();
     const lone = L.add(level, 2, -1, 0);
     const p = V.project(view, 2, -1, 0);
-    const vertex = V.pick(view, level, p.sx + B.TILE_W / 2, p.sy);
-    assert.deepEqual(vertex, { cell: vertex.cell, edge: true });
-    assert.ok(!("edge" in V.pick(view, level, p.sx + B.TILE_W / 2 + 1, p.sy)), "just past the vertex");
+    const vertex = { sx: p.sx + B.TILE_W / 2, sy: p.sy };
+    assert.deepEqual(V.pick(view, level, vertex.sx, vertex.sy), { cell: { x: 3, y: -1 }, edge: true });
+    assert.deepEqual(V.pick(view, level, vertex.sx + 1, vertex.sy), { cell: { x: 3, y: -2 } });
     const q = V.project(view, 3, -2, 0);
-    const edge = V.pick(view, level, q.sx + B.TILE_W / 4, q.sy + B.TILE_H / 4);
-    assert.deepEqual(edge, { cell: edge.cell, edge: true });
+    const edge = { sx: q.sx + B.TILE_W / 4, sy: q.sy + B.TILE_H / 4 };
+    assert.deepEqual(V.pick(view, level, edge.sx, edge.sy), { cell: { x: 4, y: -2 }, edge: true });
     assert.deepEqual(V.pick(view, level, p.sx - 1, p.sy), { tile: lone });
+  });
+
+  it("finds the line between two neighbours at every rotation, panned, in either quadrant", () => {
+    const pairs = [[[0, 0], [1, 0]], [[0, 0], [0, 1]], [[-2, -1], [-3, -1]], [[-2, -1], [-2, -2]]];
+    for (const rot of ROTS) {
+      const view = viewAt(rot, { x: 9, y: -5 });
+      const level = L.create();
+      for (const [a, b] of pairs) {
+        const name = `rot ${rot} (${a})-(${b})`;
+        const pa = V.project(view, a[0], a[1], B.NEW_TILE_ELEV);
+        const pb = V.project(view, b[0], b[1], B.NEW_TILE_ELEV);
+        const between = V.pick(view, level, (pa.sx + pb.sx) / 2, (pa.sy + pb.sy) / 2);
+        assert.equal(between.edge, true, name);
+        assert.ok([a, b].some(([x, y]) => between.cell.x === x && between.cell.y === y), name);
+        assert.deepEqual(V.pick(view, level, pa.sx, pa.sy), { cell: { x: a[0], y: a[1] } }, name);
+      }
+    }
   });
 
   it("returns the empty cell on the new-tile plane", () => {

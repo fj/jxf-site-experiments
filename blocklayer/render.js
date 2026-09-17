@@ -1,9 +1,10 @@
 /*
  * Blocklayer — drawing the scene. Everything is drawn once, at base scale, on
- * an offscreen canvas: the columns back to front with what stands on them,
- * then the ghost and the compass. That bitmap is blitted to the visible canvas
- * at `scale` (the view's zoom times the device pixel ratio) with smoothing
- * off, so every pixel stays a crisp square.
+ * an offscreen canvas: the columns back to front with what stands on them and
+ * the ghost among them at its depth, then the labels and the compass. That
+ * bitmap is blitted to the visible canvas at `scale` (the view's zoom times
+ * the device pixel ratio) with smoothing off, so every pixel stays a crisp
+ * square.
  */
 (function () {
   "use strict";
@@ -98,11 +99,11 @@
     }
   }
 
-  function drawGhost(ctx, state, ox, oy) {
+  // The column a click would add, placed like the tile it would become so it
+  // takes its turn in depth order and a column in front of it covers it.
+  function ghostEntry(state) {
     var cell = state.hover && state.hover.cell;
-    if (!cell) return;
-    var G = B.view.project(state.view, cell.x, cell.y, B.NEW_TILE_ELEV);
-    B.pixel.draw(ctx, B.tiles.ghost(B.NEW_TILE_ELEV), ox + G.sx, oy + G.sy);
+    return cell ? { x: cell.x, y: cell.y, elev: B.NEW_TILE_ELEV } : null;
   }
 
   function drawCompass(ctx, state) {
@@ -117,11 +118,21 @@
     var ctx = B.pixel.context(scene);
     ctx.clearRect(0, 0, frame.w, frame.h);
 
-    var tiles = B.view.order(state.view, B.level.all(state.level));
-    var at = tiles.map(function (tile) { return place(state, frame, tile); });
-    for (var i = 0; i < tiles.length; i++) drawTile(ctx, state, tiles[i], at[i]);
+    var ghost = ghostEntry(state);
+    var columns = B.level.all(state.level).concat(ghost ? [ghost] : []);
+    var tiles = [];
+    var at = [];
+    B.view.order(state.view, columns).forEach(function (entry) {
+      var p = place(state, frame, entry);
+      if (entry === ghost) {
+        B.pixel.draw(ctx, B.tiles.ghost(ghost.elev), p.x, p.y);
+        return;
+      }
+      drawTile(ctx, state, entry, p);
+      tiles.push(entry);
+      at.push(p);
+    });
     drawLabels(ctx, state, tiles, at);
-    drawGhost(ctx, state, frame.ox, frame.oy);
     drawCompass(ctx, state);
 
     var out = canvas.getContext("2d");

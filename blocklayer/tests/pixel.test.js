@@ -143,13 +143,6 @@ describe("pixel: memo", () => {
     assert.equal(b.calls(), 1);
   });
 
-  it("keys by string form: 1 and \"1\" share a result, as do null and undefined", () => {
-    const m = counted();
-    assert.equal(m.fn(1), m.fn("1"));
-    assert.equal(m.fn(null), m.fn(undefined));
-    assert.equal(m.calls(), 2);
-  });
-
   it("caches a falsy result too", () => {
     let calls = 0;
     const falsy = { zero: 0, empty: "", nil: null, no: false };

@@ -147,6 +147,33 @@ describe("input: adding by click and drag", () => {
     assert.deepEqual(r.of("add"), [[0, 0], [1, 0], [2, 0]]);
   });
 
+  it("a left click on a cell reached on a grid line still adds it", () => {
+    const r = rig();
+    r.fire("pointerdown", { ...r.at(25, 10, edge(0, 0)), button: PRIMARY });
+    assert.deepEqual(r.of("add"), [[0, 0]]);
+  });
+
+  it("a drag survives a trip off the canvas and back", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const b = r.at(40, 10, cell(1, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY });
+    r.fire("pointermove", { clientX: WIDTH + 5, clientY: 10 });
+    r.fire("pointermove", b);
+    assert.deepEqual(r.of("add"), [[0, 0], [1, 0]]);
+    assert.deepEqual(r.of("hover"), [[null], [cell(1, 0)]]);
+  });
+
+  it("a drag that starts on a tile selects it, then adds the empty cells it crosses", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    const c = r.at(50, 20, cell(2, 1));
+    r.fire("pointerdown", { ...t, button: PRIMARY });
+    r.fire("pointermove", c);
+    assert.deepEqual(r.of("select"), [[1, 1]]);
+    assert.deepEqual(r.of("add"), [[2, 1]]);
+  });
+
   it("a drag skips a cell it reaches on the line between two cells", () => {
     const r = rig();
     const a = r.at(10, 10, cell(0, 0));
@@ -253,6 +280,19 @@ describe("input: hold to remove", () => {
     assert.deepEqual(r.of("hold").pop(), [1, 1, null]);
     r.tick(r.B.HOLD_MS);
     assert.deepEqual(r.of("remove"), []);
+  });
+
+  it("releasing the right button mid-drag ends the hold, not the drag", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const t = r.at(20, 20, tile(1, 1));
+    const b = r.at(40, 10, cell(1, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY });
+    r.fire("pointerdown", { ...t, button: SECONDARY });
+    r.fire("pointerup", { ...t, button: SECONDARY });
+    r.fire("pointermove", b);
+    assert.deepEqual(r.of("hold"), [[1, 1, 0], [1, 1, null]]);
+    assert.deepEqual(r.of("add"), [[0, 0], [1, 0]]);
   });
 
   it("the right button on an empty cell starts no hold and adds nothing", () => {

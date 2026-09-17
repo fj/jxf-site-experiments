@@ -108,15 +108,16 @@
     return dx < HALF_TILE_W && dy >= -edge && dy <= height + edge;
   }
 
+  // The front-most tile whose silhouette is under the point, else the cell of
+  // the floor under it: where a new column's base would stand. A column covers
+  // its own floor cell, so the cell is always empty.
   function pick(view, level, sx, sy) {
     var tiles = order(view, B.level.all(level));
     for (var i = tiles.length - 1; i >= 0; i--) {
       if (hit(view, tiles[i], sx, sy)) return { tile: tiles[i] };
     }
-    var cell = cellAt(view, sx, sy, B.NEW_TILE_ELEV);
-    if (B.level.get(level, cell.x, cell.y)) return null;
-    var empty = { cell: cell };
-    if (onGridLine(view, sx, sy, B.NEW_TILE_ELEV)) empty.edge = true;
+    var empty = { cell: cellAt(view, sx, sy, B.FLOOR) };
+    if (onGridLine(view, sx, sy, B.FLOOR)) empty.edge = true;
     return empty;
   }
 

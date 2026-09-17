@@ -261,26 +261,53 @@ describe("view: pick", () => {
     assert.deepEqual(V.pick(view, level, p.sx + 4, p.sy + 20), { tile: only });
   });
 
-  it("gives the empty cell beside a lone tile its own centre, and the tile one pixel in", () => {
+  it("picks the cell whose floor is under the point, not the one whose top would be", () => {
+    const view = viewAt(0, { x: 7, y: -3 });
+    const level = L.create();
+    const back = B.NEW_TILE_ELEV - B.FLOOR;
+    for (const [x, y] of [[0, 0], [3, -2], [-4, 5]]) {
+      const floor = V.project(view, x, y, B.FLOOR);
+      const top = V.project(view, x, y, B.NEW_TILE_ELEV);
+      assert.deepEqual(V.pick(view, level, floor.sx, floor.sy), { cell: { x, y } }, `(${x},${y})`);
+      assert.deepEqual(V.pick(view, level, top.sx, top.sy),
+        { cell: { x: x - back, y: y - back } }, `(${x},${y}) top`);
+    }
+  });
+
+  it("gives the cell whose floor centre touches a lone column's side its own centre, " +
+    "and the tile one pixel in", () => {
     const { view, level } = scene();
     const lone = L.add(level, 0, 0, 0);
-    for (const [x, y] of [[1, 0], [0, 1]]) {
-      const p = V.project(view, x, y, B.NEW_TILE_ELEV);
+    for (const [x, y] of [[0, -1], [-1, 0]]) {
+      const p = V.project(view, x, y, B.FLOOR);
       const inward = p.sx > 0 ? -1 : 1;
       assert.deepEqual(V.pick(view, level, p.sx, p.sy), { cell: { x, y } }, `(${x},${y})`);
       assert.deepEqual(V.pick(view, level, p.sx + inward, p.sy), { tile: lone }, `(${x},${y})`);
     }
   });
 
+  it("hides the floor behind a column as far back as the column is tall", () => {
+    const { view, level } = scene();
+    const lone = L.add(level, 0, 0, B.NEW_TILE_ELEV);
+    const reach = B.NEW_TILE_ELEV - B.FLOOR;
+    for (let k = 1; k <= reach; k++) {
+      const p = V.project(view, -k, -k, B.FLOOR);
+      assert.deepEqual(V.pick(view, level, p.sx, p.sy), { tile: lone }, `${k} back`);
+    }
+    const clear = V.project(view, -reach - 1, -reach - 1, B.FLOOR);
+    assert.deepEqual(V.pick(view, level, clear.sx, clear.sy),
+      { cell: { x: -reach - 1, y: -reach - 1 } });
+  });
+
   it("flags a point on the line between two empty cells as an edge", () => {
     const { view, level } = scene();
     const lone = L.add(level, 2, -1, 0);
-    const p = V.project(view, 2, -1, 0);
+    const p = V.project(view, 2, -1, B.FLOOR);
     const vertex = { sx: p.sx + B.TILE_W / 2, sy: p.sy };
     const onVertex = V.pick(view, level, vertex.sx, vertex.sy);
     assert.deepEqual(onVertex, { cell: { x: 3, y: -1 }, edge: true });
     assert.deepEqual(V.pick(view, level, vertex.sx + 1, vertex.sy), { cell: { x: 3, y: -2 } });
-    const q = V.project(view, 3, -2, 0);
+    const q = V.project(view, 3, -2, B.FLOOR);
     const edge = { sx: q.sx + B.TILE_W / 4, sy: q.sy + B.TILE_H / 4 };
     assert.deepEqual(V.pick(view, level, edge.sx, edge.sy), { cell: { x: 4, y: -2 }, edge: true });
     assert.deepEqual(V.pick(view, level, p.sx - 1, p.sy), { tile: lone });
@@ -293,8 +320,8 @@ describe("view: pick", () => {
       const level = L.create();
       for (const [a, b] of pairs) {
         const name = `rot ${rot} (${a})-(${b})`;
-        const pa = V.project(view, a[0], a[1], B.NEW_TILE_ELEV);
-        const pb = V.project(view, b[0], b[1], B.NEW_TILE_ELEV);
+        const pa = V.project(view, a[0], a[1], B.FLOOR);
+        const pb = V.project(view, b[0], b[1], B.FLOOR);
         const between = V.pick(view, level, (pa.sx + pb.sx) / 2, (pa.sy + pb.sy) / 2);
         assert.equal(between.edge, true, name);
         assert.ok([a, b].some(([x, y]) => between.cell.x === x && between.cell.y === y), name);
@@ -303,19 +330,47 @@ describe("view: pick", () => {
     }
   });
 
-  it("returns the empty cell on the new-tile plane", () => {
+  it("returns the empty cell on the floor plane, turned and panned", () => {
     const view = viewAt(1, { x: 9, y: 9 });
     const level = L.create();
     L.add(level, 5, 5);
-    const p = V.project(view, 2, 3, B.NEW_TILE_ELEV);
+    const p = V.project(view, 2, 3, B.FLOOR);
     assert.deepEqual(V.pick(view, level, p.sx, p.sy), { cell: { x: 2, y: 3 } });
   });
 
-  it("returns null when the cell is occupied but its column was not hit", () => {
+  it("finds the lowest column, of any shape, over every point of its own floor cell", () => {
+    const PAST_DIAMOND = 4;              // px the sweep reaches beyond the floor diamond
+    const reachX = B.TILE_W / 2 + PAST_DIAMOND;
+    const reachY = B.TILE_H / 2 + PAST_DIAMOND;
+    const at = { x: 1, y: -2 };
+    for (const rot of ROTS) {
+      for (const shape of B.SHAPES) {
+        const view = viewAt(rot, { x: 9, y: -5 });
+        const level = L.create();
+        const low = L.add(level, at.x, at.y, B.ELEV_MIN);
+        L.setShape(level, at.x, at.y, shape);
+        const p = V.project(view, at.x, at.y, B.FLOOR);
+        for (let dx = -reachX; dx <= reachX; dx++) {
+          for (let dy = -reachY; dy <= reachY; dy++) {
+            const name = `rot ${rot} ${shape} ${dx},${dy}`;
+            const got = V.pick(view, level, p.sx + dx, p.sy + dy);
+            assert.notEqual(got, null, name);
+            const under = V.cellAt(view, p.sx + dx, p.sy + dy, B.FLOOR);
+            if (B.sameCell(under, at.x, at.y)) assert.deepEqual(got, { tile: low }, name);
+          }
+        }
+      }
+    }
+  });
+
+  it("leaves a column's floor at its side vertices to the neighbours, on the grid line", () => {
     const { view, level } = scene();
-    L.add(level, 0, 0, -3);
-    const p = V.project(view, 0, 0, B.NEW_TILE_ELEV);
-    assert.equal(V.pick(view, level, p.sx, p.sy), null);
+    L.add(level, 0, 0, B.ELEV_MIN);
+    const p = V.project(view, 0, 0, B.FLOOR);
+    const right = V.pick(view, level, p.sx + B.TILE_W / 2, p.sy);
+    const left = V.pick(view, level, p.sx - B.TILE_W / 2, p.sy);
+    assert.deepEqual(right, { cell: { x: 1, y: 0 }, edge: true });
+    assert.deepEqual(left, { cell: { x: 0, y: 1 }, edge: true });
   });
 });
 

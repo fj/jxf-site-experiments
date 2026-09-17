@@ -1,8 +1,9 @@
 /*
  * Blocklayer — the level a first visit starts with: a plateau with a raised
  * square reached by a ramp and by stairs, a sunken row, every decor object and
- * a few marks, so the first screenshot shows every feature. The slopes face
- * the way the first view sees them, which is why this loads after view.js.
+ * a few marks, so the first screenshot shows every feature. The slopes were
+ * placed to be in sight at the first view's rotation; demo.test.js checks that
+ * against view.js, which is why this loads after it.
  */
 (function () {
   "use strict";

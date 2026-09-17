@@ -1,0 +1,198 @@
+// Styles for the Blocklayer experiment.
+//
+// A column of pixel-art buttons beside the level's canvas, and a hint row and
+// a status line under the canvas. The host owns the mount's outer box; what's
+// here is the layout inside it, the button, the icon swap between themes, the
+// canvas and the hold-to-clear fill.
+
+@import "../shared/theme";
+
+$blk-button: 2.25rem;
+$blk-button-gap: 0.2rem;
+$blk-group-gap: 0.6rem;
+$blk-layout-gap: 0.75rem;
+$blk-border: 2px;
+$blk-corner: 2px;
+$blk-pressed-alpha: 0.18;
+$blk-disabled-opacity: 0.35;
+$blk-hold-alpha: 0.7;
+// The fill's length is set by the toolbar from B.HOLD_MS; this is a fallback.
+$blk-hold-fallback: 500ms;
+$blk-canvas-bg: #cfd4dc;
+$blk-canvas-bg-dark: #23242b;
+$blk-hint-gap: 1.2rem;
+$blk-hint-item-gap: 0.35rem;
+$blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothing
+
+.experiment-ext-blk-layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: $blk-layout-gap;
+  align-items: start;
+
+  @include exp-mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.experiment-ext-blk-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: $blk-group-gap;
+
+  @include exp-mobile {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: start;
+  }
+}
+
+// A 3×3 group holds its shape by keeping empty spacers in the cells it skips.
+.experiment-ext-blk-group {
+  display: grid;
+  grid-template-columns: repeat(3, $blk-button);
+  gap: $blk-button-gap;
+}
+
+.experiment-ext-blk-btn {
+  appearance: none;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  width: $blk-button;
+  height: $blk-button;
+  padding: 0;
+  border: $blk-border solid $exp-border;
+  border-radius: $blk-corner;
+  background: $exp-surface;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+
+  &:hover:not(:disabled) { border-color: $exp-link; }
+  &:focus-visible { outline: $blk-border solid $exp-link; outline-offset: 1px; }
+
+  &[aria-pressed="true"] {
+    border-color: $exp-link;
+    background: rgba($exp-link, $blk-pressed-alpha);
+  }
+
+  &:disabled {
+    opacity: $blk-disabled-opacity;
+    cursor: default;
+  }
+
+  // Hold-to-clear: a fill rising from the bottom for as long as the hold lasts.
+  &.is-holding::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba($exp-error, $blk-hold-alpha);
+    transform-origin: bottom;
+    animation: experiment-ext-blk-hold var(--experiment-ext-blk-hold, $blk-hold-fallback)
+      linear forwards;
+  }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+
+    &:hover:not(:disabled) { border-color: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+
+    &[aria-pressed="true"] {
+      border-color: $exp-link-dark;
+      background: rgba($exp-link-dark, $blk-pressed-alpha);
+    }
+
+    &.is-holding::before { background: rgba($exp-error-dark, $blk-hold-alpha); }
+  }
+}
+
+@keyframes experiment-ext-blk-hold {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+// Each UI icon is two images, one inked for each theme; only one shows.
+.experiment-ext-blk-icon {
+  position: relative;
+  display: block;
+  image-rendering: pixelated;
+  pointer-events: none;
+
+  &.is-dark { display: none; }
+
+  @include exp-dark {
+    &.is-light { display: none; }
+    &.is-dark { display: block; }
+  }
+}
+
+.experiment-ext-blk-stage {
+  position: relative;
+  min-width: 0;
+}
+
+.experiment-ext-blk-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: #{"16 / 10"};
+  image-rendering: pixelated;
+  cursor: crosshair;
+  touch-action: none;
+  outline: none;
+  border: $blk-border solid $exp-border;
+  border-radius: $blk-corner;
+  background: $blk-canvas-bg;
+
+  &:focus-visible { border-color: $exp-link; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $blk-canvas-bg-dark;
+
+    &:focus-visible { border-color: $exp-link-dark; }
+  }
+}
+
+// A level file dragged over the stage lights the canvas border, as focus does.
+.experiment-ext-blk-stage.is-dropping .experiment-ext-blk-canvas {
+  border-color: $exp-link;
+
+  @include exp-dark { border-color: $exp-link-dark; }
+}
+
+.experiment-ext-blk-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $blk-hint-item-gap $blk-hint-gap;
+  margin-top: 0.4rem;
+  font-family: $exp-mono-font-family;
+  font-size: 0.8em;
+  color: $exp-muted;
+
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+.experiment-ext-blk-hint-item {
+  display: inline-flex;
+  align-items: center;
+  gap: $blk-hint-item-gap;
+}
+
+// Where the app says, briefly, why an opened file was refused.
+.experiment-ext-blk-status {
+  min-height: $blk-status-height;
+  margin-top: 0.4rem;
+  font-family: $exp-mono-font-family;
+  font-size: 0.8em;
+  color: $exp-error;
+
+  @include exp-dark { color: $exp-error-dark; }
+}

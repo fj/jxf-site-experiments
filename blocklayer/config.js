@@ -82,12 +82,17 @@
   };
 
   var SCREEN_DIRS = B.DIRECTIONS.length;
-  var DIRS_PER_TURN = SCREEN_DIRS / 4;
+  var DIRS_PER_FACING = SCREEN_DIRS / B.FACINGS.length;   // and per quarter turn
 
   // Where world direction i (an index into DIRECTIONS) points on screen after
   // rot quarter turns, as an index into the same eight-way compass.
   B.screenDir = function (rot, i) {
-    return (((i + DIRS_PER_TURN * rot) % SCREEN_DIRS) + SCREEN_DIRS) % SCREEN_DIRS;
+    return (((i + DIRS_PER_FACING * rot) % SCREEN_DIRS) + SCREEN_DIRS) % SCREEN_DIRS;
+  };
+
+  // The same for a world facing (N, E, S or W).
+  B.facingDir = function (rot, facing) {
+    return B.screenDir(rot, DIRS_PER_FACING * B.FACINGS.indexOf(facing));
   };
 
   B.clamp = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };

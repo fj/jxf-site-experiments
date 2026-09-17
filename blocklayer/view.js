@@ -13,7 +13,7 @@
   var HALF = 0.5;                                 // of a cell: where one cell meets the next
   var HALF_TILE_W = B.TILE_W / 2;                 // base px, a diamond's centre to its side vertex
   var HALF_TILE_H = B.TILE_H / 2;                 // ...and to its top or bottom vertex
-  var DIRS_PER_FACING = B.DIRECTIONS.length / B.FACINGS.length;
+  var DIRS_PER_VIEW_FACING = B.DIRECTIONS.length / B.VIEW_FACINGS.length;
   var STEP = {                                    // one cell toward each world facing
     N: { x: 0, y: -1 },
     E: { x: 1, y: 0 },
@@ -131,8 +131,7 @@
   }
 
   function viewFacing(rot, facing) {
-    var dir = B.screenDir(rot, DIRS_PER_FACING * B.FACINGS.indexOf(facing));
-    return B.VIEW_FACINGS[dir / DIRS_PER_FACING];
+    return B.VIEW_FACINGS[B.facingDir(rot, facing) / DIRS_PER_VIEW_FACING];
   }
 
   function frame(canvas, scale) {

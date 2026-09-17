@@ -16,7 +16,6 @@
   var HOLDING_CLASS = "is-holding";
   var PRIMARY_BUTTON = 0;
   var FLAT_SHAPE = "block";                            // the one shape with no facing
-  var DIRS_PER_FACING = B.DIRECTIONS.length / B.FACINGS.length;
   var HOLD_KEYS = [" ", "Enter"];
   var FILE_ACCEPT = ".json";
 
@@ -132,10 +131,6 @@
     btn.setAttribute("aria-pressed", on ? "true" : "false");
   }
 
-  function facingDir(rot, facing) {
-    return B.screenDir(rot, DIRS_PER_FACING * B.FACINGS.indexOf(facing));
-  }
-
   function selectedTile(state) {
     var sel = state.selected;
     return sel ? B.level.get(state.level, sel.x, sel.y) : null;
@@ -150,7 +145,7 @@
     PAN_SLOTS.forEach(function (facing) {
       if (!facing) return el.appendChild(spacer());
       var btn = button("pan", facing, FACING_TITLES[facing]);
-      refs.pan[facing] = image(btn, B.marks.arrow(facingDir(rot, facing)));
+      refs.pan[facing] = image(btn, B.marks.arrow(B.facingDir(rot, facing)));
       el.appendChild(btn);
     });
     return el;
@@ -189,7 +184,7 @@
       el.appendChild(btn);
     });
     refs.facing = button("facing", "", "Facing");
-    refs.facingIcon = image(refs.facing, B.marks.arrow(facingDir(rot, facing)));
+    refs.facingIcon = image(refs.facing, B.marks.arrow(B.facingDir(rot, facing)));
     el.appendChild(refs.facing);
     return el;
   }
@@ -299,7 +294,7 @@
     el.style.setProperty(HOLD_VAR, B.HOLD_MS + "ms");
 
     var refs = { pan: {}, layers: {}, shapes: {}, decor: {}, marks: {} };
-    var last = { rot: 0, opaque: true, facingDir: facingDir(0, B.FACINGS[0]) };
+    var last = { rot: 0, opaque: true, facingDir: B.facingDir(0, B.FACINGS[0]) };
 
     el.appendChild(panGroup(refs, last.rot));
     el.appendChild(viewGroup());
@@ -318,7 +313,7 @@
       if (rot === last.rot) return;
       last.rot = rot;
       B.FACINGS.forEach(function (facing) {
-        setSprite(refs.pan[facing], B.marks.arrow(facingDir(rot, facing)));
+        setSprite(refs.pan[facing], B.marks.arrow(B.facingDir(rot, facing)));
       });
       B.MARKS.forEach(function (m) {
         if (m.dir) setSprite(refs.marks[m.key].image, B.marks.sprite(m.key, rot));
@@ -344,7 +339,7 @@
         press(btn, !!tile && tile.shape === shape);
       });
       refs.facing.disabled = !tile || tile.shape === FLAT_SHAPE;
-      var dir = facingDir(rot, tile ? tile.facing : B.FACINGS[0]);
+      var dir = B.facingDir(rot, tile ? tile.facing : B.FACINGS[0]);
       if (dir !== last.facingDir) {
         last.facingDir = dir;
         setSprite(refs.facingIcon, B.marks.arrow(dir));

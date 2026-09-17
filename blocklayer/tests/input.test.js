@@ -98,7 +98,11 @@ function rig() {
     pan: record("pan"),
     rotate: record("rotate"),
     zoom: record("zoom"),
-    deselect: record("deselect")
+    deselect: record("deselect"),
+    setShape: record("setShape"),
+    cycleFacing: record("cycleFacing"),
+    setDecor: record("setDecor"),
+    toggleMark: record("toggleMark")
   };
   B.input.attach(canvas, handlers);
   return {
@@ -402,10 +406,104 @@ describe("input: the keyboard", () => {
       r.fire("keydown", { key: "ArrowUp", ctrlKey: true }),
       r.fire("keydown", { key: "]", metaKey: true }),
       r.fire("keydown", { key: "Delete", altKey: true }),
-      r.fire("keydown", { key: "a" }),
+      r.fire("keydown", { key: "w", ctrlKey: true }),
+      r.fire("keydown", { key: "W", shiftKey: true, ctrlKey: true }),
+      r.fire("keydown", { key: "k" }),
       r.fire("keydown", { key: "Enter" })
     ];
     assert.deepEqual(r.calls, []);
-    assert.deepEqual(events.map((e) => e.prevented), [false, false, false, false, false]);
+    assert.deepEqual(events.map((e) => e.prevented), events.map(() => false));
+  });
+});
+
+const SHIFT = { shiftKey: true };
+
+// Every key that acts on the selected tile, as [key, event props].
+const TILE_KEYS = [
+  ...["w", "s", "a", "d", "b", "r", "t", "1", "2", "3", "4", "5", "p", "l", "j", "x"]
+    .map((key) => [key, {}]),
+  ...["W", "E", "D", "C", "S", "Z", "A", "Q"].map((key) => [key, SHIFT])
+];
+
+// A rig with (1, 1) selected, and the keys fired on it, each asserted swallowed.
+function pressOnSelected(keys) {
+  const r = rig();
+  r.select({ x: 1, y: 1 });
+  for (const [key, props] of keys) {
+    assert.equal(r.fire("keydown", { key, ...props }).prevented, true, key);
+  }
+  return r;
+}
+
+describe("input: keys on the selected tile", () => {
+  it("w raises and s lowers, like the wheel", () => {
+    const r = pressOnSelected([["w"], ["s"], ["w"]]);
+    assert.deepEqual(r.calls, [["raise", 1], ["raise", -1], ["raise", 1]]);
+  });
+
+  it("a turns the facing anticlockwise and d clockwise", () => {
+    const r = pressOnSelected([["a"], ["d"]]);
+    assert.deepEqual(r.calls, [["cycleFacing", -1], ["cycleFacing", 1]]);
+  });
+
+  it("b, r and t set the shape", () => {
+    const r = pressOnSelected([["b"], ["r"], ["t"]]);
+    assert.deepEqual(r.calls, ["block", "ramp", "stairs"].map((shape) => ["setShape", shape]));
+  });
+
+  it("1 to 5 toggle the decor in toolbar order", () => {
+    const r = pressOnSelected(["1", "2", "3", "4", "5"].map((key) => [key]));
+    assert.deepEqual(r.calls, r.B.DECOR.map((d) => ["setDecor", d.key]));
+  });
+
+  it("Shift with the keys around S toggles the arrow mark in that compass direction", () => {
+    const keys = ["W", "E", "D", "C", "S", "Z", "A", "Q"];
+    const r = pressOnSelected(keys.map((key) => [key, SHIFT]));
+    assert.deepEqual(r.calls, [
+      "arrow-n", "arrow-ne", "arrow-e", "arrow-se", "arrow-s", "arrow-sw", "arrow-w", "arrow-nw"
+    ].map((mark) => ["toggleMark", mark]));
+  });
+
+  it("reads a shifted key by its lowercase letter, so Caps Lock changes nothing", () => {
+    const r = pressOnSelected([["w", SHIFT]]);
+    assert.deepEqual(r.calls, [["toggleMark", "arrow-n"]]);
+  });
+
+  it("q, e, z and c do nothing without Shift", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    for (const key of ["q", "e", "z", "c"]) {
+      assert.equal(r.fire("keydown", { key }).prevented, false, key);
+    }
+    assert.deepEqual(r.calls, []);
+  });
+
+  it("Shift with a key that has no mark does nothing", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    for (const key of ["R", "X", "!", "ArrowUp"]) {
+      r.fire("keydown", { key, shiftKey: true });
+    }
+    assert.deepEqual(r.calls, [["pan", "N"]]);
+  });
+
+  it("p, l and j toggle the teleport, rope and jump marks", () => {
+    const r = pressOnSelected([["p"], ["l"], ["j"]]);
+    assert.deepEqual(r.calls, [
+      ["toggleMark", "teleport"], ["toggleMark", "rope"], ["toggleMark", "jump"]
+    ]);
+  });
+
+  it("x removes the selected tile", () => {
+    const r = pressOnSelected([["x"]]);
+    assert.deepEqual(r.calls, [["remove", 1, 1]]);
+  });
+
+  it("with nothing selected, every tile key does nothing and is not swallowed", () => {
+    const r = rig();
+    for (const [key, props] of TILE_KEYS) {
+      assert.equal(r.fire("keydown", { key, ...props }).prevented, false, key);
+    }
+    assert.deepEqual(r.calls, []);
   });
 });

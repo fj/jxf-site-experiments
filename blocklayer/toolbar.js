@@ -21,7 +21,8 @@
   var UNTURNED = 0;                                    // the rotation icons are built for
   var ICON_ATTR = "data-icon";                         // the glyph an icon shows
 
-  var FACING_TITLES = { N: "North", E: "East", S: "South", W: "West" };
+  // Each title ends with the key that does the same, as input.js binds it.
+  var PAN_TITLES = { N: "North (Up)", E: "East (Right)", S: "South (Down)", W: "West (Left)" };
   var PAN_SLOTS = [null, "N", null, "W", null, "E", null, "S", null];
   var ARROW_SLOTS = ["NW", "N", "NE", "W", null, "E", "SW", "S", "SE"];
 
@@ -30,7 +31,18 @@
     { name: "marks", title: "Marks", icon: "layer-marks" },
     { name: "decor", title: "Decor", icon: "layer-decor" }
   ];
-  var SHAPE_TITLES = { block: "Block", ramp: "Ramp", stairs: "Stairs" };
+  var SHAPE_TITLES = { block: "Block (B)", ramp: "Ramp (R)", stairs: "Stairs (T)" };
+  var FACING_TITLE = "Facing (A/D)";
+  var MARK_KEYS = {
+    "arrow-nw": "Shift+Q", "arrow-n": "Shift+W", "arrow-ne": "Shift+E",
+    "arrow-w": "Shift+A", "arrow-e": "Shift+D",
+    "arrow-sw": "Shift+Z", "arrow-s": "Shift+S", "arrow-se": "Shift+C",
+    "teleport": "P", "rope": "L", "jump": "J"
+  };
+
+  function titled(label, key) {
+    return label + " (" + key + ")";
+  }
 
   function element(tag, name) {
     var el = document.createElement(tag);
@@ -132,7 +144,7 @@
     var el = group("pan");
     PAN_SLOTS.forEach(function (facing) {
       if (!facing) return el.appendChild(spacer());
-      var btn = button("pan", facing, FACING_TITLES[facing], function () { handlers.pan(facing); });
+      var btn = button("pan", facing, PAN_TITLES[facing], function () { handlers.pan(facing); });
       refs.pan[facing] = image(btn, B.marks.arrow(B.facingDir(UNTURNED, facing)));
       el.appendChild(btn);
     });
@@ -148,10 +160,10 @@
 
   function viewGroup(handlers) {
     var el = group("view");
-    el.appendChild(stepButton("rotate", -1, "Turn left", "rotate-ccw", handlers.rotate));
-    el.appendChild(stepButton("rotate", 1, "Turn right", "rotate-cw", handlers.rotate));
-    el.appendChild(stepButton("zoom", -1, "Zoom out", "zoom-out", handlers.zoom));
-    el.appendChild(stepButton("zoom", 1, "Zoom in", "zoom-in", handlers.zoom));
+    el.appendChild(stepButton("rotate", -1, "Turn left ([)", "rotate-ccw", handlers.rotate));
+    el.appendChild(stepButton("rotate", 1, "Turn right (])", "rotate-cw", handlers.rotate));
+    el.appendChild(stepButton("zoom", -1, "Zoom out (-)", "zoom-out", handlers.zoom));
+    el.appendChild(stepButton("zoom", 1, "Zoom in (=)", "zoom-in", handlers.zoom));
     return el;
   }
 
@@ -180,7 +192,7 @@
       refs.shapes[shape] = btn;
       el.appendChild(btn);
     });
-    refs.facing = button("facing", "", "Facing", function () { handlers.cycleFacing(); });
+    refs.facing = button("facing", "", FACING_TITLE, function () { handlers.cycleFacing(); });
     refs.facingIcon = image(refs.facing, B.marks.arrow(B.facingDir(UNTURNED, B.FACINGS[0])));
     el.appendChild(refs.facing);
     return el;
@@ -188,8 +200,9 @@
 
   function decorGroup(refs, handlers) {
     var el = group("decor");
-    B.DECOR.forEach(function (d) {
-      var btn = toggle("decor", d.key, d.label, function () { handlers.setDecor(d.key); });
+    B.DECOR.forEach(function (d, i) {
+      var title = titled(d.label, i + 1);
+      var btn = toggle("decor", d.key, title, function () { handlers.setDecor(d.key); });
       image(btn, B.decor.icon(d.key));
       refs.decor[d.key] = btn;
       el.appendChild(btn);
@@ -203,7 +216,8 @@
     var others = B.MARKS.filter(function (m) { return !m.dir; });
     arrows.concat(others).forEach(function (m) {
       if (!m) return el.appendChild(spacer());
-      var btn = toggle("mark", m.key, m.label, function () { handlers.toggleMark(m.key); });
+      var title = titled(m.label, MARK_KEYS[m.key]);
+      var btn = toggle("mark", m.key, title, function () { handlers.toggleMark(m.key); });
       refs.marks[m.key] = { button: btn, image: image(btn, B.marks.sprite(m.key, UNTURNED)) };
       el.appendChild(btn);
     });

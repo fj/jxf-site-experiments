@@ -8,6 +8,22 @@
 
 const INK = "#";
 const BLANK = ".";
+const CHANNELS = 4;             // r, g, b, a per pixel, as a canvas stores them
+const OPAQUE = 255;
+const HEX_RADIX = 16;
+const HEX = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
+const RGBA = /^rgba?\(([^)]+)\)$/;
+
+// A fill style as its four channels. A pixel never filled reads as all zero,
+// which is how a canvas reports the background.
+function channels(style) {
+  const hex = HEX.exec(style);
+  if (hex) return [...hex.slice(1).map((h) => parseInt(h, HEX_RADIX)), OPAQUE];
+  const rgba = RGBA.exec(style);
+  if (!rgba) throw new Error(`no fake for the fill style '${style}'`);
+  const parts = rgba[1].split(",").map(Number);
+  return [parts[0], parts[1], parts[2], Math.round((parts[3] ?? 1) * OPAQUE)];
+}
 
 function fakeCanvas() {
   const canvas = { width: 0, height: 0, filled: new Map() };
@@ -17,6 +33,16 @@ function fakeCanvas() {
       for (let j = y; j < y + h; j++) {
         for (let i = x; i < x + w; i++) canvas.filled.set(`${i},${j}`, ctx.fillStyle);
       }
+    };
+    ctx.getImageData = (x, y, w, h) => {
+      const data = new Uint8ClampedArray(w * h * CHANNELS);
+      for (let j = 0; j < h; j++) {
+        for (let i = 0; i < w; i++) {
+          const colour = canvas.filled.get(`${x + i},${y + j}`);
+          if (colour !== undefined) data.set(channels(colour), (j * w + i) * CHANNELS);
+        }
+      }
+      return { data };
     };
     return ctx;
   };

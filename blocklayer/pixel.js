@@ -45,7 +45,9 @@
         ctx.fillRect(x, y, 1, 1);
       }
     });
-    return sprite(c, ox === undefined ? Math.floor(w / 2) : ox, oy === undefined ? Math.floor(h / 2) : oy);
+    if (ox === undefined) ox = Math.floor(w / 2);
+    if (oy === undefined) oy = Math.floor(h / 2);
+    return sprite(c, ox, oy);
   }
 
   function draw(ctx, s, x, y) {
@@ -78,8 +80,9 @@
     return toHex(parseHex(hex).map(function (v) { return v + (target - v) * t; }));
   }
 
+  // Encoded once per sprite; a sprite's pixels never change after it is made.
   function dataUrl(s) {
-    return s.canvas.toDataURL();
+    return s.url || (s.url = s.canvas.toDataURL());
   }
 
   function memo(fn) {

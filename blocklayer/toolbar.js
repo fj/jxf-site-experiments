@@ -2,9 +2,10 @@
  * Blocklayer — the toolbar: a column of pixel-art buttons that pan, turn and
  * zoom the view, show or hide its layers, and edit the selected tile's shape,
  * facing, decor and marks, and save, open or clear the level. The DOM is
- * built once; sync() refreshes pressed and disabled states from the app's
- * state and redraws only the icons that turn with the view. element() and
- * icon() lend the toolbar's builders to the rest of the interface.
+ * built once; sync() sets every pressed and disabled state and every icon
+ * from the app's state, leaving an icon alone when it already shows the right
+ * sprite. element() and icon() lend the toolbar's builders to the rest of the
+ * interface.
  */
 (function () {
   "use strict";
@@ -18,6 +19,7 @@
   var FLAT_SHAPE = "block";                            // the one shape with no facing
   var HOLD_KEYS = [" ", "Enter"];
   var FILE_ACCEPT = ".json";
+  var UNTURNED = 0;                                    // the rotation icons are built for
 
   var FACING_TITLES = { N: "North", E: "East", S: "South", W: "West" };
   var PAN_SLOTS = [null, "N", null, "W", null, "E", null, "S", null];
@@ -35,7 +37,6 @@
     { name: "marks", title: "Marks", icon: "layer-marks" },
     { name: "decor", title: "Decor", icon: "layer-decor" }
   ];
-  var OPAQUE_ICONS = { "true": "opaque", "false": "transparent" };
   var SHAPE_TITLES = { block: "Block", ramp: "Ramp", stairs: "Stairs" };
 
   function element(tag, name) {
@@ -74,7 +75,9 @@
   }
 
   function setSprite(img, sprite) {
-    img.src = B.pixel.dataUrl(sprite);
+    var url = B.pixel.dataUrl(sprite);
+    if (img.src === url) return;
+    img.src = url;
     img.width = sprite.canvas.width * ICON_SCALE;
     img.height = sprite.canvas.height * ICON_SCALE;
   }
@@ -113,6 +116,17 @@
     btn.setAttribute("aria-pressed", on ? "true" : "false");
   }
 
+  // A toggle that edits the selected tile: enabled when there is one, and
+  // pressed when `on`.
+  function syncToggle(btn, tile, on) {
+    btn.disabled = !tile;
+    press(btn, !!tile && !!on);
+  }
+
+  function opaqueIcon(opaque) {
+    return opaque ? "opaque" : "transparent";
+  }
+
   function selectedTile(state) {
     var sel = state.selected;
     return sel ? B.level.get(state.level, sel.x, sel.y) : null;
@@ -122,12 +136,12 @@
     return B.MARKS.filter(function (m) { return m.dir === dir; })[0];
   }
 
-  function panGroup(refs, handlers, rot) {
+  function panGroup(refs, handlers) {
     var el = group("pan");
     PAN_SLOTS.forEach(function (facing) {
       if (!facing) return el.appendChild(spacer());
       var btn = button("pan", facing, FACING_TITLES[facing], function () { handlers.pan(facing); });
-      refs.pan[facing] = image(btn, B.marks.arrow(B.facingDir(rot, facing)));
+      refs.pan[facing] = image(btn, B.marks.arrow(B.facingDir(UNTURNED, facing)));
       el.appendChild(btn);
     });
     return el;
@@ -144,7 +158,7 @@
     return el;
   }
 
-  function layersGroup(refs, handlers, opaque) {
+  function layersGroup(refs, handlers) {
     var el = group("layers");
     LAYER_BUTTONS.forEach(function (l) {
       var btn = toggle("layer", l.name, l.title, function () { handlers.toggleLayer(l.name); });
@@ -153,12 +167,12 @@
       el.appendChild(btn);
     });
     refs.opaque = toggle("opaque", "", "Solid", function () { handlers.toggleOpaque(); });
-    refs.opaqueIcons = themedIcons(refs.opaque, OPAQUE_ICONS[String(opaque)]);
+    refs.opaqueIcons = themedIcons(refs.opaque, opaqueIcon(true));
     el.appendChild(refs.opaque);
     return el;
   }
 
-  function shapeGroup(refs, handlers, rot, facing) {
+  function shapeGroup(refs, handlers) {
     var el = group("shape");
     B.SHAPES.forEach(function (shape) {
       var btn = toggle("shape", shape, SHAPE_TITLES[shape], function () {
@@ -169,7 +183,7 @@
       el.appendChild(btn);
     });
     refs.facing = button("facing", "", "Facing", function () { handlers.cycleFacing(); });
-    refs.facingIcon = image(refs.facing, B.marks.arrow(B.facingDir(rot, facing)));
+    refs.facingIcon = image(refs.facing, B.marks.arrow(B.facingDir(UNTURNED, B.FACINGS[0])));
     el.appendChild(refs.facing);
     return el;
   }
@@ -185,14 +199,14 @@
     return el;
   }
 
-  function marksGroup(refs, handlers, rot) {
+  function marksGroup(refs, handlers) {
     var el = group("marks");
     var arrows = ARROW_SLOTS.map(function (dir) { return dir ? markByDir(dir) : null; });
     var others = B.MARKS.filter(function (m) { return !m.dir; });
     arrows.concat(others).forEach(function (m) {
       if (!m) return el.appendChild(spacer());
       var btn = toggle("mark", m.key, m.label, function () { handlers.toggleMark(m.key); });
-      refs.marks[m.key] = { button: btn, image: image(btn, B.marks.sprite(m.key, rot)) };
+      refs.marks[m.key] = { button: btn, image: image(btn, B.marks.sprite(m.key, UNTURNED)) };
       el.appendChild(btn);
     });
     return el;
@@ -273,21 +287,17 @@
     el.style.setProperty(HOLD_VAR, B.HOLD_MS + "ms");
 
     var refs = { pan: {}, layers: {}, shapes: {}, decor: {}, marks: {} };
-    var last = { rot: 0, opaque: true, facingDir: B.facingDir(0, B.FACINGS[0]) };
-
-    el.appendChild(panGroup(refs, handlers, last.rot));
+    el.appendChild(panGroup(refs, handlers));
     el.appendChild(viewGroup(handlers));
-    el.appendChild(layersGroup(refs, handlers, last.opaque));
-    el.appendChild(shapeGroup(refs, handlers, last.rot, B.FACINGS[0]));
+    el.appendChild(layersGroup(refs, handlers));
+    el.appendChild(shapeGroup(refs, handlers));
     el.appendChild(decorGroup(refs, handlers));
-    el.appendChild(marksGroup(refs, handlers, last.rot));
+    el.appendChild(marksGroup(refs, handlers));
     var picker = filePicker(function (file) { handlers.open(file); });
     el.appendChild(fileGroup(refs, handlers, picker));
     attachHold(refs.clear, function () { handlers.clear(); });
 
-    function syncRotation(rot) {
-      if (rot === last.rot) return;
-      last.rot = rot;
+    function syncView(rot) {
       B.FACINGS.forEach(function (facing) {
         setSprite(refs.pan[facing], B.marks.arrow(B.facingDir(rot, facing)));
       });
@@ -300,41 +310,28 @@
       LAYER_BUTTONS.forEach(function (l) {
         press(refs.layers[l.name], !!state.layers[l.name]);
       });
-      var opaque = !!state.opaque;
-      press(refs.opaque, opaque);
-      if (opaque !== last.opaque) {
-        last.opaque = opaque;
-        setThemedIcons(refs.opaqueIcons, OPAQUE_ICONS[String(opaque)]);
-      }
+      press(refs.opaque, !!state.opaque);
+      setThemedIcons(refs.opaqueIcons, opaqueIcon(state.opaque));
     }
 
     function syncTile(tile, rot) {
       B.SHAPES.forEach(function (shape) {
-        var btn = refs.shapes[shape];
-        btn.disabled = !tile;
-        press(btn, !!tile && tile.shape === shape);
+        syncToggle(refs.shapes[shape], tile, tile && tile.shape === shape);
       });
       refs.facing.disabled = !tile || tile.shape === FLAT_SHAPE;
-      var dir = B.facingDir(rot, tile ? tile.facing : B.FACINGS[0]);
-      if (dir !== last.facingDir) {
-        last.facingDir = dir;
-        setSprite(refs.facingIcon, B.marks.arrow(dir));
-      }
+      var facing = tile ? tile.facing : B.FACINGS[0];
+      setSprite(refs.facingIcon, B.marks.arrow(B.facingDir(rot, facing)));
       B.DECOR.forEach(function (d) {
-        var btn = refs.decor[d.key];
-        btn.disabled = !tile;
-        press(btn, !!tile && tile.decor === d.key);
+        syncToggle(refs.decor[d.key], tile, tile && tile.decor === d.key);
       });
       B.MARKS.forEach(function (m) {
-        var btn = refs.marks[m.key].button;
-        btn.disabled = !tile;
-        press(btn, !!tile && tile.marks.indexOf(m.key) >= 0);
+        syncToggle(refs.marks[m.key].button, tile, tile && tile.marks.indexOf(m.key) >= 0);
       });
     }
 
     function sync(state) {
       var rot = state.view.rot;
-      syncRotation(rot);
+      syncView(rot);
       syncLayers(state);
       syncTile(selectedTile(state), rot);
     }

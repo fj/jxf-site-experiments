@@ -13,8 +13,7 @@
   var MARK_PITCH = 11;          // base px between marks in a row
   var MARK_ROW_PITCH = 8;       // base px between rows, which stack upward
   var MARK_ABOVE_DECOR = 6;     // base px between a decor's top and the first row
-  var LABEL_DX = 8;             // the label's centre on the front-right face...
-  var LABEL_DY = 12;            // ...relative to the top block's centre
+  var LABEL_DY = 4;             // the label's centre below the top face's centre
   var COMPASS_MARGIN = 6;       // base px from the top-left corner
 
   var base = null;
@@ -88,8 +87,15 @@
     if (state.layers.marks && tile.marks.length) {
       drawMarks(ctx, view.rot, tile.marks, qx, decor ? qy - decor.oy - MARK_ABOVE_DECOR : qy);
     }
-    if (state.layers.elevation) {
-      B.pixel.draw(ctx, B.tiles.label(elevText(tile.elev)), px + LABEL_DX, py + LABEL_DY);
+  }
+
+  // Labels go over every column, so no tile in front can cover another's.
+  function drawLabels(ctx, state, tiles, ox, oy) {
+    if (!state.layers.elevation) return;
+    for (var i = 0; i < tiles.length; i++) {
+      var tile = tiles[i];
+      var P = B.view.project(state.view, tile.x, tile.y, tile.elev);
+      B.pixel.draw(ctx, B.tiles.label(elevText(tile.elev)), ox + P.sx, oy + P.sy + LABEL_DY);
     }
   }
 
@@ -114,6 +120,7 @@
 
     var tiles = B.view.order(state.view, B.level.all(state.level));
     for (var i = 0; i < tiles.length; i++) drawTile(ctx, state, tiles[i], frame.ox, frame.oy);
+    drawLabels(ctx, state, tiles, frame.ox, frame.oy);
     drawGhost(ctx, state, frame.ox, frame.oy);
     drawCompass(ctx, state);
 

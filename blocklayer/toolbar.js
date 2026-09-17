@@ -23,8 +23,7 @@
   var ICON_ATTR = "data-icon";                         // the glyph an icon shows
   var ARROW_ICON = "arrow-";                           // ...which for a compass arrow is this + dir
 
-  // Each title ends with the key that does the same, as input.js binds it.
-  var PAN_TITLES = { N: "North (Up)", E: "East (Right)", S: "South (Down)", W: "West (Left)" };
+  var PAN_LABELS = { N: "North", E: "East", S: "South", W: "West" };
   var PAN_SLOTS = [null, "N", null, "W", null, "E", null, "S", null];
   var ARROW_SLOTS = ["NW", "N", "NE", "W", null, "E", "SW", "S", "SE"];
 
@@ -33,17 +32,14 @@
     { name: "marks", title: "Marks", icon: "layer-marks" },
     { name: "decor", title: "Decor", icon: "layer-decor" }
   ];
-  var SHAPE_TITLES = { block: "Block (B)", ramp: "Ramp (R)", stairs: "Stairs (T)" };
-  var FACING_TITLE = "Facing (A/D)";
-  var MARK_KEYS = {
-    "arrow-nw": "Shift+Q", "arrow-n": "Shift+W", "arrow-ne": "Shift+E",
-    "arrow-w": "Shift+A", "arrow-e": "Shift+D",
-    "arrow-sw": "Shift+Z", "arrow-s": "Shift+S", "arrow-se": "Shift+C",
-    "teleport": "P", "rope": "L", "jump": "J"
-  };
+  var SHAPE_LABELS = { block: "Block", ramp: "Ramp", stairs: "Stairs" };
+  var FACING_LABEL = "Facing";
+  var EITHER_KEY = "/";                                // between two keys in one title
 
+  // A button's title: its label, then the key that does the same when
+  // input.js binds one.
   function titled(label, key) {
-    return label + " (" + key + ")";
+    return key ? label + " (" + key + ")" : label;
   }
 
   function element(tag, name) {
@@ -152,15 +148,17 @@
     var el = group("pan");
     PAN_SLOTS.forEach(function (facing) {
       if (!facing) return el.appendChild(spacer());
-      var btn = button("pan", facing, PAN_TITLES[facing], function () { handlers.pan(facing); });
+      var title = titled(PAN_LABELS[facing], B.input.keyFor("pan", facing));
+      var btn = button("pan", facing, title, function () { handlers.pan(facing); });
       btn.appendChild(arrowIcon(facing));
       el.appendChild(btn);
     });
     return el;
   }
 
-  // A button that hands `run` its signed step.
-  function stepButton(act, step, title, glyph, run) {
+  // A button that hands `run` its signed step; act is the handler's name too.
+  function stepButton(act, step, label, glyph, run) {
+    var title = titled(label, B.input.keyFor(act, step));
     var btn = button(act, step, title, function () { run(step); });
     btn.appendChild(icon(glyph));
     return btn;
@@ -168,10 +166,10 @@
 
   function viewGroup(handlers) {
     var el = group("view");
-    el.appendChild(stepButton("rotate", -1, "Turn left ([)", "rotate-ccw", handlers.rotate));
-    el.appendChild(stepButton("rotate", 1, "Turn right (])", "rotate-cw", handlers.rotate));
-    el.appendChild(stepButton("zoom", -1, "Zoom out (-)", "zoom-out", handlers.zoom));
-    el.appendChild(stepButton("zoom", 1, "Zoom in (=)", "zoom-in", handlers.zoom));
+    el.appendChild(stepButton("rotate", -1, "Turn left", "rotate-ccw", handlers.rotate));
+    el.appendChild(stepButton("rotate", 1, "Turn right", "rotate-cw", handlers.rotate));
+    el.appendChild(stepButton("zoom", -1, "Zoom out", "zoom-out", handlers.zoom));
+    el.appendChild(stepButton("zoom", 1, "Zoom in", "zoom-in", handlers.zoom));
     return el;
   }
 
@@ -193,14 +191,17 @@
   function shapeGroup(refs, handlers) {
     var el = group("shape");
     B.SHAPES.forEach(function (shape) {
-      var btn = toggle("shape", shape, SHAPE_TITLES[shape], function () {
-        handlers.setShape(shape);
-      });
+      var title = titled(SHAPE_LABELS[shape], B.input.keyFor("setShape", shape));
+      var btn = toggle("shape", shape, title, function () { handlers.setShape(shape); });
       btn.appendChild(icon("shape-" + shape));
       refs.shapes[shape] = btn;
       el.appendChild(btn);
     });
-    refs.facing = button("facing", "", FACING_TITLE, function () { handlers.cycleFacing(); });
+    var keyFor = B.input.keyFor;
+    var turnKeys = keyFor("cycleFacing", -1) + EITHER_KEY + keyFor("cycleFacing", 1);
+    refs.facing = button("facing", "", titled(FACING_LABEL, turnKeys), function () {
+      handlers.cycleFacing();
+    });
     refs.facingIcon = arrowIcon(B.FACINGS[0]);
     refs.facing.appendChild(refs.facingIcon);
     el.appendChild(refs.facing);
@@ -209,8 +210,8 @@
 
   function decorGroup(refs, handlers) {
     var el = group("decor");
-    B.DECOR.forEach(function (d, i) {
-      var title = titled(d.label, i + 1);
+    B.DECOR.forEach(function (d) {
+      var title = titled(d.label, B.input.keyFor("setDecor", d.key));
       var btn = toggle("decor", d.key, title, function () { handlers.setDecor(d.key); });
       image(btn, B.decor.icon(d.key));
       refs.decor[d.key] = btn;
@@ -225,7 +226,7 @@
     var others = B.MARKS.filter(function (m) { return !m.dir; });
     arrows.concat(others).forEach(function (m) {
       if (!m) return el.appendChild(spacer());
-      var title = titled(m.label, MARK_KEYS[m.key]);
+      var title = titled(m.label, B.input.keyFor("toggleMark", m.key));
       var btn = toggle("mark", m.key, title, function () { handlers.toggleMark(m.key); });
       if (m.dir) btn.appendChild(arrowIcon(m.dir));
       else image(btn, B.marks.sprite(m.key, STILL_ROT));

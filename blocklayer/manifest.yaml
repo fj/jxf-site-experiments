@@ -30,6 +30,6 @@ scripts:
   - sprites-marks.js
   - sprites-icons.js
   - render.js
-  - toolbar.js
   - input.js
+  - toolbar.js
   - app.js

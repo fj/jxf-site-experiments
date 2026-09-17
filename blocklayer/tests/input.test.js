@@ -507,3 +507,41 @@ describe("input: keys on the selected tile", () => {
     assert.deepEqual(r.calls, []);
   });
 });
+
+describe("input: keyFor", () => {
+  const B = load(["config.js", "input.js"]);
+  const keyFor = B.input.keyFor;
+
+  it("names a view key as typed, an arrow key by its direction", () => {
+    assert.equal(keyFor("pan", "N"), "Up");
+    assert.equal(keyFor("pan", "W"), "Left");
+    assert.equal(keyFor("rotate", -1), "[");
+    assert.equal(keyFor("rotate", 1), "]");
+    assert.equal(keyFor("zoom", -1), "-");
+    assert.equal(keyFor("zoom", 1), "=");
+    assert.equal(keyFor("deselect"), "Escape");
+  });
+
+  it("names a tile key in upper case, with Shift+ before a shifted one", () => {
+    assert.equal(keyFor("raise", 1), "W");
+    assert.equal(keyFor("raise", -1), "S");
+    assert.equal(keyFor("cycleFacing", -1), "A");
+    assert.equal(keyFor("cycleFacing", 1), "D");
+    assert.equal(keyFor("setShape", "stairs"), "T");
+    assert.equal(keyFor("toggleMark", "jump"), "J");
+    assert.equal(keyFor("toggleMark", "arrow-n"), "Shift+W");
+    assert.equal(keyFor("toggleMark", "arrow-sw"), "Shift+Z");
+  });
+
+  it("numbers the decor from 1 in B.DECOR order", () => {
+    const names = B.DECOR.map((d) => keyFor("setDecor", d.key));
+    assert.deepEqual(names, B.DECOR.map((d, i) => String(i + 1)));
+  });
+
+  it("is null for a call no key makes", () => {
+    assert.equal(keyFor("save"), null);
+    assert.equal(keyFor("toggleLayer", "marks"), null);
+    assert.equal(keyFor("setShape", "dome"), null);
+    assert.equal(keyFor("remove"), null);
+  });
+});

@@ -4,7 +4,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
 
-const B = load();
+const B = load(["config.js", "level.js", "view.js"]);
 const V = B.view;
 const L = B.level;
 

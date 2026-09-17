@@ -3,8 +3,8 @@
  * and the status line into the mount, keeps the one state object the renderer
  * reads, and maps every toolbar action and pointer gesture onto a level or
  * view mutation: each one redraws, refreshes the toolbar, and — when the
- * level changed — saves it. The level also goes out to a file and comes back
- * from one, by the picker or dropped on the canvas.
+ * level changed — saves it on that redraw. The level also goes out to a file
+ * and comes back from one, by the picker or dropped on the canvas.
  */
 (function () {
   "use strict";
@@ -41,12 +41,30 @@
     return stored() || B.demo.level();
   }
 
+  var unsaved = false;
+
   function save() {
     try {
       window.localStorage.setItem(B.STORAGE_KEY, B.file.serialize(state.level));
     } catch (err) {
       // Storage refused the level; it lives on in memory until the next edit.
     }
+  }
+
+  // Edits are saved once per frame, on the redraw every edit schedules; the
+  // page going away flushes what no frame has reached yet.
+  function flushSave() {
+    if (!unsaved) return;
+    unsaved = false;
+    save();
+  }
+
+  function watchLeaving() {
+    window.addEventListener("pagehide", flushSave);
+    window.addEventListener("beforeunload", flushSave);
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) flushSave();
+    });
   }
 
   // ---- Files ---------------------------------------------------------------
@@ -145,13 +163,15 @@
   // ---- Render --------------------------------------------------------------
   var rafId = null;
 
-  function render() {
+  function frame() {
+    rafId = null;
+    flushSave();
     B.render.draw(canvas, state, scale());
   }
 
   function sched() {
     if (rafId) return;
-    rafId = requestAnimationFrame(function () { rafId = null; render(); });
+    rafId = requestAnimationFrame(frame);
   }
 
   function changed() {
@@ -160,15 +180,21 @@
   }
 
   function edited() {
-    save();
+    unsaved = true;
     changed();
   }
 
   // ---- Mutations -----------------------------------------------------------
+  // A mutation that answers false changed nothing, so there is nothing to save.
   function editSelected(mutate) {
     if (!state.selected) return;
-    mutate(state.selected.x, state.selected.y);
-    edited();
+    if (mutate(state.selected.x, state.selected.y) !== false) edited();
+  }
+
+  function sameHit(a, b) {
+    if (!a || !b) return a === b;
+    if (a.tile || b.tile) return !!a.tile && !!b.tile && B.sameCell(a.tile, b.tile.x, b.tile.y);
+    return B.sameCell(a.cell, b.cell.x, b.cell.y) && !a.edge === !b.edge;
   }
 
   function remove(x, y) {
@@ -212,6 +238,7 @@
     pick: pick,
     selected: function () { return state.selected; },
     hover: function (hit) {
+      if (sameHit(hit, state.hover)) return;
       state.hover = hit;
       sched();
     },
@@ -228,7 +255,11 @@
       changed();
     },
     raise: function (delta) {
-      editSelected(function (x, y) { B.level.raise(state.level, x, y, delta); });
+      editSelected(function (x, y) {
+        var tile = B.level.get(state.level, x, y);
+        var before = tile ? tile.elev : null;
+        return B.level.raise(state.level, x, y, delta) !== before;
+      });
     },
     hold: function (x, y, progress) {
       state.hold = progress == null ? null : { x: x, y: y, progress: progress };
@@ -288,5 +319,6 @@
   B.input.attach(canvas, handlers);
   watchDrops(stage);
   watchSize(stage);
+  watchLeaving();
   changed();
 })();

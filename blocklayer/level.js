@@ -87,6 +87,23 @@
     return tile.elev;
   }
 
+  function canRaise(tile, delta) {
+    var elev = tile.elev + delta;
+    return elev >= B.ELEV_MIN && elev <= maxElev(tile);
+  }
+
+  // Every tile takes the step or none does, so the level keeps its shape.
+  // Answers whether it moved.
+  function raiseAll(level, delta) {
+    var tiles = all(level);
+    if (!tiles.length) return false;
+    for (var i = 0; i < tiles.length; i++) {
+      if (!canRaise(tiles[i], delta)) return false;
+    }
+    tiles.forEach(function (tile) { tile.elev += delta; });
+    return true;
+  }
+
   function setShape(level, x, y, shape) {
     var tile = get(level, x, y);
     if (tile && B.SHAPES.indexOf(shape) >= 0) {
@@ -202,6 +219,7 @@
     top: top,
     maxElev: maxElev,
     raise: raise,
+    raiseAll: raiseAll,
     setShape: setShape,
     setFacing: setFacing,
     cycleFacing: cycleFacing,

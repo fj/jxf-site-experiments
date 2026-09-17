@@ -29,10 +29,10 @@
   var status = null;
 
   // ---- Persistence ---------------------------------------------------------
+  // The try is for storage itself, which a browser may refuse to hand over.
   function stored() {
     try {
-      var raw = window.localStorage.getItem(B.STORAGE_KEY);
-      return raw ? B.level.fromJSON(JSON.parse(raw)) : null;
+      return B.file.parse(window.localStorage.getItem(B.STORAGE_KEY));
     } catch (err) {
       return null;
     }

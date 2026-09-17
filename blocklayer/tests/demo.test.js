@@ -28,7 +28,7 @@ describe("demo: the first level", () => {
 
   it("has a plateau at 2, a raised 2x2 at 3, a sunken row at 1 and flat ground at 0", () => {
     const at = (elev) => tiles.filter((t) => t.elev === elev && t.shape === "block");
-    assert.ok(at(2).length >= 29);
+    assert.ok(at(2).length >= 28);
     assert.equal(at(3).length, 4);
     for (const elev of [1, 0]) {
       assert.ok(at(elev).length >= 6, `the row at ${elev}`);

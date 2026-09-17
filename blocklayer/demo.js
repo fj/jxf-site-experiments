@@ -1,6 +1,6 @@
 /*
  * Blocklayer — the level a first visit starts with: a plateau with a raised
- * square reached by a ramp and by stairs, a tower at one corner, terraces down
+ * square reached by a ramp and by stairs, a stepped tower, terraces down
  * to flat ground, every decor object and a few marks, so the first screenshot
  * shows every feature and both ends of the elevation range. The slopes were
  * placed to be in sight at the first view's rotation; demo.test.js checks that
@@ -14,7 +14,9 @@
   var PLATEAU_SIZE = 6;                           // the plateau is this many tiles square
   var PLATEAU_ELEV = 2;
   var MESA = { x: 3, y: 1, size: 2 };             // the raised square on it, one step up
-  var TOWER = { x: 0, y: 0, elev: B.ELEV_MAX };   // a pillar at the plateau's back corner
+  // A stepped tower at the plateau's back corner: the top of the range, then
+  // a step down toward the plateau.
+  var TOWER = { x: 0, y: 0, elevs: [B.ELEV_MAX, B.ELEV_MAX - 2] };
   // The rows in front of the plateau, each a step lower: a sunken row, then
   // ground so low that it carries no block at all.
   var TERRACE_ELEVS = [PLATEAU_ELEV - 1, B.ELEV_MIN];
@@ -36,7 +38,7 @@
   function level() {
     var L = B.level;
     var lvl = L.create();
-    var x, y, row;
+    var x, y, row, step;
     for (y = 0; y < PLATEAU_SIZE; y++) {
       for (x = 0; x < PLATEAU_SIZE; x++) L.add(lvl, x, y, PLATEAU_ELEV);
     }
@@ -45,7 +47,9 @@
         L.add(lvl, x, PLATEAU_SIZE + row, TERRACE_ELEVS[row]);
       }
     }
-    L.raise(lvl, TOWER.x, TOWER.y, TOWER.elev - PLATEAU_ELEV);
+    for (step = 0; step < TOWER.elevs.length; step++) {
+      L.raise(lvl, TOWER.x, TOWER.y + step, TOWER.elevs[step] - PLATEAU_ELEV);
+    }
     for (y = 0; y < MESA.size; y++) {
       for (x = 0; x < MESA.size; x++) L.raise(lvl, MESA.x + x, MESA.y + y, 1);
     }

@@ -26,6 +26,7 @@
 
   var canvas = null;
   var toolbar = null;
+  var status = null;
 
   // ---- Persistence ---------------------------------------------------------
   function stored() {
@@ -58,9 +59,9 @@
   var statusTimer = null;
 
   function showStatus(text) {
-    toolbar.status.textContent = text;
+    status.textContent = text;
     clearTimeout(statusTimer);
-    statusTimer = setTimeout(function () { toolbar.status.textContent = ""; }, B.STATUS_MS);
+    statusTimer = setTimeout(function () { status.textContent = ""; }, B.STATUS_MS);
   }
 
   function saveFile() {
@@ -269,10 +270,33 @@
   };
 
   // ---- Skeleton ------------------------------------------------------------
+  var HINTS = [
+    { icon: "hint-add", word: "add" },
+    { icon: "hint-wheel", word: "elevate" },
+    { icon: "hint-remove", word: "remove" }
+  ];
+
   function el(tag, name) {
     var node = document.createElement(tag);
     node.className = B.PREFIX + name;
     return node;
+  }
+
+  function hintRow() {
+    var row = el("div", "hint");
+    HINTS.forEach(function (h) {
+      var item = el("span", "hint-item");
+      item.appendChild(B.toolbar.icon(h.icon));
+      item.appendChild(document.createTextNode(h.word));
+      row.appendChild(item);
+    });
+    return row;
+  }
+
+  function statusLine() {
+    var line = el("div", "status");
+    line.setAttribute("role", "status");
+    return line;
   }
 
   function buildSkeleton(mount) {
@@ -281,9 +305,10 @@
     canvas = el("canvas", "canvas");
     canvas.tabIndex = 0;
     canvas.setAttribute("aria-label", "Level");
+    status = statusLine();
     stage.appendChild(canvas);
-    stage.appendChild(toolbar.hint);
-    stage.appendChild(toolbar.status);
+    stage.appendChild(hintRow());
+    stage.appendChild(status);
     layout.appendChild(toolbar.el);
     layout.appendChild(stage);
     mount.appendChild(layout);

@@ -1,10 +1,10 @@
 /*
  * Blocklayer — the toolbar: a column of pixel-art buttons that pan, turn and
  * zoom the view, show or hide its layers, and edit the selected tile's shape,
- * facing, decor and marks, and save, open or clear the level; plus the hint
- * row and the status line under the canvas. The DOM is built once; sync()
- * refreshes pressed and disabled states from the app's state and redraws only
- * the icons that turn with the view.
+ * facing, decor and marks, and save, open or clear the level. The DOM is
+ * built once; sync() refreshes pressed and disabled states from the app's
+ * state and redraws only the icons that turn with the view. icon() lends the
+ * toolbar's themed-icon pair to the rest of the interface.
  */
 (function () {
   "use strict";
@@ -40,11 +40,6 @@
   var FILE_BUTTONS = [
     { act: "save", title: "Save", icon: "file-save" },
     { act: "open", title: "Open", icon: "file-open" }
-  ];
-  var HINTS = [
-    { icon: "hint-add", word: "add" },
-    { icon: "hint-wheel", word: "elevate" },
-    { icon: "hint-remove", word: "remove" }
   ];
 
   // What a click on each data-act does; clear is absent because it needs a hold.
@@ -124,6 +119,13 @@
   function setThemedIcons(pair, name) {
     setSprite(pair.light, B.icons.sprite(name, B.COLORS.inkLight));
     setSprite(pair.dark, B.icons.sprite(name, B.COLORS.inkDark));
+  }
+
+  // The same pair, detached, for a home outside the toolbar.
+  function icon(name) {
+    var pair = document.createDocumentFragment();
+    themedIcons(pair, name);
+    return pair;
   }
 
   function press(btn, on) {
@@ -242,23 +244,6 @@
     themedIcons(refs.clear, "clear");
     el.appendChild(refs.clear);
     el.appendChild(picker);
-    return el;
-  }
-
-  function hintRow() {
-    var el = element("div", "hint");
-    HINTS.forEach(function (h) {
-      var item = element("span", "hint-item");
-      themedIcons(item, h.icon);
-      item.appendChild(document.createTextNode(h.word));
-      el.appendChild(item);
-    });
-    return el;
-  }
-
-  function statusLine() {
-    var el = element("div", "status");
-    el.setAttribute("role", "status");
     return el;
   }
 
@@ -383,10 +368,11 @@
       syncTile(selectedTile(state), rot);
     }
 
-    return { el: el, hint: hintRow(), status: statusLine(), sync: sync };
+    return { el: el, sync: sync };
   }
 
   B.toolbar = {
-    build: build
+    build: build,
+    icon: icon
   };
 })();

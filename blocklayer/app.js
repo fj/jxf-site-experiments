@@ -18,6 +18,7 @@
     view: B.view.create(),
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
+    newElev: B.NEW_TILE_ELEV,
     selected: null,
     hover: null,
     hold: null
@@ -192,6 +193,15 @@
     if (mutate(state.selected.x, state.selected.y) !== false) edited();
   }
 
+  // The height the next tile gets, which the elevation keys move when there is
+  // no tile to move instead. It is not part of the level, so nothing is saved.
+  function setNewElev(delta) {
+    var elev = B.clamp(state.newElev + delta, B.ELEV_MIN, B.ELEV_MAX);
+    if (elev === state.newElev) return;
+    state.newElev = elev;
+    changed();
+  }
+
   function remove(x, y) {
     if (!B.level.remove(state.level, x, y)) return;
     if (B.sameCell(state.selected, x, y)) state.selected = null;
@@ -241,7 +251,7 @@
       sched();
     },
     add: function (x, y) {
-      B.level.add(state.level, x, y, B.NEW_TILE_ELEV);
+      B.level.add(state.level, x, y, state.newElev);
       edited();
     },
     select: function (x, y) {
@@ -253,6 +263,10 @@
       changed();
     },
     raise: function (delta) {
+      if (!state.selected) {
+        setNewElev(delta);
+        return;
+      }
       editSelected(function (x, y) {
         var tile = B.level.get(state.level, x, y);
         var before = tile ? tile.elev : null;

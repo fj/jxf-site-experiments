@@ -103,7 +103,7 @@
   // takes its turn in depth order and a column in front of it covers it.
   function ghostEntry(state) {
     var cell = state.hover && state.hover.cell;
-    return cell ? { x: cell.x, y: cell.y, elev: B.NEW_TILE_ELEV } : null;
+    return cell ? { x: cell.x, y: cell.y, elev: state.newElev } : null;
   }
 
   function drawCompass(ctx, state) {

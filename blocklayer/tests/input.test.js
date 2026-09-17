@@ -421,7 +421,7 @@ const SHIFT = { shiftKey: true };
 
 // Every key that acts on the selected tile, as [key, event props].
 const TILE_KEYS = [
-  "w", "s", "a", "d", "b", "r", "t", "1", "2", "3", "4", "5", "p", "l", "x",
+  "a", "d", "b", "r", "t", "1", "2", "3", "4", "5", "p", "l", "x",
   "y", "u", "i", "h", "j", "k", "n", "m", ","
 ].map((key) => [key, {}]);
 
@@ -436,11 +436,6 @@ function pressOnSelected(keys) {
 }
 
 describe("input: keys on the selected tile", () => {
-  it("w raises and s lowers, like the wheel", () => {
-    const r = pressOnSelected([["w"], ["s"], ["w"]]);
-    assert.deepEqual(r.calls, [["raise", 1], ["raise", -1], ["raise", 1]]);
-  });
-
   it("a turns the facing anticlockwise and d clockwise", () => {
     const r = pressOnSelected([["a"], ["d"]]);
     assert.deepEqual(r.calls, [["cycleFacing", -1], ["cycleFacing", 1]]);
@@ -514,7 +509,19 @@ describe("input: keys on the selected tile", () => {
   });
 });
 
-describe("input: keys on the whole level", () => {
+describe("input: the elevation keys", () => {
+  it("w raises and s lowers, with a tile selected or without one", () => {
+    const r = rig();
+    for (const key of ["w", "s"]) {
+      assert.equal(r.fire("keydown", { key }).prevented, true, key);
+    }
+    r.select({ x: 1, y: 1 });
+    for (const key of ["w", "s"]) {
+      assert.equal(r.fire("keydown", { key }).prevented, true, key);
+    }
+    assert.deepEqual(r.of("raise"), [[1], [-1], [1], [-1]]);
+  });
+
   it("Shift+W raises and Shift+S lowers every tile, with a selection or without one", () => {
     const r = rig();
     for (const key of ["W", "S"]) {

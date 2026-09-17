@@ -15,8 +15,8 @@
   var SECONDARY_BUTTON = 2;
 
   // Each key names the handler it calls and what it passes. The view keys go
-  // by e.key, the tile keys by its lowercase form, and each tile key needs a
-  // selected tile.
+  // by e.key and the rest by its lowercase form. A level key acts whatever is
+  // selected; a tile key needs a selected tile.
   var VIEW_KEYS = {
     ArrowUp: ["pan", "N"],
     ArrowRight: ["pan", "E"],
@@ -30,9 +30,14 @@
     Escape: ["deselect"]
   };
 
-  var TILE_KEYS = {
+  // The elevation keys raise and lower the selected tile, or the height a new
+  // tile gets when none is selected.
+  var LEVEL_KEYS = {
     w: ["raise", 1],
-    s: ["raise", -1],
+    s: ["raise", -1]
+  };
+
+  var TILE_KEYS = {
     a: ["cycleFacing", -1],
     d: ["cycleFacing", 1],
     b: ["setShape", "block"],
@@ -86,7 +91,9 @@
   // The key bound to a handler call, as a tooltip names it: "R", "]", "Up",
   // "Shift+W"; null when none is.
   function keyFor(handler, arg) {
-    var key = boundKey(VIEW_KEYS, handler, arg) || boundKey(TILE_KEYS, handler, arg);
+    var key = boundKey(VIEW_KEYS, handler, arg) ||
+      boundKey(LEVEL_KEYS, handler, arg) ||
+      boundKey(TILE_KEYS, handler, arg);
     if (key) return keyName(key);
     key = boundKey(SHIFT_LEVEL_KEYS, handler, arg);
     return key ? SHIFT_NAME + keyName(key) : null;
@@ -218,6 +225,7 @@
     function edit(e) {
       var key = e.key.toLowerCase();
       if (e.shiftKey) return run(SHIFT_LEVEL_KEYS[key]);
+      if (LEVEL_KEYS[key]) return run(LEVEL_KEYS[key]);
       if (!handlers.selected()) return false;
       if (TILE_KEYS[key]) return run(TILE_KEYS[key]);
       if (key !== REMOVE_SELECTED_KEY) return false;

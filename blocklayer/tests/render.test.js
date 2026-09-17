@@ -39,6 +39,7 @@ function stage() {
     view: B.view.create(),
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
+    newElev: B.NEW_TILE_ELEV,
     selected: null,
     hover: null,
     hold: null
@@ -65,14 +66,15 @@ describe("render: the ghost", () => {
     assert.deepEqual(s.names(), ["column", "ghost", "column", "label", "label", "compass"]);
   });
 
-  it("is the new-tile column, with its top centre where that tile's would be", () => {
+  it("is a column at the height a new tile gets, where that tile's top would be", () => {
     const s = stage();
+    s.state.newElev = s.B.ELEV_MAX;
     s.state.hover = { cell: { x: 1, y: 1 } };
     s.draw();
     const frame = s.frame();
-    const top = s.B.view.project(s.state.view, 1, 1, s.B.NEW_TILE_ELEV);
+    const top = s.B.view.project(s.state.view, 1, 1, s.B.ELEV_MAX);
     assert.deepEqual(s.draws[0], ["ghost", frame.ox + top.sx, frame.oy + top.sy]);
-    assert.deepEqual(s.ghostElevs, [s.B.NEW_TILE_ELEV]);
+    assert.deepEqual(s.ghostElevs, [s.B.ELEV_MAX]);
   });
 
   it("is not drawn over a hovered tile, nor with nothing hovered", () => {

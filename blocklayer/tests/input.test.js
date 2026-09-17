@@ -353,7 +353,7 @@ describe("input: the keyboard", () => {
   it("[ and ] turn, - and = or + zoom", () => {
     const r = rig();
     for (const key of ["[", "]", "-", "=", "+"]) {
-      assert.equal(r.fire("keydown", { key, shiftKey: key === "+" }).prevented, true, key);
+      assert.equal(r.fire("keydown", { key }).prevented, true, key);
     }
     assert.deepEqual(r.of("rotate"), [[-1], [1]]);
     assert.deepEqual(r.of("zoom"), [[-1], [1], [1]]);

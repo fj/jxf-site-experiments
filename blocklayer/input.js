@@ -18,10 +18,6 @@
   var REMOVE_KEYS = ["Delete", "Backspace"];
   var DESELECT_KEY = "Escape";
 
-  function own(map, key) {
-    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
-  }
-
   function attach(canvas, handlers) {
     var dragging = false;
     var lastCell = null;
@@ -132,9 +128,12 @@
     function onKey(e) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       var key = e.key;
-      if (own(PAN_KEYS, key)) handlers.pan(PAN_KEYS[key]);
-      else if (own(ROTATE_KEYS, key)) handlers.rotate(ROTATE_KEYS[key]);
-      else if (own(ZOOM_KEYS, key)) handlers.zoom(ZOOM_KEYS[key]);
+      var facing = PAN_KEYS[key];
+      var turns = ROTATE_KEYS[key];
+      var delta = ZOOM_KEYS[key];
+      if (facing) handlers.pan(facing);
+      else if (turns) handlers.rotate(turns);
+      else if (delta) handlers.zoom(delta);
       else if (REMOVE_KEYS.indexOf(key) !== -1) removeSelected();
       else if (key === DESELECT_KEY) handlers.deselect();
       else return;

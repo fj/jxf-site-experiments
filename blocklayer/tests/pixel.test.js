@@ -76,6 +76,42 @@ describe("pixel: hflip", () => {
   });
 });
 
+describe("pixel: dataUrl and crispUrl", () => {
+  const PNG = "data:image/png;base64,AAAA";
+  const SVG_PREFIX = "data:image/svg+xml,";
+
+  // A sprite whose canvas counts how often it is asked to encode itself.
+  function stub() {
+    let encodes = 0;
+    const canvas = { width: 16, height: 12, toDataURL: () => { encodes++; return PNG; } };
+    return { sprite: { canvas, ox: 8, oy: 6 }, encodes: () => encodes };
+  }
+
+  it("encodes a sprite once and answers the same URL after", () => {
+    const s = stub();
+    assert.equal(P.dataUrl(s.sprite), PNG);
+    assert.equal(P.dataUrl(s.sprite), PNG);
+    assert.equal(s.encodes(), 1);
+  });
+
+  it("wraps the PNG in an SVG of the sprite's size that asks for pixelated rendering", () => {
+    const s = stub();
+    const url = P.crispUrl(s.sprite);
+    assert.ok(url.startsWith(SVG_PREFIX), url.slice(0, 30));
+    const svg = decodeURIComponent(url.slice(SVG_PREFIX.length));
+    const open = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12">';
+    const image = '<image width="16" height="12" style="image-rendering:pixelated" href="' +
+      PNG + '"/>';
+    assert.ok(svg.startsWith(open), svg);
+    assert.ok(svg.includes(image), svg);
+    assert.equal(P.crispUrl(s.sprite), url);
+    assert.equal(s.encodes(), 1);
+  });
+});
+
+// memo keys by the arguments' string forms, so 1 and "1" (or null and
+// undefined) would share an entry; every caller passes primitives that do not
+// collide, and the tests pin only what callers rely on.
 describe("pixel: memo", () => {
   function counted() {
     let calls = 0;

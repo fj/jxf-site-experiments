@@ -20,8 +20,6 @@ $blk-text-gap: 0.4em;         // between the canvas, the hint and the status lin
 $blk-pressed-alpha: 0.18;
 $blk-disabled-opacity: 0.35;
 $blk-hold-alpha: 0.7;
-// The fill's length is set by the toolbar from B.HOLD_MS; this is a fallback.
-$blk-hold-fallback: 500ms;
 $blk-canvas-bg: #cfd4dc;
 $blk-canvas-bg-dark: #23242b;
 $blk-ink: #1f1a2e;            // UI icons on a light face
@@ -92,15 +90,15 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
     cursor: default;
   }
 
-  // Hold-to-clear: a fill rising from the bottom for as long as the hold lasts.
+  // Hold-to-clear: a fill rising from the bottom for as long as the hold
+  // lasts, which the toolbar sets on the variable from B.HOLD_MS.
   &.is-holding::before {
     content: "";
     position: absolute;
     inset: 0;
     background: rgba($exp-error, $blk-hold-alpha);
     transform-origin: bottom;
-    animation: experiment-ext-blk-hold var(--experiment-ext-blk-hold, $blk-hold-fallback)
-      linear forwards;
+    animation: experiment-ext-blk-hold var(--experiment-ext-blk-hold) linear forwards;
   }
 
   @include exp-dark {
@@ -179,14 +177,19 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   @include exp-dark { border-color: $exp-link-dark; }
 }
 
+// The hint and the status line: small mono text under the canvas.
+%blk-caption {
+  margin-top: $blk-text-gap;
+  font-family: $exp-mono-font-family;
+  font-size: 0.8em;
+}
+
 .experiment-ext-blk-hint {
+  @extend %blk-caption;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: $blk-hint-item-gap $blk-hint-gap;
-  margin-top: $blk-text-gap;
-  font-family: $exp-mono-font-family;
-  font-size: 0.8em;
   color: $exp-muted;
 
   @include exp-dark { color: $exp-muted-dark; }
@@ -206,10 +209,8 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
 
 // Where the app says, briefly, why an opened file was refused.
 .experiment-ext-blk-status {
+  @extend %blk-caption;
   min-height: $blk-status-height;
-  margin-top: $blk-text-gap;
-  font-family: $exp-mono-font-family;
-  font-size: 0.8em;
   color: $exp-error;
 
   @include exp-dark { color: $exp-error-dark; }

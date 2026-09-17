@@ -36,6 +36,7 @@
     hover: { width: 1, color: B.COLORS.hover }
   };
   var PLUS_ARM = 2;                      // the ghost's "+" reaches this far from its centre
+  var FRONT_EDGE_X = HALF_W - 1;         // the left face's last column: where it meets the right
   var CHIP_PAD = 1;                      // px of chip around a label's glyphs
   var GLYPH_H = 5;
   var GLYPH_GAP = 1;
@@ -364,30 +365,41 @@
 
   // ---- Overlays ------------------------------------------------------------
 
-  function diamondRing(width, color) {
-    var shape = P.canvas(W, H);
-    fillFace(P.context(shape), HALF_W, HALF_H, diamond(0), color);
-    return ring(shape, width, color);
+  // Every other filled pixel, checkerboard-wise, in `color`.
+  function dot(c, color) {
+    var key = pixelKeys(c);
+    var ctx = P.context(c);
+    ctx.fillStyle = color;
+    for (var y = 0; y < c.height; y++) {
+      for (var x = 0; x < c.width; x++) {
+        if (key(x, y) && (x + y) % 2 === 0) ctx.fillRect(x, y, 1, 1);
+      }
+    }
   }
 
-  function ghost() {
-    var c = diamondRing(1, B.COLORS.outline);
-    var ctx = P.context(c);
-    var key = pixelKeys(c);
-    var x;
-    var y;
-    ctx.fillStyle = B.COLORS.ghost;
-    for (y = 0; y < H; y++) {
-      for (x = 0; x < W; x++) if (key(x, y) && (x + y) % 2 === 0) ctx.fillRect(x, y, 1, 1);
-    }
+  // A "+" of ghost pixels, each ringed by outline, centred on (cx, cy).
+  function drawPlus(ctx, cx, cy) {
     var arms = [];
-    for (var d = -PLUS_ARM; d <= PLUS_ARM; d++) {
-      arms.push([HALF_W + d, HALF_H], [HALF_W, HALF_H + d]);
-    }
+    for (var d = -PLUS_ARM; d <= PLUS_ARM; d++) arms.push([cx + d, cy], [cx, cy + d]);
     ctx.fillStyle = B.COLORS.outline;
     arms.forEach(function (p) { ctx.fillRect(p[0] - 1, p[1] - 1, 3, 3); });
     ctx.fillStyle = B.COLORS.ghost;
     arms.forEach(function (p) { ctx.fillRect(p[0], p[1], 1, 1); });
+  }
+
+  // The column a click would add, up to `elev`, as a dotted outline: the
+  // silhouette's ring, the seam under the top and the edge between the faces,
+  // with a "+" on the top face.
+  function ghost(elev) {
+    var blocks = elev - B.FLOOR;
+    var ink = B.COLORS.outline;
+    var c = ring(columnShape(blocks, ink, ink, ink), 1, ink);
+    var ctx = P.context(c);
+    drawSeam(ctx, 0, ink, ink);
+    ctx.fillStyle = ink;
+    ctx.fillRect(FRONT_EDGE_X, H, 1, blocks * BLOCK);
+    dot(c, B.COLORS.ghost);
+    drawPlus(ctx, HALF_W, HALF_H);
     return P.sprite(c, HALF_W, HALF_H);
   }
 

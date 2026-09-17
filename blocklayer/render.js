@@ -102,7 +102,7 @@
     var cell = state.hover && state.hover.cell;
     if (!cell) return;
     var G = B.view.project(state.view, cell.x, cell.y, B.NEW_TILE_ELEV);
-    B.pixel.draw(ctx, B.tiles.ghost(), ox + G.sx, oy + G.sy);
+    B.pixel.draw(ctx, B.tiles.ghost(B.NEW_TILE_ELEV), ox + G.sx, oy + G.sy);
   }
 
   function drawCompass(ctx, state) {

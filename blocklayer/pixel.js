@@ -91,6 +91,11 @@
     return toHex(parseHex(hex).map(function (v) { return v + (target - v) * t; }));
   }
 
+  // The colour laid only part of the way over what is behind it.
+  function translucent(hex, alpha) {
+    return "rgba(" + parseHex(hex).join(",") + "," + alpha + ")";
+  }
+
   // Encoded once per sprite; a sprite's pixels never change after it is made.
   function dataUrl(s) {
     return s.url || (s.url = s.canvas.toDataURL());
@@ -133,6 +138,7 @@
     parseHex: parseHex,
     toHex: toHex,
     shade: shade,
+    translucent: translucent,
     dataUrl: dataUrl,
     crispUrl: crispUrl,
     memo: memo

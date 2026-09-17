@@ -96,6 +96,17 @@ describe("pixel: hflip, vflip and transpose", () => {
   });
 });
 
+describe("pixel: translucent", () => {
+  it("writes a colour's channels with the alpha the caller asks for", () => {
+    assert.equal(P.translucent(GREEN, 0.5), "rgba(126,217,87,0.5)");
+    assert.equal(P.translucent("#000000", 1), "rgba(0,0,0,1)");
+  });
+
+  it("takes the channels from the hex, whatever its case", () => {
+    assert.equal(P.translucent("#7ED957", 0.25), P.translucent(GREEN, 0.25));
+  });
+});
+
 describe("pixel: dataUrl and crispUrl", () => {
   const PNG = "data:image/png;base64,AAAA";
   const SVG_PREFIX = "data:image/svg+xml,";

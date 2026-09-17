@@ -398,9 +398,10 @@
 
   // A glyph is a mask: only its alpha counts, so the ink is opaque black and
   // the tone is the same at half the alpha.
+  var MASK_INK = "#000000";
   var MASK = {};
-  MASK[INK] = "rgba(0,0,0,1)";
-  MASK[TONE] = "rgba(0,0,0," + TONE_ALPHA + ")";
+  MASK[INK] = B.pixel.translucent(MASK_INK, 1);
+  MASK[TONE] = B.pixel.translucent(MASK_INK, TONE_ALPHA);
 
   var sprite = B.pixel.memo(function (name) {
     var rows = ROWS[name];

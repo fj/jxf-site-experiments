@@ -93,6 +93,7 @@ function rig() {
     add: (x, y) => { record("add")(x, y); added.add(key(x, y)); },
     select: record("select"),
     raise: record("raise"),
+    raiseAll: record("raiseAll"),
     hold: record("hold"),
     remove: record("remove"),
     pan: record("pan"),
@@ -468,17 +469,18 @@ describe("input: keys on the selected tile", () => {
     assert.deepEqual(r.calls, [["raise", 1], ["toggleMark", "arrow-n"]]);
   });
 
-  it("the keys the marks left behind do nothing, shifted or not", () => {
+  it("no key the marks left behind toggles a mark, shifted or not", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
     for (const key of ["q", "e", "z", "c"]) {
       assert.equal(r.fire("keydown", { key }).prevented, false, key);
     }
-    for (const key of ["Q", "W", "E", "A", "D", "Z", "S", "C"]) {
-      r.fire("keydown", { key, ...SHIFT });
+    for (const key of ["Q", "E", "A", "D", "Z", "C"]) {
+      assert.equal(r.fire("keydown", { key, ...SHIFT }).prevented, false, key);
     }
+    for (const key of ["W", "S"]) r.fire("keydown", { key, ...SHIFT });
     assert.deepEqual(r.of("toggleMark"), []);
-    assert.deepEqual(r.calls, []);
+    assert.deepEqual(r.of("raiseAll"), [[1], [-1]]);
   });
 
   it("Shift with an unbound key is not swallowed; Shift with a view key still works", () => {
@@ -512,6 +514,27 @@ describe("input: keys on the selected tile", () => {
   });
 });
 
+describe("input: keys on the whole level", () => {
+  it("Shift+W raises and Shift+S lowers every tile, with a selection or without one", () => {
+    const r = rig();
+    for (const key of ["W", "S"]) {
+      assert.equal(r.fire("keydown", { key, ...SHIFT }).prevented, true, key);
+    }
+    r.select({ x: 1, y: 1 });
+    for (const key of ["W", "S"]) {
+      assert.equal(r.fire("keydown", { key, ...SHIFT }).prevented, true, key);
+    }
+    assert.deepEqual(r.of("raiseAll"), [[1], [-1], [1], [-1]]);
+  });
+
+  it("reads the shifted key by its lowercase letter, so Caps Lock changes nothing", () => {
+    const r = rig();
+    r.fire("keydown", { key: "w", ...SHIFT });
+    assert.deepEqual(r.of("raiseAll"), [[1]]);
+    assert.deepEqual(r.of("raise"), []);
+  });
+});
+
 describe("input: keyFor", () => {
   const B = load(["config.js", "input.js"]);
   const keyFor = B.input.keyFor;
@@ -533,6 +556,11 @@ describe("input: keyFor", () => {
     assert.equal(keyFor("cycleFacing", 1), "D");
     assert.equal(keyFor("setShape", "stairs"), "T");
     assert.equal(keyFor("toggleMark", "arrow-se"), ",");
+  });
+
+  it("names a shifted key with Shift+ before it", () => {
+    assert.equal(keyFor("raiseAll", 1), "Shift+W");
+    assert.equal(keyFor("raiseAll", -1), "Shift+S");
   });
 
   it("names a key for every mark, the eight arrows as a rose around the jump", () => {

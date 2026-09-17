@@ -2,9 +2,9 @@
  * Blocklayer — the pointer, wheel and keyboard on the canvas, read as editing
  * gestures: click or drag over empty cells to add, click a tile to select it,
  * wheel over the selection to elevate it, hold the right button to remove,
- * and keys that move the view or edit the selected tile. Nothing here knows
- * the level; every gesture ends in one of the handlers. keyFor() names the
- * key bound to a handler call, for the toolbar's tooltips.
+ * and keys that move the view, move the level, or edit the selected tile.
+ * Nothing here knows the level; every gesture ends in one of the handlers.
+ * keyFor() names the key bound to a handler call, for the toolbar's tooltips.
  */
 (function () {
   "use strict";
@@ -56,9 +56,17 @@
   // 1 to 5 toggle the decor, in toolbar order.
   B.DECOR.forEach(function (d, i) { TILE_KEYS[String(i + 1)] = ["setDecor", d.key]; });
 
+  // Shift makes the elevation keys act on every tile at once; no other key
+  // does anything with Shift held.
+  var SHIFT_LEVEL_KEYS = {
+    w: ["raiseAll", 1],
+    s: ["raiseAll", -1]
+  };
+
   var REMOVE_KEYS = ["Delete", "Backspace"];      // swallowed even with no selection
   var REMOVE_SELECTED_KEY = "x";                  // ...and this one only with one
   var ARROW_KEY = "Arrow";                        // what an arrow key's e.key starts with
+  var SHIFT_NAME = "Shift+";
 
   function boundKey(table, handler, arg) {
     var keys = Object.keys(table);
@@ -75,11 +83,13 @@
     return key.length === 1 ? key.toUpperCase() : key;
   }
 
-  // The key bound to a handler call, as a tooltip names it: "R", "]", "Up";
-  // null when none is.
+  // The key bound to a handler call, as a tooltip names it: "R", "]", "Up",
+  // "Shift+W"; null when none is.
   function keyFor(handler, arg) {
     var key = boundKey(VIEW_KEYS, handler, arg) || boundKey(TILE_KEYS, handler, arg);
-    return key ? keyName(key) : null;
+    if (key) return keyName(key);
+    key = boundKey(SHIFT_LEVEL_KEYS, handler, arg);
+    return key ? SHIFT_NAME + keyName(key) : null;
   }
 
   function attach(canvas, handlers) {
@@ -197,14 +207,21 @@
       handlers[action[0]].apply(null, action.slice(1));
     }
 
-    // Whether the key edited the selected tile.
-    function editSelected(e) {
-      if (e.shiftKey || !handlers.selected()) return false;
+    // Whether there was an action to run.
+    function run(action) {
+      if (!action) return false;
+      call(action);
+      return true;
+    }
+
+    // Whether the key edited the level or the selected tile.
+    function edit(e) {
       var key = e.key.toLowerCase();
-      var action = TILE_KEYS[key];
-      if (action) call(action);
-      else if (key === REMOVE_SELECTED_KEY) removeSelected();
-      else return false;
+      if (e.shiftKey) return run(SHIFT_LEVEL_KEYS[key]);
+      if (!handlers.selected()) return false;
+      if (TILE_KEYS[key]) return run(TILE_KEYS[key]);
+      if (key !== REMOVE_SELECTED_KEY) return false;
+      removeSelected();
       return true;
     }
 
@@ -213,7 +230,7 @@
       var view = VIEW_KEYS[e.key];
       if (view) call(view);
       else if (REMOVE_KEYS.indexOf(e.key) !== -1) removeSelected();
-      else if (!editSelected(e)) return;
+      else if (!edit(e)) return;
       e.preventDefault();
     }
 

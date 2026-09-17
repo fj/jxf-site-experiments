@@ -259,6 +259,9 @@
         return B.level.raise(state.level, x, y, delta) !== before;
       });
     },
+    raiseAll: function (delta) {
+      if (B.level.raiseAll(state.level, delta)) edited();
+    },
     hold: function (x, y, progress) {
       state.hold = progress == null ? null : { x: x, y: y, progress: progress };
       sched();

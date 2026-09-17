@@ -205,14 +205,28 @@
     });
   }
 
+  // A view facing names the screen side the high edge is on: `u` or `d` for
+  // up or down (up shows the slope; down shows it edge-on), then `r` or `l`.
+  function slopeSeen(viewFacing) {
+    return viewFacing.charAt(0) === "u";
+  }
+
+  function onLeft(viewFacing) {
+    return viewFacing.charAt(1) === "l";
+  }
+
+  // The slope of a ramp whose high edge is up-right: from the foot at +v to
+  // the top at -v.
+  var SLOPE = [[-EDGE, EDGE, 0], [EDGE, EDGE, 0], [EDGE, -EDGE, BLOCK], [-EDGE, -EDGE, BLOCK]];
+
   // A wedge rising to BLOCK on the up-right side (`ur`), or on the down-right
   // side (`dr`), whose sloped top is seen edge-on. The mirrors give `ul`, `dl`.
   function rampFaces(viewFacing) {
     var faces;
-    if (viewFacing === "ur" || viewFacing === "ul") {
+    if (slopeSeen(viewFacing)) {
       faces = [
         { kind: "right", pts: [[EDGE, EDGE, 0], [EDGE, -EDGE, 0], [EDGE, -EDGE, BLOCK]] },
-        { kind: "slope", pts: [[-EDGE, EDGE, 0], [EDGE, EDGE, 0], [EDGE, -EDGE, BLOCK], [-EDGE, -EDGE, BLOCK]] }
+        { kind: "slope", pts: SLOPE }
       ];
     } else {
       faces = [
@@ -220,43 +234,56 @@
         { kind: "left", pts: [[-EDGE, EDGE, 0], [EDGE, EDGE, 0], [EDGE, EDGE, BLOCK]] }
       ];
     }
-    return viewFacing === "ul" || viewFacing === "dl" ? mirror(faces) : faces;
+    return onLeft(viewFacing) ? mirror(faces) : faces;
   }
 
-  function stairsFaces(viewFacing) {
+  // Tread i of a flight up the slope, from the foot: its near and far edge
+  // along the run and the heights it rises between.
+  function tread(i) {
     var rise = BLOCK / B.STEPS;
     var depth = (2 * EDGE) / B.STEPS;
+    var near = EDGE - i * depth;
+    return { near: near, far: near - depth, lo: rise * i, hi: rise * (i + 1) };
+  }
+
+  // Seen edge-on the flight runs along u from -EDGE, so each tread's edges
+  // negate.
+  function stairsFaces(viewFacing) {
     var faces = [];
     var i;
-    if (viewFacing === "ur" || viewFacing === "ul") {
+    var t;
+    if (slopeSeen(viewFacing)) {
       for (i = 0; i < B.STEPS; i++) {
-        var vn = EDGE - i * depth;
-        var vf = vn - depth;
-        faces.push({ kind: "right", pts: [[EDGE, vn, 0], [EDGE, vf, 0], [EDGE, vf, rise * (i + 1)], [EDGE, vn, rise * (i + 1)]] });
+        t = tread(i);
+        faces.push({ kind: "right", pts: [
+          [EDGE, t.near, 0], [EDGE, t.far, 0], [EDGE, t.far, t.hi], [EDGE, t.near, t.hi]
+        ] });
       }
       for (i = 0; i < B.STEPS; i++) {
-        var near = EDGE - i * depth;
-        var far = near - depth;
-        var hi = rise * (i + 1);
-        faces.push({ kind: "left", pts: [[-EDGE, near, rise * i], [EDGE, near, rise * i], [EDGE, near, hi], [-EDGE, near, hi]] });
-        faces.push({ kind: "top", pts: [[-EDGE, near, hi], [EDGE, near, hi], [EDGE, far, hi], [-EDGE, far, hi]] });
+        t = tread(i);
+        faces.push({ kind: "left", pts: [
+          [-EDGE, t.near, t.lo], [EDGE, t.near, t.lo], [EDGE, t.near, t.hi], [-EDGE, t.near, t.hi]
+        ] });
+        faces.push({ kind: "top", pts: [
+          [-EDGE, t.near, t.hi], [EDGE, t.near, t.hi], [EDGE, t.far, t.hi], [-EDGE, t.far, t.hi]
+        ] });
       }
     } else {
       faces.push({ kind: "right", pts: rightFace(0, BLOCK) });
       for (i = 0; i < B.STEPS; i++) {
-        var un = -EDGE + i * depth;
-        var uf = un + depth;
-        var h = rise * (i + 1);
-        faces.push({ kind: "left", pts: [[un, EDGE, 0], [uf, EDGE, 0], [uf, EDGE, h], [un, EDGE, h]] });
+        t = tread(i);
+        faces.push({ kind: "left", pts: [
+          [-t.near, EDGE, 0], [-t.far, EDGE, 0], [-t.far, EDGE, t.hi], [-t.near, EDGE, t.hi]
+        ] });
       }
       for (i = 0; i < B.STEPS; i++) {
-        var u0 = -EDGE + i * depth;
-        var u1 = u0 + depth;
-        var top = rise * (i + 1);
-        faces.push({ kind: "top", pts: [[u0, -EDGE, top], [u0, EDGE, top], [u1, EDGE, top], [u1, -EDGE, top]] });
+        t = tread(i);
+        faces.push({ kind: "top", pts: [
+          [-t.near, -EDGE, t.hi], [-t.near, EDGE, t.hi], [-t.far, EDGE, t.hi], [-t.far, -EDGE, t.hi]
+        ] });
       }
     }
-    return viewFacing === "ul" || viewFacing === "dl" ? mirror(faces) : faces;
+    return onLeft(viewFacing) ? mirror(faces) : faces;
   }
 
   function drawFaces(ctx, ax, ay, elev, faces) {
@@ -341,11 +368,11 @@
     var color = kind === "select" ? B.COLORS.select : B.COLORS.hover;
     var filled = P.canvas(W, WEDGE_H);
     var ctx = P.context(filled);
-    var faces = shape === "ramp" ? rampFaces(viewFacing) : shape === "stairs" ? stairsFaces(viewFacing) : null;
-    var sloped = faces && (viewFacing === "ur" || viewFacing === "ul");
+    var faces = shape === "ramp" ? rampFaces(viewFacing)
+      : shape === "stairs" ? stairsFaces(viewFacing) : null;
     if (!faces) {
       fillFace(ctx, HALF_W, WEDGE_ANCHOR_Y, diamond(0), color);
-    } else if (sloped) {
+    } else if (slopeSeen(viewFacing)) {
       fillFace(ctx, HALF_W, WEDGE_ANCHOR_Y, rampFaces(viewFacing)[1].pts, color);
     } else {
       faces.forEach(function (f) { fillFace(ctx, HALF_W, WEDGE_ANCHOR_Y, f.pts, color); });

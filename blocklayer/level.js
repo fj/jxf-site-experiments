@@ -214,12 +214,13 @@
     for (y = 0; y < DEMO_MESA.size; y++) {
       for (x = 0; x < DEMO_MESA.size; x++) raise(level, DEMO_MESA.x + x, DEMO_MESA.y + y, 1);
     }
-    // Up onto the mesa: a ramp from the west, and stairs from the south.
-    var rampX = DEMO_MESA.x - 1;
+    // Up onto the mesa: a ramp from the east and stairs from the south. Both
+    // rise away from the first view's camera, so both slopes are in sight.
+    var rampX = DEMO_MESA.x + DEMO_MESA.size;
     var stairsX = DEMO_MESA.x + DEMO_MESA.size - 1;
     var stairsY = DEMO_MESA.y + DEMO_MESA.size;
     setShape(level, rampX, DEMO_MESA.y, "ramp");
-    setFacing(level, rampX, DEMO_MESA.y, "E");
+    setFacing(level, rampX, DEMO_MESA.y, "W");
     setShape(level, stairsX, stairsY, "stairs");
     setFacing(level, stairsX, stairsY, "N");
     DEMO_DECOR.forEach(function (d) { setDecor(level, d.x, d.y, d.decor); });

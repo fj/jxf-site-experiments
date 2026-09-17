@@ -221,10 +221,10 @@
     setShape: function (shape) {
       editSelected(function (x, y) { B.level.setShape(state.level, x, y, shape); });
     },
-    cycleFacing: function () {
+    cycleFacing: function (step) {
       editSelected(function (x, y) {
         if (!B.level.sloped(B.level.get(state.level, x, y))) return false;
-        B.level.cycleFacing(state.level, x, y);
+        B.level.cycleFacing(state.level, x, y, step);
       });
     },
     setDecor: function (key) {

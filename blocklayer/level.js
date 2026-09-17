@@ -103,10 +103,13 @@
     return tile.facing;
   }
 
-  function cycleFacing(level, x, y) {
+  // step quarter turns clockwise (N, E, S, W); negative turns the other way.
+  function cycleFacing(level, x, y, step) {
     var tile = get(level, x, y);
     if (!tile) return null;
-    var next = (B.FACINGS.indexOf(tile.facing) + 1) % B.FACINGS.length;
+    if (step === undefined) step = 1;
+    var n = B.FACINGS.length;
+    var next = (((B.FACINGS.indexOf(tile.facing) + step) % n) + n) % n;
     return setFacing(level, x, y, B.FACINGS[next]);
   }
 

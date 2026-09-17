@@ -173,6 +173,17 @@ describe("level: facing", () => {
     assert.equal(L.cycleFacing(level, 0, 0), "N");
     assert.equal(L.cycleFacing(level, 5, 5), null);
   });
+
+  it("cycles the other way for a step of -1", () => {
+    const level = L.create();
+    L.add(level, 0, 0);
+    assert.equal(L.cycleFacing(level, 0, 0, -1), "W");
+    assert.equal(L.cycleFacing(level, 0, 0, -1), "S");
+    assert.equal(L.cycleFacing(level, 0, 0, -1), "E");
+    assert.equal(L.cycleFacing(level, 0, 0, -1), "N");
+    assert.equal(L.cycleFacing(level, 0, 0, 1), "E");
+    assert.equal(L.cycleFacing(level, 5, 5, -1), null);
+  });
 });
 
 describe("level: setDecor", () => {

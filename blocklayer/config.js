@@ -29,7 +29,9 @@
 
   B.SHAPES = ["block", "ramp", "stairs"];
   B.FACINGS = ["N", "E", "S", "W"];             // world compass; N is -y, E is +x
-  B.VIEW_FACINGS = ["ur", "dr", "dl", "ul"];    // screen: up-right, down-right, down-left, up-left
+  // Where a tile's high edge is on screen, as two letters: u or d for up (the
+  // slope in view) or down (seen edge-on), then r or l for right or left.
+  B.VIEW_FACINGS = ["ur", "dr", "dl", "ul"];
   B.DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
   B.DECOR = [

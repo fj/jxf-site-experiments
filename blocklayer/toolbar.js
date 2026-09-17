@@ -3,8 +3,8 @@
  * zoom the view, show or hide its layers, and edit the selected tile's shape,
  * facing, decor and marks, and save, open or clear the level. The DOM is
  * built once; sync() refreshes pressed and disabled states from the app's
- * state and redraws only the icons that turn with the view. icon() lends the
- * toolbar's themed-icon pair to the rest of the interface.
+ * state and redraws only the icons that turn with the view. element() and
+ * icon() lend the toolbar's builders to the rest of the interface.
  */
 (function () {
   "use strict";
@@ -368,6 +368,7 @@
 
   B.toolbar = {
     build: build,
+    element: element,
     icon: icon
   };
 })();

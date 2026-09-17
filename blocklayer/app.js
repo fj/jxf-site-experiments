@@ -259,16 +259,12 @@
     { icon: "hint-remove", word: "remove" }
   ];
 
-  function el(tag, name) {
-    var node = document.createElement(tag);
-    node.className = B.PREFIX + name;
-    return node;
-  }
+  var element = B.toolbar.element;
 
   function hintRow() {
-    var row = el("div", "hint");
+    var row = element("div", "hint");
     HINTS.forEach(function (h) {
-      var item = el("span", "hint-item");
+      var item = element("span", "hint-item");
       item.appendChild(B.toolbar.icon(h.icon));
       item.appendChild(document.createTextNode(h.word));
       row.appendChild(item);
@@ -277,15 +273,15 @@
   }
 
   function statusLine() {
-    var line = el("div", "status");
+    var line = element("div", "status");
     line.setAttribute("role", "status");
     return line;
   }
 
   function buildSkeleton(mount) {
-    var layout = el("div", "layout");
-    var stage = el("div", "stage");
-    canvas = el("canvas", "canvas");
+    var layout = element("div", "layout");
+    var stage = element("div", "stage");
+    canvas = element("canvas", "canvas");
     canvas.tabIndex = 0;
     canvas.setAttribute("aria-label", "Level");
     status = statusLine();

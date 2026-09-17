@@ -10,6 +10,7 @@
   var B = window.BlockLayer = window.BlockLayer || {};
 
   var TURNS = 4;                                  // quarter turns in a full circle
+  var HALF = 0.5;                                 // of a cell: where one cell meets the next
   var HALF_TILE_W = B.TILE_W / 2;                 // base px, a diamond's centre to its side vertex
   var HALF_TILE_H = B.TILE_H / 2;                 // ...and to its top or bottom vertex
   var DIRS_PER_FACING = B.DIRECTIONS.length / B.FACINGS.length;
@@ -65,10 +66,25 @@
     return r === 0 ? 0 : r;
   }
 
-  function cellAt(view, sx, sy, z) {
+  function unproject(view, sx, sy, z) {
     var across = (sx - view.pan.x) / B.TILE_W;
     var down = (sy - view.pan.y + z * B.BLOCK_H) / B.TILE_H;
-    return fromView(view.rot, nearest(down + across), nearest(down - across));
+    return { u: down + across, v: down - across };
+  }
+
+  function cellAt(view, sx, sy, z) {
+    var p = unproject(view, sx, sy, z);
+    return fromView(view.rot, nearest(p.u), nearest(p.v));
+  }
+
+  function halfway(n) {
+    return n - Math.floor(n) === HALF;
+  }
+
+  // Half-way between two cell centres in u or v: on the line between cells.
+  function onGridLine(view, sx, sy, z) {
+    var p = unproject(view, sx, sy, z);
+    return halfway(p.u) || halfway(p.v);
   }
 
   function order(view, tiles) {
@@ -98,7 +114,10 @@
       if (hit(view, tiles[i], sx, sy)) return { tile: tiles[i] };
     }
     var cell = cellAt(view, sx, sy, B.NEW_TILE_ELEV);
-    return B.level.get(level, cell.x, cell.y) ? null : { cell: cell };
+    if (B.level.get(level, cell.x, cell.y)) return null;
+    var empty = { cell: cell };
+    if (onGridLine(view, sx, sy, B.NEW_TILE_ELEV)) empty.edge = true;
+    return empty;
   }
 
   function pan(view, facing, tiles) {

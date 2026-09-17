@@ -103,7 +103,9 @@
     function onMove(e) {
       var hit = pick(e);
       handlers.hover(hit);
-      if (dragging && hit && hit.cell && !sameCell(lastCell, hit.cell)) addCell(hit.cell);
+      if (dragging && hit && hit.cell && !hit.edge && !sameCell(lastCell, hit.cell)) {
+        addCell(hit.cell);
+      }
       if (hold && !(hit && hit.tile && sameCell(hold, hit.tile))) cancelHold();
     }
 

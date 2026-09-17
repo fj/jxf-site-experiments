@@ -271,6 +271,20 @@ describe("view: pick", () => {
     }
   });
 
+  it("flags a point on the line between two empty cells as an edge", () => {
+    const view = V.create();
+    const level = L.create();
+    const lone = L.add(level, 2, -1, 0);
+    const p = V.project(view, 2, -1, 0);
+    const vertex = V.pick(view, level, p.sx + B.TILE_W / 2, p.sy);
+    assert.deepEqual(vertex, { cell: vertex.cell, edge: true });
+    assert.ok(!("edge" in V.pick(view, level, p.sx + B.TILE_W / 2 + 1, p.sy)), "just past the vertex");
+    const q = V.project(view, 3, -2, 0);
+    const edge = V.pick(view, level, q.sx + B.TILE_W / 4, q.sy + B.TILE_H / 4);
+    assert.deepEqual(edge, { cell: edge.cell, edge: true });
+    assert.deepEqual(V.pick(view, level, p.sx - 1, p.sy), { tile: lone });
+  });
+
   it("returns the empty cell on the new-tile plane", () => {
     const view = viewAt(1, { x: 9, y: 9 });
     const level = L.create();

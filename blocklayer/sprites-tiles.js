@@ -30,8 +30,10 @@
   var WEDGE_ANCHOR_Y = HALF_H + BLOCK;
   var HOLD_ALPHA = 0.7;
   var HOLD_STEPS = 16;
-  var SELECT_WIDTH = 2;
-  var HOVER_WIDTH = 1;
+  var KINDS = {                          // the highlight ringing a tile, by kind
+    select: { width: 2, color: B.COLORS.select },
+    hover: { width: 1, color: B.COLORS.hover }
+  };
   var PLUS_ARM = 2;                      // the ghost's "+" reaches this far from its centre
   var CHIP_PAD = 1;
   var GLYPH_W = 3;
@@ -193,16 +195,28 @@
     return [[EDGE, -EDGE, zBottom], [EDGE, EDGE, zBottom], [EDGE, EDGE, zTop], [EDGE, -EDGE, zTop]];
   }
 
-  // Swapping u and v mirrors a face left to right on screen, and turns a
-  // left-facing face into a right-facing one.
+  // Swapping u and v mirrors a polygon left to right on screen...
+  function mirrorPts(pts) {
+    return pts.map(function (p) { return [p[1], p[0], p[2]]; });
+  }
+
+  // ...and turns a left-facing face into a right-facing one.
   function mirror(faces) {
     var kinds = { left: "right", right: "left" };
     return faces.map(function (f) {
-      return {
-        kind: kinds[f.kind] || f.kind,
-        pts: f.pts.map(function (p) { return [p[1], p[0], p[2]]; })
-      };
+      return { kind: kinds[f.kind] || f.kind, pts: mirrorPts(f.pts) };
     });
+  }
+
+  function polygons(faces) {
+    return faces.map(function (f) { return f.pts; });
+  }
+
+  // A wedge: its faces, and the polygons a highlight around it fills (its
+  // envelope), mirrored when the facing puts the high edge on the left.
+  function wedgeShape(viewFacing, faces, envelope) {
+    if (!onLeft(viewFacing)) return { faces: faces, envelope: envelope };
+    return { faces: mirror(faces), envelope: envelope.map(mirrorPts) };
   }
 
   // A view facing names the screen side the high edge is on: `u` or `d` for
@@ -221,20 +235,19 @@
 
   // A wedge rising to BLOCK on the up-right side (`ur`), or on the down-right
   // side (`dr`), whose sloped top is seen edge-on. The mirrors give `ul`, `dl`.
-  function rampFaces(viewFacing) {
-    var faces;
+  // The slope alone envelops the first; the edge-on wedge is its two faces.
+  function rampShape(viewFacing) {
     if (slopeSeen(viewFacing)) {
-      faces = [
+      return wedgeShape(viewFacing, [
         { kind: "right", pts: [[EDGE, EDGE, 0], [EDGE, -EDGE, 0], [EDGE, -EDGE, BLOCK]] },
         { kind: "slope", pts: SLOPE }
-      ];
-    } else {
-      faces = [
-        { kind: "right", pts: rightFace(0, BLOCK) },
-        { kind: "left", pts: [[-EDGE, EDGE, 0], [EDGE, EDGE, 0], [EDGE, EDGE, BLOCK]] }
-      ];
+      ], [SLOPE]);
     }
-    return onLeft(viewFacing) ? mirror(faces) : faces;
+    var faces = [
+      { kind: "right", pts: rightFace(0, BLOCK) },
+      { kind: "left", pts: [[-EDGE, EDGE, 0], [EDGE, EDGE, 0], [EDGE, EDGE, BLOCK]] }
+    ];
+    return wedgeShape(viewFacing, faces, polygons(faces));
   }
 
   // Tread i of a flight up the slope, from the foot: its near and far edge
@@ -247,8 +260,8 @@
   }
 
   // Seen edge-on the flight runs along u from -EDGE, so each tread's edges
-  // negate.
-  function stairsFaces(viewFacing) {
+  // negate. The ramp's slope envelops the flight; edge-on, its faces do.
+  function stairsShape(viewFacing) {
     var faces = [];
     var i;
     var t;
@@ -283,16 +296,16 @@
         ] });
       }
     }
-    return onLeft(viewFacing) ? mirror(faces) : faces;
+    return wedgeShape(viewFacing, faces, slopeSeen(viewFacing) ? [SLOPE] : polygons(faces));
   }
 
   function drawFaces(ctx, ax, ay, elev, faces) {
     faces.forEach(function (f) { fillFace(ctx, ax, ay, f.pts, faceColor(elev, f.kind)); });
   }
 
-  function wedge(elev, faces) {
+  function wedge(elev, shape) {
     var c = P.canvas(W, WEDGE_H);
-    drawFaces(P.context(c), HALF_W, WEDGE_ANCHOR_Y, elev, faces);
+    drawFaces(P.context(c), HALF_W, WEDGE_ANCHOR_Y, elev, shape.faces);
     outlinePass(c);
     return P.sprite(c, HALF_W, WEDGE_ANCHOR_Y);
   }
@@ -363,21 +376,22 @@
     return P.sprite(c, HALF_W, HALF_H);
   }
 
+  function envelope(shape, viewFacing) {
+    if (shape === "ramp") return rampShape(viewFacing).envelope;
+    if (shape === "stairs") return stairsShape(viewFacing).envelope;
+    return [diamond(0)];
+  }
+
+  // The highlight around a tile: its envelope filled, then only the ring
+  // within the kind's width of the background kept.
   function outline(shape, viewFacing, kind) {
-    var width = kind === "select" ? SELECT_WIDTH : HOVER_WIDTH;
-    var color = kind === "select" ? B.COLORS.select : B.COLORS.hover;
+    var style = KINDS[kind];
     var filled = P.canvas(W, WEDGE_H);
     var ctx = P.context(filled);
-    var faces = shape === "ramp" ? rampFaces(viewFacing)
-      : shape === "stairs" ? stairsFaces(viewFacing) : null;
-    if (!faces) {
-      fillFace(ctx, HALF_W, WEDGE_ANCHOR_Y, diamond(0), color);
-    } else if (slopeSeen(viewFacing)) {
-      fillFace(ctx, HALF_W, WEDGE_ANCHOR_Y, rampFaces(viewFacing)[1].pts, color);
-    } else {
-      faces.forEach(function (f) { fillFace(ctx, HALF_W, WEDGE_ANCHOR_Y, f.pts, color); });
-    }
-    return P.sprite(ring(filled, width, color), HALF_W, WEDGE_ANCHOR_Y);
+    envelope(shape, viewFacing).forEach(function (pts) {
+      fillFace(ctx, HALF_W, WEDGE_ANCHOR_Y, pts, style.color);
+    });
+    return P.sprite(ring(filled, style.width, style.color), HALF_W, WEDGE_ANCHOR_Y);
   }
 
   function holdStep(step) {
@@ -420,8 +434,8 @@
 
   B.tiles = {
     column: P.memo(column),
-    ramp: P.memo(function (elev, viewFacing) { return wedge(elev, rampFaces(viewFacing)); }),
-    stairs: P.memo(function (elev, viewFacing) { return wedge(elev, stairsFaces(viewFacing)); }),
+    ramp: P.memo(function (elev, viewFacing) { return wedge(elev, rampShape(viewFacing)); }),
+    stairs: P.memo(function (elev, viewFacing) { return wedge(elev, stairsShape(viewFacing)); }),
     ghost: P.memo(ghost),
     outline: P.memo(outline),
     holdMask: function (progress) {

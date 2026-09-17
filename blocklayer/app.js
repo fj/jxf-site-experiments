@@ -1,9 +1,10 @@
 /*
- * Blocklayer — the app entry. Builds the toolbar, the canvas and the hint row
- * into the mount, keeps the one state object the renderer reads, and maps
- * every toolbar action and pointer gesture onto a level or view mutation:
- * each one redraws, refreshes the toolbar, and — when the level changed —
- * saves it.
+ * Blocklayer — the app entry. Builds the toolbar, the canvas, the hint row
+ * and the status line into the mount, keeps the one state object the renderer
+ * reads, and maps every toolbar action and pointer gesture onto a level or
+ * view mutation: each one redraws, refreshes the toolbar, and — when the
+ * level changed — saves it. The level also goes out to a file and comes back
+ * from one, by the picker or dropped on the canvas.
  */
 (function () {
   "use strict";
@@ -25,6 +26,7 @@
 
   var canvas = null;
   var toolbar = null;
+  var status = null;
 
   // ---- Persistence ---------------------------------------------------------
   function stored() {
@@ -46,6 +48,75 @@
     } catch (err) {
       // Storage refused the level; it lives on in memory until the next edit.
     }
+  }
+
+  // ---- Files ---------------------------------------------------------------
+  var JSON_MIME = "application/json";
+  var NOT_A_LEVEL = "not a level file";
+  var OBJECT_URL_TTL_MS = 5000;    // long enough for the browser to start the download
+  var DROPPING_CLASS = "is-dropping";
+
+  var statusTimer = null;
+
+  function showStatus(text) {
+    status.textContent = text;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function () { status.textContent = ""; }, B.STATUS_MS);
+  }
+
+  function saveFile() {
+    var url = URL.createObjectURL(new Blob([B.file.serialize(state.level)], { type: JSON_MIME }));
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = B.file.FILE_NAME;
+    link.hidden = true;
+    // Firefox acts on the click only for an anchor that is in the document.
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, OBJECT_URL_TTL_MS);
+  }
+
+  function useLevel(level) {
+    if (!level) {
+      showStatus(NOT_A_LEVEL);
+      return;
+    }
+    state.level = level;
+    state.selected = null;
+    state.hover = null;
+    edited();
+  }
+
+  function openFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () { useLevel(B.file.parse(String(reader.result))); };
+    reader.onerror = function () { useLevel(null); };
+    reader.readAsText(file);
+  }
+
+  function droppedLevel(transfer) {
+    var files = transfer ? transfer.files : null;
+    for (var i = 0; files && i < files.length; i++) {
+      if (B.file.isLevelFile(files[i].name)) return files[i];
+    }
+    return null;
+  }
+
+  function watchDrops(stage) {
+    canvas.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      stage.classList.add(DROPPING_CLASS);
+    });
+    canvas.addEventListener("dragleave", function () {
+      stage.classList.remove(DROPPING_CLASS);
+    });
+    canvas.addEventListener("drop", function (e) {
+      e.preventDefault();
+      stage.classList.remove(DROPPING_CLASS);
+      var file = droppedLevel(e.dataTransfer);
+      if (file) openFile(file);
+    });
   }
 
   // ---- Frame and picking ---------------------------------------------------
@@ -161,6 +232,8 @@
     toggleMark: function (key) {
       editSelected(function (x, y) { B.level.toggleMark(state.level, x, y, key); });
     },
+    save: saveFile,
+    open: openFile,
     clear: clear
   };
 
@@ -209,8 +282,11 @@
     canvas = el("canvas", "canvas");
     canvas.tabIndex = 0;
     canvas.setAttribute("aria-label", "Level");
+    status = el("div", "status");
+    status.setAttribute("role", "status");
     stage.appendChild(canvas);
     stage.appendChild(toolbar.hint);
+    stage.appendChild(status);
     layout.appendChild(toolbar.el);
     layout.appendChild(stage);
     mount.appendChild(layout);
@@ -221,6 +297,7 @@
   toolbar = B.toolbar.build(toolbarHandlers);
   var stage = buildSkeleton(root);
   B.input.attach(canvas, inputHandlers);
+  watchDrops(stage);
   watchSize(stage);
   changed();
 })();

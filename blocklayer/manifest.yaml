@@ -14,9 +14,11 @@ mount: experiment-ext-blk
 styles:
   - style.scss
 
-# Local scripts, in dependency order. Each attaches one module to the
-# window.BlockLayer namespace; app.js wires them together and comes last.
+# Scripts, in dependency order: the kit's file download first, then the local
+# modules, each attaching to the window.BlockLayer namespace; app.js wires
+# them together and comes last.
 scripts:
+  - ../shared/png.js
   - config.js
   - pixel.js
   - level.js

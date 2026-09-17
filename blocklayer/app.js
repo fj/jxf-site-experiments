@@ -53,7 +53,6 @@
   // ---- Files ---------------------------------------------------------------
   var JSON_MIME = "application/json";
   var NOT_A_LEVEL = "not a level file";
-  var OBJECT_URL_TTL_MS = 5000;    // long enough for the browser to start the download
   var DROPPING_CLASS = "is-dropping";
 
   var statusTimer = null;
@@ -65,16 +64,12 @@
   }
 
   function saveFile() {
-    var url = URL.createObjectURL(new Blob([B.file.serialize(state.level)], { type: JSON_MIME }));
-    var link = document.createElement("a");
-    link.href = url;
-    link.download = B.file.FILE_NAME;
-    link.hidden = true;
-    // Firefox acts on the click only for an anchor that is in the document.
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(function () { URL.revokeObjectURL(url); }, OBJECT_URL_TTL_MS);
+    var blob = new Blob([B.file.serialize(state.level)], { type: JSON_MIME });
+    try {
+      window.ExpPng.save(blob, B.file.FILE_NAME);
+    } catch (err) {
+      showStatus(err.message);
+    }
   }
 
   function useLevel(level) {

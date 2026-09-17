@@ -236,6 +236,6 @@ sprites, string-art, shading, memoizing), `level.js`, `file.js`, `view.js` and
 projection, picking, the frame; the level a first visit starts with — all
 unit-tested under `tests/`), `sprites-tiles.js`, `sprites-decor.js`,
 `sprites-marks.js`, `sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`,
-and `app.js` last.
+and `app.js` last, with the kit's `shared/png.js` for the file download.
 The level autosaves to `localStorage`, and a `.blocklayer.json` dropped on the
 canvas opens.

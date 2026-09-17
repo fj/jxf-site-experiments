@@ -23,11 +23,12 @@
   var PAN_SLOTS = [null, "N", null, "W", null, "E", null, "S", null];
   var ARROW_SLOTS = ["NW", "N", "NE", "W", null, "E", "SW", "S", "SE"];
 
+  // act names the handler each view button calls, with arg.
   var VIEW_BUTTONS = [
-    { act: "rotate", arg: "-1", title: "Turn left", icon: "rotate-ccw" },
-    { act: "rotate", arg: "1", title: "Turn right", icon: "rotate-cw" },
-    { act: "zoom", arg: "-1", title: "Zoom out", icon: "zoom-out" },
-    { act: "zoom", arg: "1", title: "Zoom in", icon: "zoom-in" }
+    { act: "rotate", arg: -1, title: "Turn left", icon: "rotate-ccw" },
+    { act: "rotate", arg: 1, title: "Turn right", icon: "rotate-cw" },
+    { act: "zoom", arg: -1, title: "Zoom out", icon: "zoom-out" },
+    { act: "zoom", arg: 1, title: "Zoom in", icon: "zoom-in" }
   ];
   var LAYER_BUTTONS = [
     { name: "elevation", title: "Elevation", icon: "layer-elev" },
@@ -36,27 +37,6 @@
   ];
   var OPAQUE_ICONS = { "true": "opaque", "false": "transparent" };
   var SHAPE_TITLES = { block: "Block", ramp: "Ramp", stairs: "Stairs" };
-  var FILE_BUTTONS = [
-    { act: "save", title: "Save", icon: "file-save" },
-    { act: "open", title: "Open", icon: "file-open" }
-  ];
-
-  // What a click on each data-act does; clear is absent because it needs a hold.
-  function actions(handlers, picker) {
-    return {
-      pan: function (arg) { handlers.pan(arg); },
-      rotate: function (arg) { handlers.rotate(Number(arg)); },
-      zoom: function (arg) { handlers.zoom(Number(arg)); },
-      layer: function (arg) { handlers.toggleLayer(arg); },
-      opaque: function () { handlers.toggleOpaque(); },
-      shape: function (arg) { handlers.setShape(arg); },
-      facing: function () { handlers.cycleFacing(); },
-      decor: function (arg) { handlers.setDecor(arg); },
-      mark: function (arg) { handlers.toggleMark(arg); },
-      save: function () { handlers.save(); },
-      open: function () { picker.click(); }
-    };
-  }
 
   function element(tag, name) {
     var el = document.createElement(tag);
@@ -76,17 +56,19 @@
     return el;
   }
 
-  function button(act, arg, title) {
+  // data-act and data-arg are the hooks the driver and the tests find a button by.
+  function button(act, arg, title, onClick) {
     var btn = element("button", "btn");
     btn.type = "button";
     btn.setAttribute("data-act", act);
     btn.setAttribute("data-arg", arg);
     btn.title = title;
+    if (onClick) btn.addEventListener("click", onClick);
     return btn;
   }
 
-  function toggle(act, arg, title) {
-    var btn = button(act, arg, title);
+  function toggle(act, arg, title, onClick) {
+    var btn = button(act, arg, title, onClick);
     btn.setAttribute("aria-pressed", "false");
     return btn;
   }
@@ -140,59 +122,62 @@
     return B.MARKS.filter(function (m) { return m.dir === dir; })[0];
   }
 
-  function panGroup(refs, rot) {
+  function panGroup(refs, handlers, rot) {
     var el = group("pan");
     PAN_SLOTS.forEach(function (facing) {
       if (!facing) return el.appendChild(spacer());
-      var btn = button("pan", facing, FACING_TITLES[facing]);
+      var btn = button("pan", facing, FACING_TITLES[facing], function () { handlers.pan(facing); });
       refs.pan[facing] = image(btn, B.marks.arrow(B.facingDir(rot, facing)));
       el.appendChild(btn);
     });
     return el;
   }
 
-  function viewGroup() {
+  function viewGroup(handlers) {
     var el = group("view");
     VIEW_BUTTONS.forEach(function (v) {
-      var btn = button(v.act, v.arg, v.title);
+      var run = handlers[v.act];
+      var btn = button(v.act, v.arg, v.title, function () { run(v.arg); });
       themedIcons(btn, v.icon);
       el.appendChild(btn);
     });
     return el;
   }
 
-  function layersGroup(refs, opaque) {
+  function layersGroup(refs, handlers, opaque) {
     var el = group("layers");
     LAYER_BUTTONS.forEach(function (l) {
-      var btn = toggle("layer", l.name, l.title);
+      var btn = toggle("layer", l.name, l.title, function () { handlers.toggleLayer(l.name); });
       themedIcons(btn, l.icon);
       refs.layers[l.name] = btn;
       el.appendChild(btn);
     });
-    refs.opaque = toggle("opaque", "", "Solid");
+    refs.opaque = toggle("opaque", "", "Solid", function () { handlers.toggleOpaque(); });
     refs.opaqueIcons = themedIcons(refs.opaque, OPAQUE_ICONS[String(opaque)]);
     el.appendChild(refs.opaque);
     return el;
   }
 
-  function shapeGroup(refs, rot, facing) {
+  function shapeGroup(refs, handlers, rot, facing) {
     var el = group("shape");
     B.SHAPES.forEach(function (shape) {
-      var btn = toggle("shape", shape, SHAPE_TITLES[shape]);
+      var btn = toggle("shape", shape, SHAPE_TITLES[shape], function () {
+        handlers.setShape(shape);
+      });
       themedIcons(btn, "shape-" + shape);
       refs.shapes[shape] = btn;
       el.appendChild(btn);
     });
-    refs.facing = button("facing", "", "Facing");
+    refs.facing = button("facing", "", "Facing", function () { handlers.cycleFacing(); });
     refs.facingIcon = image(refs.facing, B.marks.arrow(B.facingDir(rot, facing)));
     el.appendChild(refs.facing);
     return el;
   }
 
-  function decorGroup(refs) {
+  function decorGroup(refs, handlers) {
     var el = group("decor");
     B.DECOR.forEach(function (d) {
-      var btn = toggle("decor", d.key, d.label);
+      var btn = toggle("decor", d.key, d.label, function () { handlers.setDecor(d.key); });
       image(btn, B.decor.icon(d.key));
       refs.decor[d.key] = btn;
       el.appendChild(btn);
@@ -200,13 +185,13 @@
     return el;
   }
 
-  function marksGroup(refs, rot) {
+  function marksGroup(refs, handlers, rot) {
     var el = group("marks");
     var arrows = ARROW_SLOTS.map(function (dir) { return dir ? markByDir(dir) : null; });
     var others = B.MARKS.filter(function (m) { return !m.dir; });
     arrows.concat(others).forEach(function (m) {
       if (!m) return el.appendChild(spacer());
-      var btn = toggle("mark", m.key, m.label);
+      var btn = toggle("mark", m.key, m.label, function () { handlers.toggleMark(m.key); });
       refs.marks[m.key] = { button: btn, image: image(btn, B.marks.sprite(m.key, rot)) };
       el.appendChild(btn);
     });
@@ -228,13 +213,15 @@
     return input;
   }
 
-  function fileGroup(refs, picker) {
+  // The clear button has no click: it fires only after a full hold.
+  function fileGroup(refs, handlers, picker) {
     var el = group("file");
-    FILE_BUTTONS.forEach(function (f) {
-      var btn = button(f.act, "", f.title);
-      themedIcons(btn, f.icon);
-      el.appendChild(btn);
-    });
+    var save = button("save", "", "Save", function () { handlers.save(); });
+    themedIcons(save, "file-save");
+    el.appendChild(save);
+    var open = button("open", "", "Open", function () { picker.click(); });
+    themedIcons(open, "file-open");
+    el.appendChild(open);
     refs.clear = button("clear", "", "Clear");
     themedIcons(refs.clear, "clear");
     el.appendChild(refs.clear);
@@ -242,15 +229,7 @@
     return el;
   }
 
-  function dispatch(event, run) {
-    var target = event.target;
-    var btn = target.closest ? target.closest("button[data-act]") : null;
-    if (!btn || btn.disabled) return;
-    var action = run[btn.getAttribute("data-act")];
-    if (action) action(btn.getAttribute("data-arg"));
-  }
-
-  // The clear button fires only after a full hold, by pointer or by a held key.
+  // A full hold, by pointer or by a held key, fires the clear.
   function attachHold(btn, onClear) {
     var timer = null;
 
@@ -296,17 +275,14 @@
     var refs = { pan: {}, layers: {}, shapes: {}, decor: {}, marks: {} };
     var last = { rot: 0, opaque: true, facingDir: B.facingDir(0, B.FACINGS[0]) };
 
-    el.appendChild(panGroup(refs, last.rot));
-    el.appendChild(viewGroup());
-    el.appendChild(layersGroup(refs, last.opaque));
-    el.appendChild(shapeGroup(refs, last.rot, B.FACINGS[0]));
-    el.appendChild(decorGroup(refs));
-    el.appendChild(marksGroup(refs, last.rot));
+    el.appendChild(panGroup(refs, handlers, last.rot));
+    el.appendChild(viewGroup(handlers));
+    el.appendChild(layersGroup(refs, handlers, last.opaque));
+    el.appendChild(shapeGroup(refs, handlers, last.rot, B.FACINGS[0]));
+    el.appendChild(decorGroup(refs, handlers));
+    el.appendChild(marksGroup(refs, handlers, last.rot));
     var picker = filePicker(function (file) { handlers.open(file); });
-    el.appendChild(fileGroup(refs, picker));
-
-    var run = actions(handlers, picker);
-    el.addEventListener("click", function (e) { dispatch(e, run); });
+    el.appendChild(fileGroup(refs, handlers, picker));
     attachHold(refs.clear, function () { handlers.clear(); });
 
     function syncRotation(rot) {

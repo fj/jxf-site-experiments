@@ -99,12 +99,13 @@
     return s.crispUrl;
   }
 
+  // Keyed by the arguments' string forms, which every sprite function's
+  // primitive arguments have; on the per-tile hot path, so no serialising.
   function memo(fn) {
     var cache = {};
     return function () {
-      var args = Array.prototype.slice.call(arguments);
-      var key = JSON.stringify(args);
-      if (!(key in cache)) cache[key] = fn.apply(null, args);
+      var key = Array.prototype.join.call(arguments, ",");
+      if (!(key in cache)) cache[key] = fn.apply(null, arguments);
       return cache[key];
     };
   }

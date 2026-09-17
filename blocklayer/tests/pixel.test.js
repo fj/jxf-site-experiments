@@ -84,7 +84,7 @@ describe("pixel: memo", () => {
 
   it("keeps a distinct result for each distinct argument list", () => {
     const m = counted();
-    const results = [m.fn(1), m.fn(2), m.fn(1, 2), m.fn("1"), m.fn()];
+    const results = [m.fn(1), m.fn(2), m.fn(1, 2), m.fn(12), m.fn("a"), m.fn()];
     assert.equal(new Set(results).size, results.length);
     assert.equal(m.calls(), results.length);
     assert.equal(m.fn(1), results[0]);
@@ -98,21 +98,21 @@ describe("pixel: memo", () => {
     assert.equal(b.calls(), 1);
   });
 
-  it("keys by value, so equal arrays and objects share a result", () => {
+  it("keys by string form: 1 and \"1\" share a result, as do null and undefined", () => {
     const m = counted();
-    assert.equal(m.fn([1, 2], { a: 1 }), m.fn([1, 2], { a: 1 }));
-    assert.notEqual(m.fn([1, 2], { a: 1 }), m.fn([1, 2], { a: 2 }));
+    assert.equal(m.fn(1), m.fn("1"));
+    assert.equal(m.fn(null), m.fn(undefined));
     assert.equal(m.calls(), 2);
   });
 
   it("caches a falsy result too", () => {
     let calls = 0;
-    const fn = P.memo((v) => { calls++; return v; });
-    const falsy = [0, "", null, false];
-    for (const v of falsy) {
-      assert.equal(fn(v), v);
-      assert.equal(fn(v), v);
+    const falsy = { zero: 0, empty: "", nil: null, no: false };
+    const fn = P.memo((name) => { calls++; return falsy[name]; });
+    for (const name of Object.keys(falsy)) {
+      assert.equal(fn(name), falsy[name]);
+      assert.equal(fn(name), falsy[name]);
     }
-    assert.equal(calls, falsy.length);
+    assert.equal(calls, Object.keys(falsy).length);
   });
 });

@@ -35,6 +35,16 @@ function turned(rot) {
   return view;
 }
 
+// The one translucent colour a sprite's pixels carry, as its channels and its
+// alpha.
+function oneColour(sprite) {
+  const colours = [...new Set(sprite.canvas.filled.values())];
+  assert.equal(colours.length, 1, colours.join(" "));
+  const rgba = /^rgba\((\d+,\d+,\d+),([\d.]+)\)$/.exec(colours[0]);
+  assert.ok(rgba, colours[0]);
+  return { channels: rgba[1], alpha: Number(rgba[2]) };
+}
+
 describe("tiles: grid", () => {
   it("answers one pattern tile, a cell wide and a cell tall, anchored on a lattice point", () => {
     const tile = B.tiles.grid();
@@ -44,12 +54,9 @@ describe("tiles: grid", () => {
   });
 
   it("draws every line in the grid colour, part way to the canvas behind it", () => {
-    const colours = [...new Set(B.tiles.grid().canvas.filled.values())];
-    assert.equal(colours.length, 1);
-    const rgba = /^rgba\((\d+,\d+,\d+),([\d.]+)\)$/.exec(colours[0]);
-    assert.ok(rgba, colours[0]);
-    assert.equal(rgba[1], B.pixel.parseHex(B.COLORS.grid).join(","));
-    assert.ok(Number(rgba[2]) > 0 && Number(rgba[2]) < 1, colours[0]);
+    const colour = oneColour(B.tiles.grid());
+    assert.equal(colour.channels, B.pixel.parseHex(B.COLORS.grid).join(","));
+    assert.ok(colour.alpha > 0 && colour.alpha < 1, String(colour.alpha));
   });
 
   it("repeats along the lattice: a step to another cell leaves the pattern as it was", () => {
@@ -94,5 +101,13 @@ describe("tiles: grid", () => {
     for (const [at, paints] of B.tiles.grid().canvas.paints) {
       assert.equal(paints, 1, `painted ${paints} times at (${at})`);
     }
+  });
+});
+
+describe("tiles: holdMask", () => {
+  it("fills a held tile with the hold colour, part way to the tile under it", () => {
+    const colour = oneColour(B.tiles.holdMask(1));
+    assert.equal(colour.channels, B.pixel.parseHex(B.COLORS.hold).join(","));
+    assert.ok(colour.alpha > 0 && colour.alpha < 1, String(colour.alpha));
   });
 });

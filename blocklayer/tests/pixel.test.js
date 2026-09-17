@@ -67,12 +67,32 @@ describe("pixel: shade", () => {
   });
 });
 
-describe("pixel: hflip", () => {
-  it("mirrors each row left to right and leaves the input alone", () => {
-    const rows = ["#..", "##.", "..#"];
-    assert.deepEqual(P.hflip(rows), ["..#", ".##", "#.."]);
-    assert.deepEqual(rows, ["#..", "##.", "..#"]);
+describe("pixel: hflip, vflip and transpose", () => {
+  const rows = ["#...", "##..", "..#."];
+  const copy = rows.slice();
+
+  it("hflip mirrors each row left to right and leaves the input alone", () => {
+    assert.deepEqual(P.hflip(rows), ["...#", "..##", ".#.."]);
+    assert.deepEqual(rows, copy);
     assert.deepEqual(P.hflip(P.hflip(rows)), rows);
+  });
+
+  it("vflip mirrors the rows top to bottom and leaves the input alone", () => {
+    assert.deepEqual(P.vflip(rows), ["..#.", "##..", "#..."]);
+    assert.deepEqual(rows, copy);
+    assert.deepEqual(P.vflip(P.vflip(rows)), rows);
+  });
+
+  it("transpose turns rows into columns, so a wide art comes back tall", () => {
+    assert.deepEqual(P.transpose(rows), ["##.", ".#.", "..#", "..."]);
+    assert.deepEqual(rows, copy);
+    assert.deepEqual(P.transpose(P.transpose(rows)), rows);
+  });
+
+  it("an up arrow transposed points left, and mirrored after that points right", () => {
+    const up = [".#.", "###", ".#.", ".#."];
+    assert.deepEqual(P.transpose(up), [".#..", "####", ".#.."]);
+    assert.deepEqual(P.hflip(P.transpose(up)), ["..#.", "####", "..#."]);
   });
 });
 

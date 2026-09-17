@@ -49,14 +49,15 @@
 
   // Indexed by screen direction: up-right, right, down-right, down,
   // down-left, left, up-left, up.
+  var P = B.pixel;
   var ARROW_BY_SCREEN_DIR = [
     ARROW_UP_RIGHT,
-    B.pixel.hflip(transpose(ARROW_UP)),
-    vflip(ARROW_UP_RIGHT),
-    vflip(ARROW_UP),
-    B.pixel.hflip(vflip(ARROW_UP_RIGHT)),
-    transpose(ARROW_UP),
-    B.pixel.hflip(ARROW_UP_RIGHT),
+    P.hflip(P.transpose(ARROW_UP)),
+    P.vflip(ARROW_UP_RIGHT),
+    P.vflip(ARROW_UP),
+    P.hflip(P.vflip(ARROW_UP_RIGHT)),
+    P.transpose(ARROW_UP),
+    P.hflip(ARROW_UP_RIGHT),
     ARROW_UP
   ];
 
@@ -94,18 +95,6 @@
       "GG.....GG"
     ]
   };
-
-  function vflip(rows) {
-    return rows.slice().reverse();
-  }
-
-  function transpose(rows) {
-    var out = [];
-    for (var x = 0; x < rows[0].length; x++) {
-      out.push(rows.map(function (row) { return row.charAt(x); }).join(""));
-    }
-    return out;
-  }
 
   function blank(width) {
     var row = "";

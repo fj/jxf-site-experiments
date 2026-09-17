@@ -34,6 +34,11 @@ build time (verifying the pinned SRI) and serves them self-hosted, so this repo
 stays free of vendored blobs and the dependency list lives with the experiment,
 not the host.
 
+An experiment's pure modules — the ones with no DOM or canvas in them — can
+carry `node:test` files in a `tests/` directory beside them. The host runs every
+such directory with `task test:experiments`; on its own, `node --test
+<experiment>/tests/` does the same. Everything that draws is checked by eye.
+
 Because the app runs in the host page's document, it inherits the site's fonts,
 colours, and dark mode while bringing its own scoped component styles. Anything
 an experiment contributes to the document's class/id namespace — component
@@ -205,3 +210,30 @@ tainting the canvas. Modules on the `DndCard` namespace: `config.js`,
 of them needs), `pages.js` (the kinds, and a set of them), then one module per
 kind — `card.js`, `inventory.js`, `features.js`, `spells.js` — with
 `downloads.js` and `app.js` last.
+
+### `blocklayer/`
+
+An isometric pixel-art level editor. A level is a set of tiles on an integer
+grid; each tile is a column of blocks from the floor to its elevation (-3 to
++3), shaped as a block, a ramp or a flight of stairs rising to the next level on
+one side, carrying at most one decor object (a chest, a rock, three crystal
+pillars) and any number of marks (eight compass arrows, a teleport, a rope, a
+jump). The view turns in quarter turns, zooms at whole-number factors, pans in
+the four compass directions, hides or shows the elevation labels, the marks and
+the decor, and draws the tiles solid or see-through. Editing happens on the
+canvas: hover shows where a tile would go, click or drag adds tiles, click
+selects one, the wheel raises or lowers the selected tile, and the right button
+held removes one. The toolbar is icons only.
+
+The scene is drawn at the sprites' own scale on an offscreen canvas and blitted
+up by a whole number, so pixels stay square. Every sprite is built in code from
+the palette in `config.js` — nothing is a bitmap file. Modules on the
+`BlockLayer` namespace, in load order: `config.js`, `pixel.js` (anchored
+sprites, string-art, shading, memoizing), `level.js`, `file.js` and `view.js`
+(the pure models: tiles and their edits and validation; the
+`*.blocklayer.json` file a level is saved to and opened from; rotation,
+projection, picking, the frame — all unit-tested under `tests/`),
+`sprites-tiles.js`, `sprites-decor.js`, `sprites-marks.js`,
+`sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`, and `app.js` last.
+The level autosaves to `localStorage`, and a `.blocklayer.json` dropped on the
+canvas opens.

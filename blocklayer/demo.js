@@ -14,9 +14,10 @@
   var PLATEAU_SIZE = 6;                           // the plateau is this many tiles square
   var PLATEAU_ELEV = 2;
   var MESA = { x: 3, y: 1, size: 2 };             // the raised square on it, one step up
+  var TOWER_DROP = 2;                             // blocks the tower falls to its shoulder
   // A stepped tower at the plateau's back corner: the top of the range, then
-  // a step down toward the plateau.
-  var TOWER = { x: 0, y: 0, elevs: [B.ELEV_MAX, B.ELEV_MAX - 2] };
+  // a shoulder on the way down to the plateau.
+  var TOWER = { x: 0, y: 0, elevs: [B.ELEV_MAX, B.ELEV_MAX - TOWER_DROP] };
   // The rows in front of the plateau, each a step lower: a sunken row, then
   // ground so low that it carries no block at all.
   var TERRACE_ELEVS = [PLATEAU_ELEV - 1, B.ELEV_MIN];

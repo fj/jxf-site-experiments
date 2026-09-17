@@ -52,9 +52,9 @@
     }
 
     function startHold(tile) {
-      hold = { x: tile.x, y: tile.y, start: performance.now(), raf: 0 };
+      hold = { x: tile.x, y: tile.y, start: window.performance.now(), raf: 0 };
       handlers.hold(hold.x, hold.y, 0);
-      hold.raf = requestAnimationFrame(tickHold);
+      hold.raf = window.requestAnimationFrame(tickHold);
     }
 
     function tickHold(now) {
@@ -62,7 +62,7 @@
       var progress = B.clamp((now - hold.start) / B.HOLD_MS, 0, 1);
       if (progress < 1) {
         handlers.hold(hold.x, hold.y, progress);
-        hold.raf = requestAnimationFrame(tickHold);
+        hold.raf = window.requestAnimationFrame(tickHold);
         return;
       }
       var held = hold;
@@ -75,7 +75,7 @@
       if (!hold) return;
       var held = hold;
       hold = null;
-      cancelAnimationFrame(held.raf);
+      window.cancelAnimationFrame(held.raf);
       handlers.hold(held.x, held.y, null);
     }
 

@@ -20,15 +20,12 @@
   B.TILE_W = 32;           // base-scale pixels: the top diamond's width
   B.TILE_H = 16;           // ...and its height
   B.BLOCK_H = 16;          // one elevation step, as the height of a block's side
-  B.STEPS = 4;             // treads on a flight of stairs
 
   B.ZOOM_MIN = 1;
   B.ZOOM_MAX = 4;
   B.ZOOM_DEFAULT = 2;
-  B.PAN_STEP = 1;          // tiles the camera moves per pan press
   B.HOLD_MS = 500;         // the right button held this long removes a tile
   B.STATUS_MS = 3000;      // a message on the status line stays this long
-  B.TRANSPARENT_ALPHA = 0.45;
 
   B.SHAPES = ["block", "ramp", "stairs"];
   B.FACINGS = ["N", "E", "S", "W"];             // world compass; N is -y, E is +x

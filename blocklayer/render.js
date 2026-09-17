@@ -16,6 +16,7 @@
   var MARK_ABOVE_DECOR = 6;     // base px between a decor's top and the first row
   var LABEL_DY = 4;             // the label's centre below the top face's centre
   var COMPASS_MARGIN = 6;       // base px from the top-left corner
+  var TRANSPARENT_ALPHA = 0.45; // how solid a see-through tile is drawn
 
   var base = null;
 
@@ -69,7 +70,7 @@
     var viewFacing = B.view.viewFacing(view.rot, tile.facing);
     var slope = wedge(tile, viewFacing);
 
-    ctx.globalAlpha = state.opaque ? 1 : B.TRANSPARENT_ALPHA;
+    ctx.globalAlpha = state.opaque ? 1 : TRANSPARENT_ALPHA;
     B.pixel.draw(ctx, B.tiles.column(tile.elev), at.x, at.y);
     if (slope) B.pixel.draw(ctx, slope, at.x, at.y);
     ctx.globalAlpha = 1;

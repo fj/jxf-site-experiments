@@ -71,6 +71,7 @@
   var JSON_MIME = "application/json";
   var NOT_A_LEVEL = "not a level file";
   var DROPPING_CLASS = "is-dropping";
+  var PAN_STEP = 1;                // tiles the camera moves per pan press
 
   var statusTimer = null;
 
@@ -211,7 +212,7 @@
 
   // Everything the toolbar and the pointer can do; each reads the keys it needs.
   var handlers = {
-    pan: function (facing) { B.view.pan(state.view, facing, B.PAN_STEP); changed(); },
+    pan: function (facing) { B.view.pan(state.view, facing, PAN_STEP); changed(); },
     rotate: function (turns) { B.view.rotate(state.view, turns); changed(); },
     zoom: function (delta) { B.view.zoom(state.view, delta); changed(); },
     toggleLayer: function (name) {

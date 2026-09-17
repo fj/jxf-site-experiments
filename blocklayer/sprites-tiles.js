@@ -14,6 +14,7 @@
   var W = B.TILE_W;
   var H = B.TILE_H;
   var BLOCK = B.BLOCK_H;
+  var STEPS = 4;                         // treads on a flight of stairs
   var HALF_W = W / 2;
   var HALF_H = H / 2;
   var EDGE = 0.5;                        // a tile spans u, v in [-EDGE, EDGE]
@@ -255,8 +256,8 @@
   // Tread i of a flight up the slope, from the foot: its near and far edge
   // along the run and the heights it rises between.
   function tread(i) {
-    var rise = BLOCK / B.STEPS;
-    var depth = (2 * EDGE) / B.STEPS;
+    var rise = BLOCK / STEPS;
+    var depth = (2 * EDGE) / STEPS;
     var near = EDGE - i * depth;
     return { near: near, far: near - depth, lo: rise * i, hi: rise * (i + 1) };
   }
@@ -268,13 +269,13 @@
     var i;
     var t;
     if (slopeSeen(viewFacing)) {
-      for (i = 0; i < B.STEPS; i++) {
+      for (i = 0; i < STEPS; i++) {
         t = tread(i);
         faces.push({ kind: "right", pts: [
           [EDGE, t.near, 0], [EDGE, t.far, 0], [EDGE, t.far, t.hi], [EDGE, t.near, t.hi]
         ] });
       }
-      for (i = 0; i < B.STEPS; i++) {
+      for (i = 0; i < STEPS; i++) {
         t = tread(i);
         faces.push({ kind: "left", pts: [
           [-EDGE, t.near, t.lo], [EDGE, t.near, t.lo], [EDGE, t.near, t.hi], [-EDGE, t.near, t.hi]
@@ -285,13 +286,13 @@
       }
     } else {
       faces.push({ kind: "right", pts: rightFace(0, BLOCK) });
-      for (i = 0; i < B.STEPS; i++) {
+      for (i = 0; i < STEPS; i++) {
         t = tread(i);
         faces.push({ kind: "left", pts: [
           [-t.near, EDGE, 0], [-t.far, EDGE, 0], [-t.far, EDGE, t.hi], [-t.near, EDGE, t.hi]
         ] });
       }
-      for (i = 0; i < B.STEPS; i++) {
+      for (i = 0; i < STEPS; i++) {
         t = tread(i);
         faces.push({ kind: "top", pts: [
           [-t.near, -EDGE, t.hi], [-t.near, EDGE, t.hi], [-t.far, EDGE, t.hi], [-t.far, -EDGE, t.hi]

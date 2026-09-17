@@ -151,8 +151,5 @@
     return still(key);
   });
 
-  B.marks = {
-    sprite: sprite,
-    arrow: arrow
-  };
+  B.marks = { sprite: sprite };
 })();

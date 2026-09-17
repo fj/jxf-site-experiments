@@ -1,11 +1,12 @@
 /*
  * Blocklayer — the toolbar: a column of pixel-art buttons that pan, turn and
  * zoom the view, show or hide its layers, and edit the selected tile's shape,
- * facing, decor and marks, and save, open or clear the level. The DOM is
- * built once; sync() sets every pressed and disabled state and every icon
- * from the app's state, leaving an icon alone when it already shows the right
- * sprite. element() and icon() lend the toolbar's builders to the rest of the
- * interface.
+ * facing, decor and marks, and save, open or clear the level. The direction
+ * buttons are a compass rose that does not turn with the view. The DOM is
+ * built once; sync() sets every pressed and disabled state from the app's
+ * state, and the two icons that follow it (solid, facing), leaving an icon
+ * alone when it already shows the right glyph. element() and icon() lend the
+ * toolbar's builders to the rest of the interface.
  */
 (function () {
   "use strict";
@@ -18,8 +19,9 @@
   var PRIMARY_BUTTON = 0;
   var HOLD_KEYS = [" ", "Enter"];
   var FILE_ACCEPT = ".json";
-  var UNTURNED = 0;                                    // the rotation icons are built for
+  var STILL_ROT = 0;                                   // a still mark is the same at every rotation
   var ICON_ATTR = "data-icon";                         // the glyph an icon shows
+  var ARROW_ICON = "arrow-";                           // ...which for a compass arrow is this + dir
 
   // Each title ends with the key that does the same, as input.js binds it.
   var PAN_TITLES = { N: "North (Up)", E: "East (Right)", S: "South (Down)", W: "West (Left)" };
@@ -79,40 +81,46 @@
     return btn;
   }
 
-  function setSprite(img, sprite) {
-    var url = B.pixel.dataUrl(sprite);
-    if (img.src === url) return;
-    img.src = url;
-    img.width = sprite.canvas.width * ICON_SCALE;
-    img.height = sprite.canvas.height * ICON_SCALE;
-  }
-
-  // Coloured pixel art on a button: a decor object or an arrow.
+  // Coloured pixel art on a button: a decor object or a still mark.
   function image(parent, sprite) {
     var img = element("img", "image");
     img.alt = "";
     img.draggable = false;
-    setSprite(img, sprite);
+    img.src = B.pixel.dataUrl(sprite);
+    img.width = sprite.canvas.width * ICON_SCALE;
+    img.height = sprite.canvas.height * ICON_SCALE;
     parent.appendChild(img);
-    return img;
   }
 
   // A UI glyph is a mask over the element's text colour, which the stylesheet
-  // sets per theme.
-  function setIcon(span, name) {
-    if (span.getAttribute(ICON_ATTR) === name) return;
-    var sprite = B.icons.sprite(name);
+  // sets per theme; the key names the glyph so a repeat is skipped.
+  function setIcon(span, key, sprite) {
+    if (span.getAttribute(ICON_ATTR) === key) return;
     var url = "url(\"" + B.pixel.crispUrl(sprite) + "\")";
-    span.setAttribute(ICON_ATTR, name);
+    span.setAttribute(ICON_ATTR, key);
     span.style.setProperty("mask-image", url);
     span.style.setProperty("-webkit-mask-image", url);
     span.style.width = sprite.canvas.width * ICON_SCALE + "px";
     span.style.height = sprite.canvas.height * ICON_SCALE + "px";
   }
 
+  function setGlyph(span, name) {
+    setIcon(span, name, B.icons.sprite(name));
+  }
+
+  function setArrow(span, dir) {
+    setIcon(span, ARROW_ICON + dir, B.icons.arrow(dir));
+  }
+
   function icon(name) {
     var span = element("span", "icon");
-    setIcon(span, name);
+    setGlyph(span, name);
+    return span;
+  }
+
+  function arrowIcon(dir) {
+    var span = element("span", "icon");
+    setArrow(span, dir);
     return span;
   }
 
@@ -140,12 +148,12 @@
     return B.MARKS.filter(function (m) { return m.dir === dir; })[0];
   }
 
-  function panGroup(refs, handlers) {
+  function panGroup(handlers) {
     var el = group("pan");
     PAN_SLOTS.forEach(function (facing) {
       if (!facing) return el.appendChild(spacer());
       var btn = button("pan", facing, PAN_TITLES[facing], function () { handlers.pan(facing); });
-      refs.pan[facing] = image(btn, B.marks.arrow(B.facingDir(UNTURNED, facing)));
+      btn.appendChild(arrowIcon(facing));
       el.appendChild(btn);
     });
     return el;
@@ -193,7 +201,8 @@
       el.appendChild(btn);
     });
     refs.facing = button("facing", "", FACING_TITLE, function () { handlers.cycleFacing(); });
-    refs.facingIcon = image(refs.facing, B.marks.arrow(B.facingDir(UNTURNED, B.FACINGS[0])));
+    refs.facingIcon = arrowIcon(B.FACINGS[0]);
+    refs.facing.appendChild(refs.facingIcon);
     el.appendChild(refs.facing);
     return el;
   }
@@ -218,7 +227,9 @@
       if (!m) return el.appendChild(spacer());
       var title = titled(m.label, MARK_KEYS[m.key]);
       var btn = toggle("mark", m.key, title, function () { handlers.toggleMark(m.key); });
-      refs.marks[m.key] = { button: btn, image: image(btn, B.marks.sprite(m.key, UNTURNED)) };
+      if (m.dir) btn.appendChild(arrowIcon(m.dir));
+      else image(btn, B.marks.sprite(m.key, STILL_ROT));
+      refs.marks[m.key] = btn;
       el.appendChild(btn);
     });
     return el;
@@ -298,8 +309,8 @@
     var el = element("div", "toolbar");
     el.style.setProperty(HOLD_VAR, B.HOLD_MS + "ms");
 
-    var refs = { pan: {}, layers: {}, shapes: {}, decor: {}, marks: {} };
-    el.appendChild(panGroup(refs, handlers));
+    var refs = { layers: {}, shapes: {}, decor: {}, marks: {} };
+    el.appendChild(panGroup(handlers));
     el.appendChild(viewGroup(handlers));
     el.appendChild(layersGroup(refs, handlers));
     el.appendChild(shapeGroup(refs, handlers));
@@ -309,43 +320,31 @@
     el.appendChild(fileGroup(refs, handlers, picker));
     attachHold(refs.clear, function () { handlers.clear(); });
 
-    function syncView(rot) {
-      B.FACINGS.forEach(function (facing) {
-        setSprite(refs.pan[facing], B.marks.arrow(B.facingDir(rot, facing)));
-      });
-      B.MARKS.forEach(function (m) {
-        if (m.dir) setSprite(refs.marks[m.key].image, B.marks.sprite(m.key, rot));
-      });
-    }
-
     function syncLayers(state) {
       LAYER_BUTTONS.forEach(function (l) {
         press(refs.layers[l.name], !!state.layers[l.name]);
       });
       press(refs.opaque, !!state.opaque);
-      setIcon(refs.opaqueIcon, opaqueIcon(state.opaque));
+      setGlyph(refs.opaqueIcon, opaqueIcon(state.opaque));
     }
 
-    function syncTile(tile, rot) {
+    function syncTile(tile) {
       B.SHAPES.forEach(function (shape) {
         syncToggle(refs.shapes[shape], tile, tile && tile.shape === shape);
       });
       refs.facing.disabled = !tile || !B.level.sloped(tile);
-      var facing = tile ? tile.facing : B.FACINGS[0];
-      setSprite(refs.facingIcon, B.marks.arrow(B.facingDir(rot, facing)));
+      setArrow(refs.facingIcon, tile ? tile.facing : B.FACINGS[0]);
       B.DECOR.forEach(function (d) {
         syncToggle(refs.decor[d.key], tile, tile && tile.decor === d.key);
       });
       B.MARKS.forEach(function (m) {
-        syncToggle(refs.marks[m.key].button, tile, tile && tile.marks.indexOf(m.key) >= 0);
+        syncToggle(refs.marks[m.key], tile, tile && tile.marks.indexOf(m.key) >= 0);
       });
     }
 
     function sync(state) {
-      var rot = state.view.rot;
-      syncView(rot);
       syncLayers(state);
-      syncTile(selectedTile(state), rot);
+      syncTile(selectedTile(state));
     }
 
     return { el: el, sync: sync };

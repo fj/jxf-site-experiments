@@ -33,9 +33,11 @@
       return inside(e) ? handlers.pick(e.clientX, e.clientY) : null;
     }
 
-    function addCell(cell) {
+    // Adds the cell, then answers what is under the pointer now: the new tile.
+    function addCell(e, cell) {
       lastCell = cell;
       handlers.add(cell.x, cell.y);
+      return pick(e);
     }
 
     function endDrag() {
@@ -85,7 +87,7 @@
       if (e.button === PRIMARY_BUTTON) {
         dragging = true;
         lastCell = null;
-        if (hit && hit.cell) addCell(hit.cell);
+        if (hit && hit.cell) handlers.hover(addCell(e, hit.cell));
         else if (hit && hit.tile) handlers.select(hit.tile.x, hit.tile.y);
       } else if (hit && hit.tile) {
         startHold(hit.tile);
@@ -96,8 +98,10 @@
       var hit = pick(e);
       var cell = hit && hit.cell;
       var tile = hit && hit.tile;
+      if (dragging && cell && !hit.edge && !B.sameCell(lastCell, cell.x, cell.y)) {
+        hit = addCell(e, cell);
+      }
       handlers.hover(hit);
-      if (dragging && cell && !hit.edge && !B.sameCell(lastCell, cell.x, cell.y)) addCell(cell);
       if (hold && !(tile && B.sameCell(hold, tile.x, tile.y))) cancelHold();
     }
 

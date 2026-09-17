@@ -69,20 +69,28 @@ function fakeCanvas() {
 }
 
 // input.js attached to a stub canvas, with the hit under each client point
-// declared by the test and every handler call recorded.
+// declared by the test and every handler call recorded. A cell that has been
+// added answers as its tile from then on, as the level would.
 function rig() {
   const clock = fakeWindow();
   const B = load(["config.js", "input.js"], clock.window);
   const canvas = fakeCanvas();
   const hits = new Map();
+  const added = new Set();
   const calls = [];
   let selected = null;
   const record = (name) => (...args) => { calls.push([name, ...args]); };
+  const key = (x, y) => `${x},${y}`;
+  const pick = (x, y) => {
+    const hit = hits.get(key(x, y)) || null;
+    const cell = hit && hit.cell;
+    return cell && added.has(key(cell.x, cell.y)) ? tile(cell.x, cell.y) : hit;
+  };
   const handlers = {
-    pick: (x, y) => hits.get(`${x},${y}`) || null,
+    pick,
     selected: () => selected,
     hover: record("hover"),
-    add: record("add"),
+    add: (x, y) => { record("add")(x, y); added.add(key(x, y)); },
     select: record("select"),
     raise: record("raise"),
     hold: record("hold"),
@@ -124,6 +132,16 @@ describe("input: adding by click and drag", () => {
     assert.equal(e.prevented, true);
   });
 
+  it("a click, and each cell of a drag, hovers the tile it added in place of the cell", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const b = r.at(40, 10, cell(1, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY });
+    assert.deepEqual(r.calls, [["add", 0, 0], ["hover", tile(0, 0)]]);
+    r.fire("pointermove", b);
+    assert.deepEqual(r.calls.slice(2), [["add", 1, 0], ["hover", tile(1, 0)]]);
+  });
+
   it("a left click on a tile selects it and adds nothing", () => {
     const r = rig();
     r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: PRIMARY });
@@ -161,7 +179,7 @@ describe("input: adding by click and drag", () => {
     r.fire("pointermove", { clientX: WIDTH + 5, clientY: 10 });
     r.fire("pointermove", b);
     assert.deepEqual(r.of("add"), [[0, 0], [1, 0]]);
-    assert.deepEqual(r.of("hover"), [[null], [cell(1, 0)]]);
+    assert.deepEqual(r.of("hover"), [[tile(0, 0)], [null], [tile(1, 0)]]);
   });
 
   it("a drag that starts on a tile selects it, then adds the empty cells it crosses", () => {
@@ -192,7 +210,7 @@ describe("input: adding by click and drag", () => {
     r.fire("pointerdown", { ...a, button: PRIMARY });
     r.fire("pointermove", t);
     assert.deepEqual(r.of("add"), [[0, 0]]);
-    assert.deepEqual(r.of("hover"), [[tile(1, 1)]]);
+    assert.deepEqual(r.of("hover"), [[tile(0, 0)], [tile(1, 1)]]);
   });
 
   it("a pointer outside the canvas hovers nothing", () => {

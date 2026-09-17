@@ -222,10 +222,13 @@ most one decor object (a chest, a rock, three crystal pillars) and any number of
 marks (eight compass arrows, a teleport, a rope, a jump). The view turns in
 quarter turns, zooms at whole-number factors, pans in the four compass
 directions, hides or shows the elevation labels, the marks and the decor, and
-draws the tiles solid or see-through. Editing happens on the canvas: hover
-shows where a tile would go, click or drag adds tiles, click selects one, the
-wheel raises or lowers the selected tile, and the right button held removes
-one. The toolbar is icons only.
+draws the tiles solid or see-through. A light grey grid rules the floor under
+the scene. Editing happens on the canvas: hover shows where a tile would go,
+click or drag adds tiles, click selects one, the wheel raises or lowers the
+selected tile, and the right button held removes one. The keyboard does the
+same work: `W` and `S` move the selected tile, or the height a new tile gets
+when nothing is selected, `Shift+W` and `Shift+S` move the whole level, and the
+marks sit in a compass rose under the right hand. The toolbar is icons only.
 
 The scene is drawn at the sprites' own scale on an offscreen canvas and blitted
 up by a whole number, so pixels stay square. Every sprite is built in code from

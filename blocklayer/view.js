@@ -120,6 +120,14 @@
     return empty;
   }
 
+  // Whether two picks name the same thing: the same tile, or the same empty
+  // cell reached the same way (on a grid line or off it).
+  function sameHit(a, b) {
+    if (!a || !b) return a === b;
+    if (a.tile || b.tile) return !!a.tile && !!b.tile && B.sameCell(a.tile, b.tile.x, b.tile.y);
+    return B.sameCell(a.cell, b.cell.x, b.cell.y) && !a.edge === !b.edge;
+  }
+
   function pan(view, facing, tiles) {
     var step = STEP[facing];
     if (!step) return view.pan;
@@ -152,6 +160,7 @@
     order: order,
     hit: hit,
     pick: pick,
+    sameHit: sameHit,
     viewFacing: viewFacing,
     frame: frame
   };

@@ -319,6 +319,33 @@ describe("view: pick", () => {
   });
 });
 
+describe("view: sameHit", () => {
+  const onTile = (x, y, more = {}) => ({ tile: tile({ x, y, ...more }) });
+  const onCell = (x, y) => ({ cell: { x, y } });
+  const onEdge = (x, y) => ({ cell: { x, y }, edge: true });
+
+  it("is true for nothing twice, a tile however edited, the same cell, the same edge", () => {
+    const pairs = [
+      [null, null],
+      [onTile(1, 2), onTile(1, 2)],
+      [onTile(1, 2), onTile(1, 2, { elev: 3, shape: "ramp", decor: "chest" })],
+      [onCell(1, 2), onCell(1, 2)],
+      [onEdge(1, 2), onEdge(1, 2)]
+    ];
+    for (const [a, b] of pairs) assert.equal(V.sameHit(a, b), true, JSON.stringify([a, b]));
+  });
+
+  it("is false against nothing, across kinds or cells, and between a cell and its edge", () => {
+    const pairs = [
+      [null, onTile(1, 2)], [onCell(1, 2), null],
+      [onTile(1, 2), onCell(1, 2)], [onCell(1, 2), onTile(1, 2)],
+      [onTile(1, 2), onTile(2, 1)], [onCell(1, 2), onCell(1, 3)],
+      [onCell(1, 2), onEdge(1, 2)], [onEdge(1, 2), onCell(1, 2)]
+    ];
+    for (const [a, b] of pairs) assert.equal(V.sameHit(a, b), false, JSON.stringify([a, b]));
+  });
+});
+
 describe("view: pan", () => {
   it("moves the scene down-left when the camera goes north at rot 0", () => {
     const view = V.create();

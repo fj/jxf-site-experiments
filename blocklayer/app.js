@@ -192,12 +192,6 @@
     if (mutate(state.selected.x, state.selected.y) !== false) edited();
   }
 
-  function sameHit(a, b) {
-    if (!a || !b) return a === b;
-    if (a.tile || b.tile) return !!a.tile && !!b.tile && B.sameCell(a.tile, b.tile.x, b.tile.y);
-    return B.sameCell(a.cell, b.cell.x, b.cell.y) && !a.edge === !b.edge;
-  }
-
   function remove(x, y) {
     if (!B.level.remove(state.level, x, y)) return;
     if (B.sameCell(state.selected, x, y)) state.selected = null;
@@ -239,7 +233,7 @@
     pick: pick,
     selected: function () { return state.selected; },
     hover: function (hit) {
-      if (sameHit(hit, state.hover)) return;
+      if (B.view.sameHit(hit, state.hover)) return;
       state.hover = hit;
       sched();
     },

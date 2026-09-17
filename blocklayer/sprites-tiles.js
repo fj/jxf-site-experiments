@@ -22,6 +22,7 @@
   // the full width: the shape a 32 × 16 tile needs to tile the plane.
   var U_SCALE = HALF_W + 0.5;
   var V_SCALE = HALF_H + 0.25;
+  var ROW_STEP = 2;                      // px a diamond row grows on each side: the 2:1 slope
   var PIXEL_CENTRE = 0.5;
   var SLOPE_SHADE = -0.08;
   var SEAM_SHADE = -0.18;                // between two stacked blocks
@@ -109,21 +110,26 @@
     fillPoly(ctx, face.map(function (p) { return toScreen(ax, ay, p); }), color);
   }
 
-  function colorKeys(canvas) {
-    var ctx = P.context(canvas);
+  // Each pixel of a canvas as one packed RGBA int, so 0 is the background and
+  // a key doubles as "filled". Off the canvas reads as background.
+  function pixelKeys(canvas) {
     var w = canvas.width;
-    var d = ctx.getImageData(0, 0, w, canvas.height).data;
+    var h = canvas.height;
+    var packed = new Uint32Array(P.context(canvas).getImageData(0, 0, w, h).data.buffer);
     return function (x, y) {
-      if (x < 0 || y < 0 || x >= w || y >= canvas.height) return "";
-      var i = (y * w + x) * 4;
-      return d[i + 3] ? d[i] + "," + d[i + 1] + "," + d[i + 2] : "";
+      return x < 0 || y < 0 || x >= w || y >= h ? 0 : packed[y * w + x];
     };
+  }
+
+  // Whether a pixel touches the background on any of its four sides.
+  function bare(key, x, y) {
+    return !key(x - 1, y) || !key(x + 1, y) || !key(x, y - 1) || !key(x, y + 1);
   }
 
   // A filled pixel becomes outline where it borders the background, or where
   // the pixel to its right or below is a different colour.
   function outlinePass(canvas) {
-    var key = colorKeys(canvas);
+    var key = pixelKeys(canvas);
     var ctx = P.context(canvas);
     ctx.fillStyle = B.COLORS.outline;
     for (var y = 0; y < canvas.height; y++) {
@@ -132,9 +138,8 @@
         if (!c) continue;
         var right = key(x + 1, y);
         var below = key(x, y + 1);
-        var bare = !key(x - 1, y) || !right || !key(x, y - 1) || !below;
         var seam = (right && right !== c) || (below && below !== c);
-        if (bare || seam) ctx.fillRect(x, y, 1, 1);
+        if (seam || bare(key, x, y)) ctx.fillRect(x, y, 1, 1);
       }
     }
   }
@@ -142,7 +147,7 @@
   // The filled pixels of `shape` that lie within `width` of the background,
   // drawn in `color` on a canvas of the same size.
   function ring(shape, width, color) {
-    var key = colorKeys(shape);
+    var key = pixelKeys(shape);
     var w = shape.width;
     var h = shape.height;
     var level = [];
@@ -150,8 +155,7 @@
     var y;
     for (y = 0; y < h; y++) {
       for (x = 0; x < w; x++) {
-        var bare = key(x, y) && (!key(x - 1, y) || !key(x + 1, y) || !key(x, y - 1) || !key(x, y + 1));
-        level[y * w + x] = bare ? 1 : 0;
+        level[y * w + x] = key(x, y) && bare(key, x, y) ? 1 : 0;
       }
     }
     for (var depth = 2; depth <= width; depth++) {
@@ -268,19 +272,24 @@
 
   // ---- The column ----------------------------------------------------------
 
-  // How far a pixel column sits inside the diamond: 0 at its widest, 7 at
-  // its top and bottom points.
-  function inset(x) {
-    return Math.floor((x < HALF_W ? HALF_W - 1 - x : x - HALF_W) / 2);
+  // Pixel row y of the top diamond: where it starts and how wide it is.
+  function diamondRow(y) {
+    var k = y < HALF_H ? y : H - 1 - y;
+    return { x: HALF_W - ROW_STEP * (k + 1), w: 2 * ROW_STEP * (k + 1) };
   }
 
+  // Between two stacked blocks, a darker line along the diamond's lower edge:
+  // the ROW_STEP pixels at each end of a row that the row below leaves bare.
   function drawSeams(ctx, elev, blocks) {
     var left = P.shade(faceColor(elev, "left"), SEAM_SHADE);
     var right = P.shade(faceColor(elev, "right"), SEAM_SHADE);
     for (var k = 1; k < blocks; k++) {
-      for (var x = 0; x < W; x++) {
-        ctx.fillStyle = x < HALF_W ? left : right;
-        ctx.fillRect(x, H - 1 - inset(x) + BLOCK * k, 1, 1);
+      for (var y = HALF_H; y < H; y++) {
+        var row = diamondRow(y);
+        ctx.fillStyle = left;
+        ctx.fillRect(row.x, y + BLOCK * k, ROW_STEP, 1);
+        ctx.fillStyle = right;
+        ctx.fillRect(row.x + row.w - ROW_STEP, y + BLOCK * k, ROW_STEP, 1);
       }
     }
   }
@@ -309,7 +318,7 @@
   function ghost() {
     var c = diamondRing(1, B.COLORS.outline);
     var ctx = P.context(c);
-    var key = colorKeys(c);
+    var key = pixelKeys(c);
     var x;
     var y;
     ctx.fillStyle = B.COLORS.ghost;
@@ -317,7 +326,9 @@
       for (x = 0; x < W; x++) if (key(x, y) && (x + y) % 2 === 0) ctx.fillRect(x, y, 1, 1);
     }
     var arms = [];
-    for (var d = -PLUS_ARM; d <= PLUS_ARM; d++) arms.push([HALF_W + d, HALF_H], [HALF_W, HALF_H + d]);
+    for (var d = -PLUS_ARM; d <= PLUS_ARM; d++) {
+      arms.push([HALF_W + d, HALF_H], [HALF_W, HALF_H + d]);
+    }
     ctx.fillStyle = B.COLORS.outline;
     arms.forEach(function (p) { ctx.fillRect(p[0] - 1, p[1] - 1, 3, 3); });
     ctx.fillStyle = B.COLORS.ghost;
@@ -349,8 +360,8 @@
     ctx.fillStyle = "rgba(" + rgb.join(",") + "," + HOLD_ALPHA + ")";
     var rows = Math.round(H * step / HOLD_STEPS);
     for (var y = H - rows; y < H; y++) {
-      var k = y < HALF_H ? y : H - 1 - y;
-      ctx.fillRect(HALF_W - 2 - 2 * k, y, 4 + 4 * k, 1);
+      var row = diamondRow(y);
+      ctx.fillRect(row.x, y, row.w, 1);
     }
     return P.sprite(c, HALF_W, HALF_H);
   }

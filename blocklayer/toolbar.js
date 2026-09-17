@@ -26,13 +26,6 @@
   var PAN_SLOTS = [null, "N", null, "W", null, "E", null, "S", null];
   var ARROW_SLOTS = ["NW", "N", "NE", "W", null, "E", "SW", "S", "SE"];
 
-  // act names the handler each view button calls, with arg.
-  var VIEW_BUTTONS = [
-    { act: "rotate", arg: -1, title: "Turn left", icon: "rotate-ccw" },
-    { act: "rotate", arg: 1, title: "Turn right", icon: "rotate-cw" },
-    { act: "zoom", arg: -1, title: "Zoom out", icon: "zoom-out" },
-    { act: "zoom", arg: 1, title: "Zoom in", icon: "zoom-in" }
-  ];
   var LAYER_BUTTONS = [
     { name: "elevation", title: "Elevation", icon: "layer-elev" },
     { name: "marks", title: "Marks", icon: "layer-marks" },
@@ -147,14 +140,19 @@
     return el;
   }
 
+  // A button that hands `run` its signed step.
+  function stepButton(act, step, title, glyph, run) {
+    var btn = button(act, step, title, function () { run(step); });
+    btn.appendChild(icon(glyph));
+    return btn;
+  }
+
   function viewGroup(handlers) {
     var el = group("view");
-    VIEW_BUTTONS.forEach(function (v) {
-      var run = handlers[v.act];
-      var btn = button(v.act, v.arg, v.title, function () { run(v.arg); });
-      btn.appendChild(icon(v.icon));
-      el.appendChild(btn);
-    });
+    el.appendChild(stepButton("rotate", -1, "Turn left", "rotate-ccw", handlers.rotate));
+    el.appendChild(stepButton("rotate", 1, "Turn right", "rotate-cw", handlers.rotate));
+    el.appendChild(stepButton("zoom", -1, "Zoom out", "zoom-out", handlers.zoom));
+    el.appendChild(stepButton("zoom", 1, "Zoom in", "zoom-in", handlers.zoom));
     return el;
   }
 

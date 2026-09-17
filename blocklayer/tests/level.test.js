@@ -3,19 +3,13 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { inspect } = require("node:util");
-const { load } = require("./load");
+const { load, tile } = require("./load");
 
 const B = load(["config.js", "level.js"]);
 const L = B.level;
 
 const DECOR_KEYS = B.DECOR.map((d) => d.key);
 const MARK_KEYS = B.MARKS.map((m) => m.key);
-
-function goodTile(overrides = {}) {
-  return {
-    x: 1, y: 2, elev: 0, shape: "block", facing: "N", decor: null, marks: [], ...overrides
-  };
-}
 
 describe("level: tiles", () => {
   it("starts empty", () => {
@@ -85,16 +79,16 @@ describe("level: tiles", () => {
 
 describe("level: top and maxElev", () => {
   it("a block tops out at its elevation and can reach the max", () => {
-    const tile = goodTile({ elev: 2 });
-    assert.equal(L.top(tile), 2);
-    assert.equal(L.maxElev(tile), B.ELEV_MAX);
+    const block = tile({ elev: 2 });
+    assert.equal(L.top(block), 2);
+    assert.equal(L.maxElev(block), B.ELEV_MAX);
   });
 
   it("a ramp or stairs tops out one block higher and so stops one lower", () => {
     for (const shape of ["ramp", "stairs"]) {
-      const tile = goodTile({ elev: 2, shape });
-      assert.equal(L.top(tile), 3);
-      assert.equal(L.maxElev(tile), B.ELEV_MAX - 1);
+      const sloped = tile({ elev: 2, shape });
+      assert.equal(L.top(sloped), 3);
+      assert.equal(L.maxElev(sloped), B.ELEV_MAX - 1);
     }
   });
 });
@@ -297,12 +291,12 @@ describe("level: fromJSON", () => {
   });
 
   it("drops fields it does not know", () => {
-    const level = L.fromJSON({ tiles: [goodTile({ extra: 1 })] });
-    assert.deepEqual(L.get(level, 1, 2), goodTile());
+    const level = L.fromJSON({ tiles: [tile({ extra: 1 })] });
+    assert.deepEqual(L.get(level, 1, 2), tile());
   });
 
   it("reads a good tile in full", () => {
-    const raw = goodTile({
+    const raw = tile({
       elev: -2, shape: "stairs", facing: "W", decor: "chest", marks: ["jump"]
     });
     const level = L.fromJSON({ version: 1, tiles: [raw] });
@@ -313,49 +307,49 @@ describe("level: fromJSON", () => {
 
   it("fills in a missing decor and missing marks", () => {
     const level = L.fromJSON({ tiles: [{ x: 0, y: 0, elev: 0, shape: "block", facing: "N" }] });
-    assert.deepEqual(L.get(level, 0, 0), goodTile({ x: 0, y: 0 }));
+    assert.deepEqual(L.get(level, 0, 0), tile({ x: 0, y: 0 }));
   });
 
   it("drops each kind of bad tile and keeps the good ones around it", () => {
     const bad = [
       null, 7, "tile", [],
-      goodTile({ x: 1.5 }), goodTile({ y: "2" }), goodTile({ x: NaN }), goodTile({ y: Infinity }),
-      goodTile({ elev: B.ELEV_MAX + 1 }), goodTile({ elev: B.ELEV_MIN - 1 }),
-      goodTile({ elev: 0.5 }), goodTile({ elev: "0" }), goodTile({ elev: undefined }),
-      goodTile({ shape: "dome" }), goodTile({ shape: undefined }),
-      goodTile({ facing: "up" }), goodTile({ facing: undefined }),
-      goodTile({ decor: "dragon" }), goodTile({ decor: 3 })
+      tile({ x: 1.5 }), tile({ y: "2" }), tile({ x: NaN }), tile({ y: Infinity }),
+      tile({ elev: B.ELEV_MAX + 1 }), tile({ elev: B.ELEV_MIN - 1 }),
+      tile({ elev: 0.5 }), tile({ elev: "0" }), tile({ elev: undefined }),
+      tile({ shape: "dome" }), tile({ shape: undefined }),
+      tile({ facing: "up" }), tile({ facing: undefined }),
+      tile({ decor: "dragon" }), tile({ decor: 3 })
     ];
     for (const raw of bad) {
       assert.equal(L.count(L.fromJSON({ tiles: [raw] })), 0, inspect(raw));
     }
-    const level = L.fromJSON({ tiles: [goodTile({ x: 0 }), ...bad, goodTile({ x: 9 })] });
+    const level = L.fromJSON({ tiles: [tile({ x: 0 }), ...bad, tile({ x: 9 })] });
     assert.equal(L.count(level), 2);
-    assert.deepEqual(L.get(level, 0, 2), goodTile({ x: 0 }));
-    assert.deepEqual(L.get(level, 9, 2), goodTile({ x: 9 }));
+    assert.deepEqual(L.get(level, 0, 2), tile({ x: 0 }));
+    assert.deepEqual(L.get(level, 9, 2), tile({ x: 9 }));
   });
 
   it("drops unknown and repeated marks but keeps the tile", () => {
-    const raw = goodTile({ marks: ["rope", "arrow-up", "rope", 4, null, "jump"] });
+    const raw = tile({ marks: ["rope", "arrow-up", "rope", 4, null, "jump"] });
     const level = L.fromJSON({ tiles: [raw] });
     assert.deepEqual(L.get(level, 1, 2).marks, ["rope", "jump"]);
   });
 
   it("treats marks that are not an array as none", () => {
-    const level = L.fromJSON({ tiles: [goodTile({ marks: "rope" })] });
+    const level = L.fromJSON({ tiles: [tile({ marks: "rope" })] });
     assert.deepEqual(L.get(level, 1, 2).marks, []);
   });
 
   it("keeps the first tile of a duplicated cell", () => {
-    const level = L.fromJSON({ tiles: [goodTile({ elev: 1 }), goodTile({ elev: 2 })] });
+    const level = L.fromJSON({ tiles: [tile({ elev: 1 }), tile({ elev: 2 })] });
     assert.equal(L.count(level), 1);
     assert.equal(L.get(level, 1, 2).elev, 1);
   });
 
   it("clamps a ramp or stairs above its max instead of dropping it", () => {
     const level = L.fromJSON({ tiles: [
-      goodTile({ x: 0, shape: "ramp", elev: B.ELEV_MAX }),
-      goodTile({ x: 1, shape: "stairs", elev: B.ELEV_MAX })
+      tile({ x: 0, shape: "ramp", elev: B.ELEV_MAX }),
+      tile({ x: 1, shape: "stairs", elev: B.ELEV_MAX })
     ] });
     assert.equal(L.get(level, 0, 2).elev, B.ELEV_MAX - 1);
     assert.equal(L.get(level, 1, 2).elev, B.ELEV_MAX - 1);

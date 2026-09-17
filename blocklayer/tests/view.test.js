@@ -2,7 +2,7 @@
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { load } = require("./load");
+const { load, tile } = require("./load");
 
 const B = load(["config.js", "level.js", "view.js"]);
 const V = B.view;
@@ -18,8 +18,13 @@ function viewAt(rot, pan = { x: 0, y: 0 }) {
   return view;
 }
 
-function tile(x, y, elev = 0, shape = "block") {
-  return { x, y, elev, shape, facing: "N", decor: null, marks: [] };
+// A fresh view over a fresh level.
+function scene() {
+  return { view: V.create(), level: L.create() };
+}
+
+function tilesAt(cells) {
+  return cells.map(([x, y]) => tile({ x, y }));
 }
 
 describe("view: create, rotate, zoom", () => {
@@ -143,7 +148,7 @@ describe("view: cellAt", () => {
 
 describe("view: order", () => {
   it("sorts back to front by u + v, then by u, without touching the input", () => {
-    const tiles = [tile(2, 0), tile(1, 1), tile(1, 0), tile(0, 1), tile(0, 0)];
+    const tiles = tilesAt([[2, 0], [1, 1], [1, 0], [0, 1], [0, 0]]);
     const copy = tiles.slice();
     const sorted = V.order(V.create(), tiles);
     assert.deepEqual(sorted.map((t) => [t.x, t.y]), [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0]]);
@@ -152,20 +157,20 @@ describe("view: order", () => {
   });
 
   it("reverses when the view turns half way round", () => {
-    const tiles = [tile(0, 0), tile(1, 1), tile(2, 2)];
+    const tiles = tilesAt([[0, 0], [1, 1], [2, 2]]);
     const sorted = V.order(viewAt(2), tiles);
     assert.deepEqual(sorted.map((t) => t.x), [2, 1, 0]);
   });
 
   it("breaks ties by u, not by world x, once turned", () => {
-    const tiles = [tile(-3, -3), tile(0, 0), tile(2, 2)];
+    const tiles = tilesAt([[-3, -3], [0, 0], [2, 2]]);
     const sorted = V.order(viewAt(1), tiles);
     assert.deepEqual(sorted.map((t) => t.x), [2, 0, -3]);
   });
 
   it("puts a larger u + v later at every rotation", () => {
     for (const rot of ROTS) {
-      const tiles = [tile(3, -2), tile(-1, 4), tile(0, 0), tile(-3, -3), tile(2, 2)];
+      const tiles = tilesAt([[3, -2], [-1, 4], [0, 0], [-3, -3], [2, 2]]);
       const sorted = V.order(viewAt(rot), tiles);
       const depth = (t) => { const p = V.toView(rot, t.x, t.y); return p.u + p.v; };
       for (let i = 1; i < sorted.length; i++) {
@@ -177,7 +182,7 @@ describe("view: order", () => {
 
 describe("view: hit", () => {
   const view = V.create();
-  const block = tile(0, 0, 0);
+  const block = tile({ x: 0, y: 0 });
   const columnH = (0 - B.FLOOR) * B.BLOCK_H;
 
   it("is true inside the top diamond and on its upper outline", () => {
@@ -210,7 +215,7 @@ describe("view: hit", () => {
 
   it("rises one block for a ramp or stairs but still stands on the same floor", () => {
     for (const shape of ["ramp", "stairs"]) {
-      const sloped = tile(0, 0, 0, shape);
+      const sloped = tile({ x: 0, y: 0, shape });
       assert.equal(V.hit(view, sloped, 0, -B.BLOCK_H - 4), true, shape);
       assert.equal(V.hit(view, sloped, 0, columnH + 8), true, shape);
       assert.equal(V.hit(view, sloped, 0, columnH + 9), false, shape);
@@ -220,7 +225,7 @@ describe("view: hit", () => {
 
   it("follows the tile through rotation and pan", () => {
     const turned = viewAt(3, { x: 40, y: -30 });
-    const t = tile(2, -1, 1);
+    const t = tile({ x: 2, y: -1, elev: 1 });
     const p = V.project(turned, 2, -1, 1);
     assert.equal(V.hit(turned, t, p.sx, p.sy), true);
     assert.equal(V.hit(turned, t, p.sx + B.TILE_W / 2 + 1, p.sy), false);
@@ -229,8 +234,7 @@ describe("view: hit", () => {
 
 describe("view: pick", () => {
   it("lets a tall tile in front hide a lower one behind it", () => {
-    const view = V.create();
-    const level = L.create();
+    const { view, level } = scene();
     L.add(level, 0, 0, 0);
     const front = L.add(level, 1, 1, 3);
     const p = V.project(view, 0, 0, 0);
@@ -239,8 +243,7 @@ describe("view: pick", () => {
   });
 
   it("returns the front-most tile where two overlap and each where they do not", () => {
-    const view = V.create();
-    const level = L.create();
+    const { view, level } = scene();
     const behind = L.add(level, 0, 0, 0);
     const front = L.add(level, 1, 0, 0);
     const overlap = { sx: 8, sy: 8 };
@@ -252,16 +255,14 @@ describe("view: pick", () => {
   });
 
   it("returns the tile that is alone under the point", () => {
-    const view = V.create();
-    const level = L.create();
+    const { view, level } = scene();
     const only = L.add(level, 2, -3, -1);
     const p = V.project(view, 2, -3, -1);
     assert.deepEqual(V.pick(view, level, p.sx + 4, p.sy + 20), { tile: only });
   });
 
   it("gives the empty cell beside a lone tile its own centre, and the tile one pixel in", () => {
-    const view = V.create();
-    const level = L.create();
+    const { view, level } = scene();
     const lone = L.add(level, 0, 0, 0);
     for (const [x, y] of [[1, 0], [0, 1]]) {
       const p = V.project(view, x, y, B.NEW_TILE_ELEV);
@@ -272,12 +273,12 @@ describe("view: pick", () => {
   });
 
   it("flags a point on the line between two empty cells as an edge", () => {
-    const view = V.create();
-    const level = L.create();
+    const { view, level } = scene();
     const lone = L.add(level, 2, -1, 0);
     const p = V.project(view, 2, -1, 0);
     const vertex = { sx: p.sx + B.TILE_W / 2, sy: p.sy };
-    assert.deepEqual(V.pick(view, level, vertex.sx, vertex.sy), { cell: { x: 3, y: -1 }, edge: true });
+    const onVertex = V.pick(view, level, vertex.sx, vertex.sy);
+    assert.deepEqual(onVertex, { cell: { x: 3, y: -1 }, edge: true });
     assert.deepEqual(V.pick(view, level, vertex.sx + 1, vertex.sy), { cell: { x: 3, y: -2 } });
     const q = V.project(view, 3, -2, 0);
     const edge = { sx: q.sx + B.TILE_W / 4, sy: q.sy + B.TILE_H / 4 };
@@ -311,8 +312,7 @@ describe("view: pick", () => {
   });
 
   it("returns null when the cell is occupied but its column was not hit", () => {
-    const view = V.create();
-    const level = L.create();
+    const { view, level } = scene();
     L.add(level, 0, 0, -3);
     const p = V.project(view, 0, 0, B.NEW_TILE_ELEV);
     assert.equal(V.pick(view, level, p.sx, p.sy), null);

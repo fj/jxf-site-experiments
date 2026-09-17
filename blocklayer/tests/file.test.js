@@ -3,19 +3,13 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { inspect } = require("node:util");
-const { load } = require("./load");
+const { load, tile } = require("./load");
 
 const B = load(["config.js", "level.js", "file.js"]);
 const F = B.file;
 const L = B.level;
 
 const TWO_SPACE_INDENT = 2;
-
-function goodTile(overrides = {}) {
-  return {
-    x: 1, y: 2, elev: 0, shape: "block", facing: "N", decor: null, marks: [], ...overrides
-  };
-}
 
 // A few tiles that between them use every field a tile can carry.
 function sampleLevel() {
@@ -39,21 +33,10 @@ describe("file: names", () => {
 });
 
 describe("file: serialize", () => {
-  const level = sampleLevel();
-  const text = F.serialize(level);
-
-  it("writes valid JSON equal to the level's toJSON", () => {
-    assert.deepEqual(JSON.parse(text), L.toJSON(level));
-  });
-
-  it("pretty-prints with a two-space indent", () => {
-    assert.equal(text, JSON.stringify(L.toJSON(level), null, TWO_SPACE_INDENT) + "\n");
-    assert.match(text, /^\{\n {2}"version": 1,\n {2}"tiles": \[\n {4}\{\n {6}"x": /);
-  });
-
-  it("ends with exactly one newline", () => {
-    assert.ok(text.endsWith("\n"), "ends with a newline");
-    assert.ok(!text.endsWith("\n\n"), "and only one");
+  it("is the level's toJSON, pretty-printed two spaces deep, with one final newline", () => {
+    const level = sampleLevel();
+    const expected = JSON.stringify(L.toJSON(level), null, TWO_SPACE_INDENT) + "\n";
+    assert.equal(F.serialize(level), expected);
   });
 
   it("writes an empty level", () => {
@@ -94,21 +77,21 @@ describe("file: parse", () => {
     const text = JSON.stringify({
       version: 1,
       tiles: [
-        goodTile({ x: 0 }),
-        goodTile({ x: 1, elev: B.ELEV_MAX + 1 }),
-        goodTile({ x: 2, shape: "dome" }),
+        tile({ x: 0 }),
+        tile({ x: 1, elev: B.ELEV_MAX + 1 }),
+        tile({ x: 2, shape: "dome" }),
         "tile",
-        goodTile({ x: 3, marks: ["rope", "arrow-up", "rope"] })
+        tile({ x: 3, marks: ["rope", "arrow-up", "rope"] })
       ]
     });
     const level = F.parse(text);
     assert.equal(L.count(level), 2);
-    assert.deepEqual(L.get(level, 0, 2), goodTile({ x: 0 }));
-    assert.deepEqual(L.get(level, 3, 2), goodTile({ x: 3, marks: ["rope"] }));
+    assert.deepEqual(L.get(level, 0, 2), tile({ x: 0 }));
+    assert.deepEqual(L.get(level, 3, 2), tile({ x: 3, marks: ["rope"] }));
   });
 
   it("reads a hand-written file without the version or the optional fields", () => {
     const level = F.parse('{"tiles":[{"x":0,"y":0,"elev":1,"shape":"block","facing":"N"}]}');
-    assert.deepEqual(L.get(level, 0, 0), goodTile({ x: 0, y: 0, elev: 1 }));
+    assert.deepEqual(L.get(level, 0, 0), tile({ x: 0, y: 0, elev: 1 }));
   });
 });

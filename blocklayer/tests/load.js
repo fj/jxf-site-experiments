@@ -3,6 +3,7 @@
  * hands back the `BlockLayer` namespace they build. A test that needs more of
  * a window (a clock, a frame scheduler) passes its own. Each module is
  * compiled in the test's own realm so its objects compare with deepStrictEqual.
+ * tile() is a well-formed tile, as level.js would make it, for any test.
  */
 "use strict";
 
@@ -21,4 +22,10 @@ function load(names, window = {}) {
   return window.BlockLayer;
 }
 
-module.exports = { load };
+function tile(overrides = {}) {
+  return {
+    x: 1, y: 2, elev: 0, shape: "block", facing: "N", decor: null, marks: [], ...overrides
+  };
+}
+
+module.exports = { load, tile };

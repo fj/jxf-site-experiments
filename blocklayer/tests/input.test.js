@@ -2,7 +2,7 @@
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { load } = require("./load");
+const { load, tile: makeTile } = require("./load");
 
 const WIDTH = 400;
 const HEIGHT = 300;
@@ -111,7 +111,7 @@ function rig() {
 
 const cell = (x, y) => ({ cell: { x, y } });
 const edge = (x, y) => ({ cell: { x, y }, edge: true });
-const tile = (x, y) => ({ tile: { x, y, elev: 0, shape: "block", facing: "N", decor: null, marks: [] } });
+const tile = (x, y) => ({ tile: makeTile({ x, y }) });
 
 describe("input: adding by click and drag", () => {
   it("a left click on an empty cell adds it, focuses the canvas and captures the pointer", () => {
@@ -222,7 +222,9 @@ describe("input: hold to remove", () => {
     r.tick(r.B.HOLD_MS / 2);
     const progress = r.of("hold").map((h) => h[2]);
     assert.equal(progress[progress.length - 1], 0.5);
-    for (let i = 1; i < progress.length; i++) assert.ok(progress[i] > progress[i - 1], `frame ${i}`);
+    for (let i = 1; i < progress.length; i++) {
+      assert.ok(progress[i] > progress[i - 1], `frame ${i}`);
+    }
     assert.deepEqual(r.of("remove"), []);
     r.tick(r.B.HOLD_MS / 2);
     assert.deepEqual(r.of("remove"), [[1, 1]]);

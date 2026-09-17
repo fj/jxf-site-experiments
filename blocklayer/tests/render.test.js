@@ -9,11 +9,11 @@ const HEIGHT = 300;
 const SCALE = 2;
 const PANS = [{ x: 0, y: 0 }, { x: 7, y: -3 }, { x: -40, y: 120 }];
 
-const wrap = (n, size) => ((n % size) + size) % size;
-
 // render.js over a recording pixel layer: every sprite module answers a
-// tagged stand-in, and each draw of one is logged with its name and position.
-// A pattern fill is logged too, by the name of the tile it repeats.
+// tagged stand-in, and each draw of one is logged with its name and where the
+// context's transform puts it. A pattern fill is logged too, by the name of
+// the tile it repeats, and clearing the scene empties the log, as clearing a
+// canvas empties it.
 function stage() {
   const B = load(["config.js", "level.js", "view.js", "render.js"]);
   const draws = [];
@@ -21,26 +21,27 @@ function stage() {
   const ghostElevs = [];
   const tag = (name) => ({ name, ox: 0, oy: 0 });
   const gridTile = { name: "grid", canvas: { name: "grid" }, ox: 0, oy: 0 };
+  const saved = [];
   let at = { x: 0, y: 0 };
-  const ctx = {
+  const scene = {
     globalAlpha: 1,
     fillStyle: null,
     imageSmoothingEnabled: true,
-    clearRect() {},
-    drawImage() {},
-    save() {},
-    restore() { at = { x: 0, y: 0 }; },
-    translate(x, y) { at = { x, y }; },
+    clearRect() { draws.length = 0; fills.length = 0; },
+    save() { saved.push(at); },
+    restore() { if (saved.length) at = saved.pop(); },
+    translate(x, y) { at = { x: at.x + x, y: at.y + y }; },
     createPattern: (image, repeat) => ({ image, repeat }),
     fillRect(x, y, w, h) {
-      fills.push({ pattern: ctx.fillStyle, at, x: at.x + x, y: at.y + y, w, h });
-      draws.push([ctx.fillStyle.image.name, at.x + x, at.y + y]);
+      fills.push({ pattern: scene.fillStyle, at, x: at.x + x, y: at.y + y, w, h });
+      draws.push([scene.fillStyle.image.name, at.x + x, at.y + y]);
     }
   };
+  const out = { imageSmoothingEnabled: true, clearRect() {}, drawImage() {} };
   B.pixel = {
     canvas: (w, h) => ({ width: w, height: h }),
-    context: () => ctx,
-    draw: (c, sprite, x, y) => { draws.push([sprite.name, x, y]); }
+    context: () => scene,
+    draw: (c, sprite, x, y) => { draws.push([sprite.name, at.x + x, at.y + y]); }
   };
   B.tiles = {
     grid: () => gridTile,
@@ -55,7 +56,7 @@ function stage() {
   B.icons = { compass: () => tag("compass") };
   B.decor = { sprite: () => tag("decor") };
   B.marks = { sprite: () => tag("mark") };
-  const canvas = { width: WIDTH, height: HEIGHT, getContext: () => ctx };
+  const canvas = { width: WIDTH, height: HEIGHT, getContext: () => out };
   const state = {
     level: B.level.create(),
     view: B.view.create(),
@@ -144,18 +145,21 @@ describe("render: the floor grid", () => {
     }
   });
 
-  it("lands a lattice point, on whole pixels, where cell (0, 0) stands on the floor", () => {
+  // Any lattice point aligns the pattern, so the test asks for a cell centre
+  // rather than for cell (0, 0) itself.
+  it("starts the pattern on whole pixels where a cell stands on the floor, as the view pans", () => {
     for (const pan of PANS) {
       const s = stage();
       s.state.view.pan = { ...pan };
       s.draw();
       const frame = s.frame();
-      const floor = s.B.view.project(s.state.view, 0, 0, s.B.FLOOR);
       const at = s.fills[0].at;
+      const start = { sx: at.x - frame.ox, sy: at.y - frame.oy };
+      const cell = s.B.view.cellAt(s.state.view, start.sx, start.sy, s.B.FLOOR);
+      const stands = s.B.view.project(s.state.view, cell.x, cell.y, s.B.FLOOR);
       const where = `pan ${pan.x}, ${pan.y}`;
       assert.ok(Number.isInteger(at.x) && Number.isInteger(at.y), where);
-      assert.equal(wrap(at.x - (frame.ox + floor.sx), s.B.TILE_W), 0, where);
-      assert.equal(wrap(at.y - (frame.oy + floor.sy), s.B.TILE_H), 0, where);
+      assert.deepEqual([stands.sx, stands.sy], [start.sx, start.sy], where);
     }
   });
 });

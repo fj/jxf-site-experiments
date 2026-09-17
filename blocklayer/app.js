@@ -90,14 +90,6 @@
     reader.readAsText(file);
   }
 
-  function droppedLevel(transfer) {
-    var files = transfer ? transfer.files : null;
-    for (var i = 0; files && i < files.length; i++) {
-      if (B.file.isLevelFile(files[i].name)) return files[i];
-    }
-    return null;
-  }
-
   function watchDrops(stage) {
     canvas.addEventListener("dragover", function (e) {
       e.preventDefault();
@@ -109,8 +101,8 @@
     canvas.addEventListener("drop", function (e) {
       e.preventDefault();
       stage.classList.remove(DROPPING_CLASS);
-      var file = droppedLevel(e.dataTransfer);
-      if (file) openFile(file);
+      var files = e.dataTransfer ? e.dataTransfer.files : null;
+      if (files && files.length) openFile(files[0]);
     });
   }
 

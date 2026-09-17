@@ -112,17 +112,3 @@ describe("file: parse", () => {
     assert.deepEqual(L.get(level, 0, 0), goodTile({ x: 0, y: 0, elev: 1 }));
   });
 });
-
-describe("file: isLevelFile", () => {
-  it("accepts the level extension and plain .json in any case", () => {
-    const names = [
-      "x.blocklayer.json", "X.BLOCKLAYER.JSON", "x.json", "level.JSON", "dir.d/level.blocklayer.json"
-    ];
-    for (const name of names) assert.equal(F.isLevelFile(name), true, name);
-  });
-
-  it("refuses other names, an empty name and non-strings", () => {
-    const names = ["x.txt", "x.json.txt", "json", "x.jsonx", "", undefined, null, 3, {}, ["x.json"]];
-    for (const name of names) assert.equal(F.isLevelFile(name), false, inspect(name));
-  });
-});

@@ -40,28 +40,25 @@
     t: ["setShape", "stairs"],
     p: ["toggleMark", "teleport"],
     l: ["toggleMark", "rope"],
-    j: ["toggleMark", "jump"]
+    // Y to the comma are a compass rose under the right hand, around the J
+    // that marks a jump; each of the eight toggles an arrow.
+    y: ["toggleMark", "arrow-nw"],
+    u: ["toggleMark", "arrow-n"],
+    i: ["toggleMark", "arrow-ne"],
+    h: ["toggleMark", "arrow-w"],
+    j: ["toggleMark", "jump"],
+    k: ["toggleMark", "arrow-e"],
+    n: ["toggleMark", "arrow-sw"],
+    m: ["toggleMark", "arrow-s"],
+    ",": ["toggleMark", "arrow-se"]
   };
 
   // 1 to 5 toggle the decor, in toolbar order.
   B.DECOR.forEach(function (d, i) { TILE_KEYS[String(i + 1)] = ["setDecor", d.key]; });
 
-  // With Shift, the keys around S mirror the compass; each toggles an arrow.
-  var SHIFT_MARK_KEYS = {
-    q: ["toggleMark", "arrow-nw"],
-    w: ["toggleMark", "arrow-n"],
-    e: ["toggleMark", "arrow-ne"],
-    a: ["toggleMark", "arrow-w"],
-    d: ["toggleMark", "arrow-e"],
-    z: ["toggleMark", "arrow-sw"],
-    s: ["toggleMark", "arrow-s"],
-    c: ["toggleMark", "arrow-se"]
-  };
-
   var REMOVE_KEYS = ["Delete", "Backspace"];      // swallowed even with no selection
   var REMOVE_SELECTED_KEY = "x";                  // ...and this one only with one
   var ARROW_KEY = "Arrow";                        // what an arrow key's e.key starts with
-  var SHIFT_NAME = "Shift+";
 
   function boundKey(table, handler, arg) {
     var keys = Object.keys(table);
@@ -78,13 +75,11 @@
     return key.length === 1 ? key.toUpperCase() : key;
   }
 
-  // The key bound to a handler call, as a tooltip names it: "R", "]", "Up",
-  // "Shift+W"; null when none is.
+  // The key bound to a handler call, as a tooltip names it: "R", "]", "Up";
+  // null when none is.
   function keyFor(handler, arg) {
     var key = boundKey(VIEW_KEYS, handler, arg) || boundKey(TILE_KEYS, handler, arg);
-    if (key) return keyName(key);
-    key = boundKey(SHIFT_MARK_KEYS, handler, arg);
-    return key ? SHIFT_NAME + keyName(key) : null;
+    return key ? keyName(key) : null;
   }
 
   function attach(canvas, handlers) {
@@ -204,11 +199,11 @@
 
     // Whether the key edited the selected tile.
     function editSelected(e) {
-      if (!handlers.selected()) return false;
+      if (e.shiftKey || !handlers.selected()) return false;
       var key = e.key.toLowerCase();
-      var action = (e.shiftKey ? SHIFT_MARK_KEYS : TILE_KEYS)[key];
+      var action = TILE_KEYS[key];
       if (action) call(action);
-      else if (!e.shiftKey && key === REMOVE_SELECTED_KEY) removeSelected();
+      else if (key === REMOVE_SELECTED_KEY) removeSelected();
       else return false;
       return true;
     }

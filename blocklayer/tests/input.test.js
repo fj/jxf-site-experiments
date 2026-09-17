@@ -408,7 +408,7 @@ describe("input: the keyboard", () => {
       r.fire("keydown", { key: "Delete", altKey: true }),
       r.fire("keydown", { key: "w", ctrlKey: true }),
       r.fire("keydown", { key: "W", shiftKey: true, ctrlKey: true }),
-      r.fire("keydown", { key: "k" }),
+      r.fire("keydown", { key: "g" }),
       r.fire("keydown", { key: "Enter" })
     ];
     assert.deepEqual(r.calls, []);
@@ -420,10 +420,9 @@ const SHIFT = { shiftKey: true };
 
 // Every key that acts on the selected tile, as [key, event props].
 const TILE_KEYS = [
-  ...["w", "s", "a", "d", "b", "r", "t", "1", "2", "3", "4", "5", "p", "l", "j", "x"]
-    .map((key) => [key, {}]),
-  ...["W", "E", "D", "C", "S", "Z", "A", "Q"].map((key) => [key, SHIFT])
-];
+  "w", "s", "a", "d", "b", "r", "t", "1", "2", "3", "4", "5", "p", "l", "x",
+  "y", "u", "i", "h", "j", "k", "n", "m", ","
+].map((key) => [key, {}]);
 
 // A rig with (1, 1) selected, and the keys fired on it, each asserted swallowed.
 function pressOnSelected(keys) {
@@ -456,25 +455,29 @@ describe("input: keys on the selected tile", () => {
     assert.deepEqual(r.calls, r.B.DECOR.map((d) => ["setDecor", d.key]));
   });
 
-  it("Shift with the keys around S toggles the arrow mark in that compass direction", () => {
-    const keys = ["W", "E", "D", "C", "S", "Z", "A", "Q"];
-    const r = pressOnSelected(keys.map((key) => [key, SHIFT]));
+  it("the rose under the right hand toggles the arrow mark in that compass direction", () => {
+    const keys = ["u", "i", "k", ",", "m", "n", "h", "y"];
+    const r = pressOnSelected(keys.map((key) => [key]));
     assert.deepEqual(r.calls, [
       "arrow-n", "arrow-ne", "arrow-e", "arrow-se", "arrow-s", "arrow-sw", "arrow-w", "arrow-nw"
     ].map((mark) => ["toggleMark", mark]));
   });
 
   it("reads a key by its lowercase letter, so Caps Lock changes nothing", () => {
-    const r = pressOnSelected([["W"], ["w", SHIFT]]);
+    const r = pressOnSelected([["W"], ["U"]]);
     assert.deepEqual(r.calls, [["raise", 1], ["toggleMark", "arrow-n"]]);
   });
 
-  it("q, e, z and c do nothing without Shift", () => {
+  it("the keys the marks left behind do nothing, shifted or not", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
     for (const key of ["q", "e", "z", "c"]) {
       assert.equal(r.fire("keydown", { key }).prevented, false, key);
     }
+    for (const key of ["Q", "W", "E", "A", "D", "Z", "S", "C"]) {
+      r.fire("keydown", { key, ...SHIFT });
+    }
+    assert.deepEqual(r.of("toggleMark"), []);
     assert.deepEqual(r.calls, []);
   });
 
@@ -523,15 +526,24 @@ describe("input: keyFor", () => {
     assert.equal(keyFor("deselect"), "Escape");
   });
 
-  it("names a tile key in upper case, with Shift+ before a shifted one", () => {
+  it("names a tile key in upper case, and a punctuation key as typed", () => {
     assert.equal(keyFor("raise", 1), "W");
     assert.equal(keyFor("raise", -1), "S");
     assert.equal(keyFor("cycleFacing", -1), "A");
     assert.equal(keyFor("cycleFacing", 1), "D");
     assert.equal(keyFor("setShape", "stairs"), "T");
-    assert.equal(keyFor("toggleMark", "jump"), "J");
-    assert.equal(keyFor("toggleMark", "arrow-n"), "Shift+W");
-    assert.equal(keyFor("toggleMark", "arrow-sw"), "Shift+Z");
+    assert.equal(keyFor("toggleMark", "arrow-se"), ",");
+  });
+
+  it("names a key for every mark, the eight arrows as a rose around the jump", () => {
+    const rose = {
+      "arrow-nw": "Y", "arrow-n": "U", "arrow-ne": "I",
+      "arrow-w": "H", jump: "J", "arrow-e": "K",
+      "arrow-sw": "N", "arrow-s": "M", "arrow-se": ",",
+      teleport: "P", rope: "L"
+    };
+    const names = B.MARKS.map((m) => keyFor("toggleMark", m.key));
+    assert.deepEqual(names, B.MARKS.map((m) => rose[m.key]));
   });
 
   it("numbers the decor from 1 in B.DECOR order", () => {

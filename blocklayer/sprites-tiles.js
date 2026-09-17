@@ -31,6 +31,7 @@
   var WEDGE_ANCHOR_Y = HALF_H + BLOCK;
   var HOLD_ALPHA = 0.7;
   var HOLD_STEPS = 16;
+  var GRID_ALPHA = 0.55;
   var KINDS = {                          // the highlight ringing a tile, by kind
     select: { width: 2, color: B.COLORS.select },
     hover: { width: 1, color: B.COLORS.hover }
@@ -367,6 +368,32 @@
     return P.sprite(c, HALF_W, HALF_H);
   }
 
+  // ---- The floor grid ------------------------------------------------------
+
+  // The two upper edges of the cell centred on (cx, cy): the ROW_STEP pixels
+  // at each end of a row in the diamond's top half.
+  function drawUpperEdges(ctx, cx, cy) {
+    for (var y = 0; y < HALF_H; y++) {
+      var row = diamondRow(y);
+      var left = cx - HALF_W + row.x;
+      ctx.fillRect(left, cy - HALF_H + y, ROW_STEP, 1);
+      ctx.fillRect(left + row.w - ROW_STEP, cy - HALF_H + y, ROW_STEP, 1);
+    }
+  }
+
+  // The floor lattice as a tile that repeats, anchored on a lattice point: a
+  // cell in the tile's middle and one at each bottom corner, each drawing only
+  // its upper edges, so the edge two cells share is drawn once.
+  function grid() {
+    var c = P.canvas(W, H);
+    var ctx = P.context(c);
+    ctx.fillStyle = translucent(B.COLORS.grid, GRID_ALPHA);
+    drawUpperEdges(ctx, HALF_W, HALF_H);
+    drawUpperEdges(ctx, 0, H);
+    drawUpperEdges(ctx, W, H);
+    return P.sprite(c, 0, 0);
+  }
+
   // ---- Overlays ------------------------------------------------------------
 
   // Every other filled pixel, checkerboard-wise, in `color`.
@@ -474,6 +501,7 @@
   var memoHold = P.memo(holdStep);
 
   B.tiles = {
+    grid: P.memo(grid),
     column: P.memo(column),
     ramp: P.memo(function (elev, viewFacing) { return wedge(elev, rampShape(viewFacing)); }),
     stairs: P.memo(function (elev, viewFacing) { return wedge(elev, stairsShape(viewFacing)); }),

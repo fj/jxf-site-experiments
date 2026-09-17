@@ -59,6 +59,19 @@ describe("tiles: column", () => {
   });
 });
 
+describe("tiles: label", () => {
+  it("spells every elevation in the range, and a '+' before one", () => {
+    for (const elev of ELEVATIONS) {
+      assert.ok(T.label(String(elev)).canvas.filled.size > 0, `elevation ${elev}`);
+      assert.ok(T.label(`+${elev}`).canvas.filled.size > 0, `+${elev}`);
+    }
+  });
+
+  it("refuses a glyph it does not have, the sign a plain number never needs", () => {
+    assert.throws(() => T.label("-1"), /no glyph/);
+  });
+});
+
 describe("tiles: ghost", () => {
   const centre = `${B.TILE_W / 2},${B.TILE_H / 2}`;
 

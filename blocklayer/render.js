@@ -32,10 +32,6 @@
     return state.hover && state.hover.tile ? state.hover.tile : null;
   }
 
-  function elevText(elev) {
-    return elev > 0 ? "+" + elev : String(elev);
-  }
-
   function wedge(tile, viewFacing) {
     if (tile.shape === "ramp") return B.tiles.ramp(tile.elev, viewFacing);
     if (tile.shape === "stairs") return B.tiles.stairs(tile.elev, viewFacing);
@@ -95,7 +91,7 @@
   function drawLabels(ctx, state, tiles, at) {
     if (!state.layers.elevation) return;
     for (var i = 0; i < tiles.length; i++) {
-      B.pixel.draw(ctx, B.tiles.label(elevText(tiles[i].elev)), at[i].x, at[i].y + LABEL_DY);
+      B.pixel.draw(ctx, B.tiles.label(String(tiles[i].elev)), at[i].x, at[i].y + LABEL_DY);
     }
   }
 

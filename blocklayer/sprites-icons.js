@@ -1,8 +1,8 @@
 /*
  * Blocklayer — the interface's own pixel art: the 16×16 glyphs on the toolbar
- * buttons and in the hint row, drawn in whatever ink the theme asks for, and
- * the compass rose that shows where world north points. Everything is string
- * art turned into a sprite once and cached.
+ * buttons and in the hint row, drawn as alpha masks for the stylesheet to
+ * colour by theme, and the compass rose that shows where world north points.
+ * Everything is string art turned into a sprite once and cached.
  */
 (function () {
   "use strict";
@@ -11,8 +11,7 @@
 
   var INK = "#";
   var TONE = "o";
-  var TONE_MIX = 0.5;              // how far the second tone sits from the ink
-  var MID_LUMINANCE = 128;         // an ink averaging under this counts as dark
+  var TONE_ALPHA = 0.5;            // the second tone's share of the ink's alpha
 
   var COMPASS_SIZE = 24;           // px, square
   var ARM_STEPS = 3;               // 2:1 steps on each short arm of the rose
@@ -349,22 +348,16 @@
     return row.split("").reverse().join("");
   }
 
-  function isDark(hex) {
-    var rgb = B.pixel.parseHex(hex);
-    return (rgb[0] + rgb[1] + rgb[2]) / rgb.length < MID_LUMINANCE;
-  }
+  // A glyph is a mask: only its alpha counts, so the ink is opaque black and
+  // the tone is the same at half the alpha.
+  var MASK = {};
+  MASK[INK] = "rgba(0,0,0,1)";
+  MASK[TONE] = "rgba(0,0,0," + TONE_ALPHA + ")";
 
-  function palette(ink) {
-    var p = {};
-    p[INK] = ink;
-    p[TONE] = B.pixel.shade(ink, isDark(ink) ? TONE_MIX : -TONE_MIX);
-    return p;
-  }
-
-  var sprite = B.pixel.memo(function (name, ink) {
+  var sprite = B.pixel.memo(function (name) {
     var rows = ROWS[name];
     if (!rows) throw new Error("unknown icon: " + name);
-    return B.pixel.fromRows(rows, palette(ink));
+    return B.pixel.fromRows(rows, MASK);
   });
 
   // The rose's ink pixels relative to its centre: four 2:1 arms, the north one

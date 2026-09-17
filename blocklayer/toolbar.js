@@ -20,6 +20,7 @@
   var HOLD_KEYS = [" ", "Enter"];
   var FILE_ACCEPT = ".json";
   var UNTURNED = 0;                                    // the rotation icons are built for
+  var ICON_ATTR = "data-icon";                         // the glyph an icon shows
 
   var FACING_TITLES = { N: "North", E: "East", S: "South", W: "West" };
   var PAN_SLOTS = [null, "N", null, "W", null, "E", null, "S", null];
@@ -82,9 +83,9 @@
     img.height = sprite.canvas.height * ICON_SCALE;
   }
 
-  function image(parent, sprite, theme) {
-    var img = element("img", "icon");
-    if (theme) img.classList.add("is-" + theme);
+  // Coloured pixel art on a button: a decor object or an arrow.
+  function image(parent, sprite) {
+    var img = element("img", "image");
     img.alt = "";
     img.draggable = false;
     setSprite(img, sprite);
@@ -92,24 +93,23 @@
     return img;
   }
 
-  // A UI icon is one image per theme; the stylesheet shows the right one.
-  function themedIcons(parent, name) {
-    return {
-      light: image(parent, B.icons.sprite(name, B.COLORS.inkLight), "light"),
-      dark: image(parent, B.icons.sprite(name, B.COLORS.inkDark), "dark")
-    };
+  // A UI glyph is a mask over the element's text colour, which the stylesheet
+  // sets per theme.
+  function setIcon(span, name) {
+    if (span.getAttribute(ICON_ATTR) === name) return;
+    var sprite = B.icons.sprite(name);
+    var url = "url(\"" + B.pixel.crispUrl(sprite) + "\")";
+    span.setAttribute(ICON_ATTR, name);
+    span.style.setProperty("mask-image", url);
+    span.style.setProperty("-webkit-mask-image", url);
+    span.style.width = sprite.canvas.width * ICON_SCALE + "px";
+    span.style.height = sprite.canvas.height * ICON_SCALE + "px";
   }
 
-  function setThemedIcons(pair, name) {
-    setSprite(pair.light, B.icons.sprite(name, B.COLORS.inkLight));
-    setSprite(pair.dark, B.icons.sprite(name, B.COLORS.inkDark));
-  }
-
-  // The same pair, detached, for a home outside the toolbar.
   function icon(name) {
-    var pair = document.createDocumentFragment();
-    themedIcons(pair, name);
-    return pair;
+    var span = element("span", "icon");
+    setIcon(span, name);
+    return span;
   }
 
   function press(btn, on) {
@@ -152,7 +152,7 @@
     VIEW_BUTTONS.forEach(function (v) {
       var run = handlers[v.act];
       var btn = button(v.act, v.arg, v.title, function () { run(v.arg); });
-      themedIcons(btn, v.icon);
+      btn.appendChild(icon(v.icon));
       el.appendChild(btn);
     });
     return el;
@@ -162,12 +162,13 @@
     var el = group("layers");
     LAYER_BUTTONS.forEach(function (l) {
       var btn = toggle("layer", l.name, l.title, function () { handlers.toggleLayer(l.name); });
-      themedIcons(btn, l.icon);
+      btn.appendChild(icon(l.icon));
       refs.layers[l.name] = btn;
       el.appendChild(btn);
     });
     refs.opaque = toggle("opaque", "", "Solid", function () { handlers.toggleOpaque(); });
-    refs.opaqueIcons = themedIcons(refs.opaque, opaqueIcon(true));
+    refs.opaqueIcon = icon(opaqueIcon(true));
+    refs.opaque.appendChild(refs.opaqueIcon);
     el.appendChild(refs.opaque);
     return el;
   }
@@ -178,7 +179,7 @@
       var btn = toggle("shape", shape, SHAPE_TITLES[shape], function () {
         handlers.setShape(shape);
       });
-      themedIcons(btn, "shape-" + shape);
+      btn.appendChild(icon("shape-" + shape));
       refs.shapes[shape] = btn;
       el.appendChild(btn);
     });
@@ -231,13 +232,13 @@
   function fileGroup(refs, handlers, picker) {
     var el = group("file");
     var save = button("save", "", "Save", function () { handlers.save(); });
-    themedIcons(save, "file-save");
+    save.appendChild(icon("file-save"));
     el.appendChild(save);
     var open = button("open", "", "Open", function () { picker.click(); });
-    themedIcons(open, "file-open");
+    open.appendChild(icon("file-open"));
     el.appendChild(open);
     refs.clear = button("clear", "", "Clear");
-    themedIcons(refs.clear, "clear");
+    refs.clear.appendChild(icon("clear"));
     el.appendChild(refs.clear);
     el.appendChild(picker);
     return el;
@@ -311,7 +312,7 @@
         press(refs.layers[l.name], !!state.layers[l.name]);
       });
       press(refs.opaque, !!state.opaque);
-      setThemedIcons(refs.opaqueIcons, opaqueIcon(state.opaque));
+      setIcon(refs.opaqueIcon, opaqueIcon(state.opaque));
     }
 
     function syncTile(tile, rot) {

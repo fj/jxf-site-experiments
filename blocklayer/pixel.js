@@ -85,6 +85,20 @@
     return s.url || (s.url = s.canvas.toDataURL());
   }
 
+  // The sprite as a CSS image that scales without smoothing. A mask-image is
+  // smoothed whatever the element's image-rendering says; the PNG inside an
+  // SVG that asks for pixelated rendering is not, at any device pixel ratio.
+  function crispUrl(s) {
+    if (!s.crispUrl) {
+      var size = "width=\"" + s.canvas.width + "\" height=\"" + s.canvas.height + "\"";
+      var svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" " + size + ">" +
+        "<image " + size + " style=\"image-rendering:pixelated\" href=\"" + dataUrl(s) + "\"/>" +
+        "</svg>";
+      s.crispUrl = "data:image/svg+xml," + encodeURIComponent(svg);
+    }
+    return s.crispUrl;
+  }
+
   function memo(fn) {
     var cache = {};
     return function () {
@@ -106,6 +120,7 @@
     toHex: toHex,
     shade: shade,
     dataUrl: dataUrl,
+    crispUrl: crispUrl,
     memo: memo
   };
 })();

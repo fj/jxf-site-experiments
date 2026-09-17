@@ -76,9 +76,7 @@
     hover: "#ffffff",
     hold: "#ff4d3d",
     label: "#1f1a2e",
-    labelText: "#ffffff",
-    inkLight: "#1f1a2e",   // toolbar icons on a light face
-    inkDark: "#e8e8f0"     // ...and on a dark one
+    labelText: "#ffffff"
   };
 
   // How far each side face of a block or a decor object is shaded from its

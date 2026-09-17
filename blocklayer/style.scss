@@ -2,7 +2,7 @@
 //
 // A column of pixel-art buttons beside the level's canvas, and a hint row and
 // a status line under the canvas. The host owns the mount's outer box; what's
-// here is the layout inside it, the button, the icon swap between themes, the
+// here is the layout inside it, the button, the icon's colour per theme, the
 // canvas and the hold-to-clear fill.
 
 @import "../shared/theme";
@@ -24,6 +24,8 @@ $blk-hold-alpha: 0.7;
 $blk-hold-fallback: 500ms;
 $blk-canvas-bg: #cfd4dc;
 $blk-canvas-bg-dark: #23242b;
+$blk-ink: #1f1a2e;            // UI icons on a light face
+$blk-ink-dark: #e8e8f0;       // ...and on a dark one
 $blk-hint-gap: 1.2em;
 $blk-hint-item-gap: 0.35em;
 $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothing
@@ -70,7 +72,7 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   border: $blk-border solid $exp-border;
   border-radius: $blk-corner;
   background: $exp-surface;
-  color: inherit;
+  color: $blk-ink;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-touch-callout: none;
@@ -104,6 +106,7 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   @include exp-dark {
     border-color: $exp-border-dark;
     background: $exp-surface-dark;
+    color: $blk-ink-dark;
 
     &:hover:not(:disabled) { border-color: $exp-link-dark; }
     &:focus-visible { outline-color: $exp-link-dark; }
@@ -122,19 +125,24 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   to { transform: scaleY(1); }
 }
 
-// Each UI icon is two images, one inked for each theme; only one shows.
-.experiment-ext-blk-icon {
+// Both kinds of icon are positioned so they paint over the hold fill.
+// The coloured pixel art on a button: a decor object or an arrow.
+.experiment-ext-blk-image {
   position: relative;
   display: block;
   image-rendering: pixelated;
   pointer-events: none;
+}
 
-  &.is-dark { display: none; }
-
-  @include exp-dark {
-    &.is-light { display: none; }
-    &.is-dark { display: block; }
-  }
+// A UI glyph is an alpha mask over the text colour, so one sprite serves both
+// themes; the mask and the size are set inline from the sprite.
+.experiment-ext-blk-icon {
+  position: relative;
+  display: block;
+  background-color: currentColor;
+  mask-size: 100% 100%;
+  -webkit-mask-size: 100% 100%;
+  pointer-events: none;
 }
 
 .experiment-ext-blk-stage {
@@ -188,6 +196,12 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   display: inline-flex;
   align-items: center;
   gap: $blk-hint-item-gap;
+
+  .experiment-ext-blk-icon {
+    color: $blk-ink;
+
+    @include exp-dark { color: $blk-ink-dark; }
+  }
 }
 
 // Where the app says, briefly, why an opened file was refused.

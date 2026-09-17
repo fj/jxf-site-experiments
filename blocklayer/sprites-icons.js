@@ -1,8 +1,9 @@
 /*
  * Blocklayer — the interface's own pixel art: the 16×16 glyphs on the toolbar
- * buttons and in the hint row, drawn as alpha masks for the stylesheet to
- * colour by theme, and the compass rose that shows where world north points.
- * Everything is string art turned into a sprite once and cached.
+ * buttons and in the hint row, the eight compass arrows the direction buttons
+ * show, both drawn as alpha masks for the stylesheet to colour by theme, and
+ * the compass rose that shows where world north points. Everything is string
+ * art turned into a sprite once and cached.
  */
 (function () {
   "use strict";
@@ -344,6 +345,57 @@
 
   ROWS["rotate-ccw"] = B.pixel.hflip(ROWS["rotate-cw"]);
 
+  // The compass arrows the toolbar's direction buttons show: one along an
+  // axis and one on the 45° diagonal, the other six flipped from these.
+  var ARROW_N = [
+    "................",
+    ".......##.......",
+    "......####......",
+    ".....######.....",
+    "....##.##.##....",
+    "...##..##..##...",
+    "..##...##...##..",
+    ".......##.......",
+    ".......##.......",
+    ".......##.......",
+    ".......##.......",
+    ".......##.......",
+    ".......##.......",
+    ".......##.......",
+    "................",
+    "................"
+  ];
+
+  var ARROW_NE = [
+    "................",
+    "................",
+    "......########..",
+    "......########..",
+    "..........####..",
+    ".........##.##..",
+    "........##..##..",
+    ".......##...##..",
+    "......##....##..",
+    ".....##.....##..",
+    "....##..........",
+    "...##...........",
+    "..##............",
+    "................",
+    "................",
+    "................"
+  ];
+
+  var ARROW_ROWS = {
+    N: ARROW_N,
+    NE: ARROW_NE,
+    E: B.pixel.hflip(B.pixel.transpose(ARROW_N)),
+    SE: B.pixel.vflip(ARROW_NE),
+    S: B.pixel.vflip(ARROW_N),
+    SW: B.pixel.hflip(B.pixel.vflip(ARROW_NE)),
+    W: B.pixel.transpose(ARROW_N),
+    NW: B.pixel.hflip(ARROW_NE)
+  };
+
   // A glyph is a mask: only its alpha counts, so the ink is opaque black and
   // the tone is the same at half the alpha.
   var MASK = {};
@@ -353,6 +405,12 @@
   var sprite = B.pixel.memo(function (name) {
     var rows = ROWS[name];
     if (!rows) throw new Error("unknown icon: " + name);
+    return B.pixel.fromRows(rows, MASK);
+  });
+
+  var arrow = B.pixel.memo(function (dir) {
+    var rows = ARROW_ROWS[dir];
+    if (!rows) throw new Error("unknown direction: " + dir);
     return B.pixel.fromRows(rows, MASK);
   });
 
@@ -405,6 +463,7 @@
 
   B.icons = {
     sprite: sprite,
+    arrow: arrow,
     compass: compass
   };
 })();

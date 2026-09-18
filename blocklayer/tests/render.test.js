@@ -9,10 +9,17 @@ const HEIGHT = 300;
 const SCALE = 2;
 const PANS = [{ x: 0, y: 0 }, { x: 7, y: -3 }, { x: -40, y: 120 }];
 const COMPASS_SIZE = 24;        // the stand-in compass, which the badge sits under
+const DECOR_OY = 20;            // ...and how tall the stand-in decor object stands
+const FULL_ALPHA = 1;
+const TRANSPARENT_ALPHA = 0.45; // how solid render.js draws a see-through tile
+const TILE_ELEV = 2;            // blocks under a tile, so a top read wrong lands elsewhere
+const HOLD_PROGRESS = 0.4;      // part way through the hold that removes a tile
+const WEDGE_OF = { block: null, ramp: "ramp", stairs: "stairs" };
 
 // render.js over a recording pixel layer: every sprite module answers a
-// tagged stand-in, and each draw of one is logged with its name and where it
-// lands. A tiled fill is logged the same way, with the rect it covers, and
+// tagged stand-in, and each draw of one is logged with its name, where it
+// lands and how solid the scene was drawing at. What a sprite was asked for is
+// logged too. A tiled fill is logged like a draw, with the rect it covers, and
 // clearing the scene empties the log, as clearing a canvas empties it.
 function stage() {
   const B = load(["config.js", "level.js", "view.js", "render.js"]);
@@ -20,36 +27,45 @@ function stage() {
   const fills = [];
   const ghostElevs = [];
   const labels = [];
-  const tag = (name, size = 0) => ({ name, ox: 0, oy: 0, canvas: { width: size, height: size } });
+  const calls = new Map();
+  const record = (name, args) => {
+    if (!calls.has(name)) calls.set(name, []);
+    calls.get(name).push(args);
+  };
+  const tag = (name, { size = 0, oy = 0 } = {}) =>
+    ({ name, ox: 0, oy, canvas: { width: size, height: size } });
   const gridTile = tag("grid");
   const scene = {
-    globalAlpha: 1,
+    globalAlpha: FULL_ALPHA,
     imageSmoothingEnabled: true,
-    clearRect() { draws.length = 0; fills.length = 0; }
+    clearRect() { draws.length = 0; fills.length = 0; calls.clear(); }
   };
   const out = { imageSmoothingEnabled: true, clearRect() {}, drawImage() {} };
   B.pixel = {
     canvas: (w, h) => ({ width: w, height: h }),
     context: () => scene,
-    draw: (c, sprite, x, y) => { draws.push([sprite.name, x, y]); },
+    draw: (c, sprite, x, y) => { draws.push([sprite.name, x, y, scene.globalAlpha]); },
     drawTiled: (c, sprite, x, y, w, h) => {
-      draws.push([sprite.name, x, y]);
+      draws.push([sprite.name, x, y, scene.globalAlpha]);
       fills.push({ sprite, x, y, w, h });
     }
   };
   B.tiles = {
     grid: () => gridTile,
     column: () => tag("column"),
-    ramp: () => tag("ramp"),
-    stairs: () => tag("stairs"),
+    ramp: (elev, viewFacing) => { record("ramp", [elev, viewFacing]); return tag("ramp"); },
+    stairs: (elev, viewFacing) => { record("stairs", [elev, viewFacing]); return tag("stairs"); },
     ghost: (elev) => { ghostElevs.push(elev); return tag("ghost"); },
-    outline: () => tag("outline"),
-    holdMask: () => tag("hold"),
+    outline: (shape, viewFacing, kind) => {
+      record("outline", [shape, viewFacing, kind]);
+      return tag("outline");
+    },
+    holdMask: (progress) => { record("hold", [progress]); return tag("hold"); },
     label: (text) => { labels.push(text); return tag("label"); }
   };
-  B.icons = { compass: () => tag("compass", COMPASS_SIZE) };
-  B.decor = { sprite: () => tag("decor") };
-  B.marks = { sprite: () => tag("mark") };
+  B.icons = { compass: () => tag("compass", { size: COMPASS_SIZE }) };
+  B.decor = { sprite: (key) => { record("decor", [key]); return tag("decor", { oy: DECOR_OY }); } };
+  B.marks = { sprite: (key, rot) => { record("mark", [key, rot]); return tag("mark"); } };
   const canvas = { width: WIDTH, height: HEIGHT, getContext: () => out };
   const state = {
     level: B.level.create(),
@@ -68,6 +84,7 @@ function stage() {
     fills,
     ghostElevs,
     labels,
+    asked: (name) => calls.get(name) || [],
     add: (x, y, elev) => B.level.add(state.level, x, y, elev),
     draw: () => B.render.draw(canvas, state, SCALE),
     names: () => draws.map((d) => d[0]),
@@ -77,6 +94,46 @@ function stage() {
 
 // The new-tile badge is a label too, and always the last one drawn.
 const columnLabels = (s) => s.labels.slice(0, -1);
+
+const drawsNamed = (s, name) => s.draws.filter((d) => d[0] === name);
+
+const drawNamed = (s, name) => {
+  const found = drawsNamed(s, name);
+  assert.equal(found.length, 1, `${found.length} ${name} draws`);
+  return found[0];
+};
+
+// Where a tile's anchor, the centre of its top diamond, lands on the base
+// canvas.
+const anchorOf = (s, tile) => {
+  const frame = s.frame();
+  const p = s.B.view.project(s.state.view, tile.x, tile.y, tile.elev);
+  return [frame.ox + p.sx, frame.oy + p.sy];
+};
+
+// A tile of the given shape, facing east, with the view turned a quarter, so
+// the facing the view reads is not the tile's own.
+const turnedTile = (s, x, y, shape) => {
+  const tile = s.add(x, y, TILE_ELEV);
+  s.B.level.setShape(s.state.level, x, y, shape);
+  s.B.level.setFacing(s.state.level, x, y, "E");
+  s.B.view.rotate(s.state.view, 1);
+  return tile;
+};
+
+const viewFacingOf = (s, tile) => s.B.view.viewFacing(s.state.view.rot, tile.facing);
+
+const decorOn = (s, x, y) => {
+  const key = s.B.DECOR[0].key;
+  s.B.level.setDecor(s.state.level, x, y, key);
+  return key;
+};
+
+const marksOn = (s, x, y, count) => {
+  const keys = s.B.MARKS.slice(0, count).map((m) => m.key);
+  keys.forEach((key) => s.B.level.toggleMark(s.state.level, x, y, key));
+  return keys;
+};
 
 describe("render: the elevation labels", () => {
   it("labels each column with its elevation, as a plain number", () => {
@@ -116,7 +173,7 @@ describe("render: the ghost", () => {
     const frame = s.frame();
     const top = s.B.view.project(s.state.view, 1, 1, s.B.ELEV_MAX);
     const ghost = s.draws.find((d) => d[0] === "ghost");
-    assert.deepEqual(ghost, ["ghost", frame.ox + top.sx, frame.oy + top.sy]);
+    assert.deepEqual(ghost, ["ghost", frame.ox + top.sx, frame.oy + top.sy, FULL_ALPHA]);
     assert.deepEqual(s.ghostElevs, [s.B.ELEV_MAX]);
   });
 
@@ -206,5 +263,128 @@ describe("render: the new-tile badge", () => {
     s.draw();
     assert.equal(s.names().pop(), "label");
     assert.equal(s.labels.pop(), "+" + (s.B.ELEV_MAX - 1));
+  });
+});
+
+describe("render: the see-through tiles", () => {
+  it("draws a column see-through while the tiles are not opaque, and solid while they are", () => {
+    for (const [opaque, alpha] of [[false, TRANSPARENT_ALPHA], [true, FULL_ALPHA]]) {
+      const s = stage();
+      s.add(0, 0, TILE_ELEV);
+      s.state.opaque = opaque;
+      s.draw();
+      const [, , , drawn] = drawNamed(s, "column");
+      assert.equal(drawn, alpha, `opaque ${opaque}`);
+    }
+  });
+
+  it("sees through the wedge of a sloped tile as it does the column under it", () => {
+    const s = stage();
+    turnedTile(s, 0, 0, "ramp");
+    s.state.opaque = false;
+    s.draw();
+    const [, , , drawn] = drawNamed(s, "ramp");
+    assert.equal(drawn, TRANSPARENT_ALPHA);
+  });
+
+  it("draws what stands on a see-through tile solid, so a mark on it stays legible", () => {
+    const s = stage();
+    const tile = s.add(0, 0, TILE_ELEV);
+    decorOn(s, 0, 0);
+    marksOn(s, 0, 0, 1);
+    s.state.opaque = false;
+    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.hold = { x: tile.x, y: tile.y, progress: HOLD_PROGRESS };
+    s.draw();
+    const over = s.draws.filter(([name]) => name !== "column");
+    assert.deepEqual(new Set(over.map(([name]) => name)),
+      new Set(["grid", "hold", "outline", "decor", "mark", "label", "compass"]));
+    for (const [name, , , alpha] of over) assert.equal(alpha, FULL_ALPHA, name);
+  });
+});
+
+describe("render: the wedge a sloped tile stands on", () => {
+  it("draws a ramp its wedge and a flight of stairs its own, and a block neither", () => {
+    assert.deepEqual(Object.keys(WEDGE_OF), stage().B.SHAPES);
+    for (const [shape, wedge] of Object.entries(WEDGE_OF)) {
+      const s = stage();
+      const tile = turnedTile(s, 0, 0, shape);
+      s.draw();
+      const names = s.names();
+      assert.deepEqual(names.filter((name) => name === "ramp" || name === "stairs"),
+        wedge ? [wedge] : [], shape);
+      if (!wedge) continue;
+      const [, x, y] = drawNamed(s, wedge);
+      assert.deepEqual([x, y], anchorOf(s, tile), shape);
+      assert.ok(names.indexOf(wedge) > names.indexOf("column"), `${shape}: over its column`);
+    }
+  });
+
+  it("cuts the wedge to the tile's elevation and to the facing the view sees", () => {
+    const s = stage();
+    const tile = turnedTile(s, 0, 0, "ramp");
+    s.draw();
+    assert.deepEqual(s.asked("ramp"), [[tile.elev, viewFacingOf(s, tile)]]);
+    assert.notEqual(viewFacingOf(s, tile), s.B.view.viewFacing(0, tile.facing));
+  });
+});
+
+describe("render: the hold mask", () => {
+  it("wipes the held tile at the progress the hold carries, and no other tile", () => {
+    const s = stage();
+    const held = s.add(0, 0, TILE_ELEV);
+    s.add(1, 1, TILE_ELEV);
+    s.state.hold = { x: held.x, y: held.y, progress: HOLD_PROGRESS };
+    s.draw();
+    const [, x, y] = drawNamed(s, "hold");
+    assert.deepEqual([x, y], anchorOf(s, held));
+    assert.deepEqual(s.asked("hold"), [[HOLD_PROGRESS]]);
+  });
+
+  it("wipes no tile while nothing is held", () => {
+    const s = stage();
+    s.add(0, 0, TILE_ELEV);
+    s.draw();
+    assert.deepEqual(drawsNamed(s, "hold"), []);
+  });
+});
+
+describe("render: the highlight ring", () => {
+  it("rings the selected tile, with its shape and the facing the view sees", () => {
+    const s = stage();
+    const tile = turnedTile(s, 0, 0, "ramp");
+    s.add(1, 1, TILE_ELEV);
+    s.state.selected = { x: tile.x, y: tile.y };
+    s.draw();
+    const [, x, y] = drawNamed(s, "outline");
+    assert.deepEqual([x, y], anchorOf(s, tile));
+    assert.deepEqual(s.asked("outline"), [[tile.shape, viewFacingOf(s, tile), "select"]]);
+  });
+
+  it("rings the hovered tile in the hover ring", () => {
+    const s = stage();
+    const tile = turnedTile(s, 0, 0, "stairs");
+    s.add(1, 1, TILE_ELEV);
+    s.state.hover = { tile: tile };
+    s.draw();
+    const [, x, y] = drawNamed(s, "outline");
+    assert.deepEqual([x, y], anchorOf(s, tile));
+    assert.deepEqual(s.asked("outline"), [[tile.shape, viewFacingOf(s, tile), "hover"]]);
+  });
+
+  it("rings the selected tile as selected while the pointer hovers it too", () => {
+    const s = stage();
+    const tile = s.add(0, 0, TILE_ELEV);
+    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.hover = { tile: tile };
+    s.draw();
+    assert.deepEqual(s.asked("outline"), [[tile.shape, viewFacingOf(s, tile), "select"]]);
+  });
+
+  it("rings no tile while none is selected and none hovered", () => {
+    const s = stage();
+    s.add(0, 0, TILE_ELEV);
+    s.draw();
+    assert.deepEqual(drawsNamed(s, "outline"), []);
   });
 });

@@ -347,10 +347,32 @@ describe("tiles: grid", () => {
   });
 });
 
+const HOLD_STEPS = 16;        // steps of progress the mask is built in
+const HOLD_SAMPLES = 100;     // progress readings a hold takes, frame by frame
+
 describe("tiles: holdMask", () => {
   it("fills a held tile with the hold colour, part way to the tile under it", () => {
     const colour = oneColour(T.holdMask(1));
     assert.equal(colour.channels, P.parseHex(B.COLORS.hold).join(","));
     assert.ok(colour.alpha > 0 && colour.alpha < 1, String(colour.alpha));
+  });
+
+  it("fills more of the tile at every step, from nothing at all to its whole top face", () => {
+    const filled = [];
+    for (let step = 0; step <= HOLD_STEPS; step++) {
+      filled.push(T.holdMask(step / HOLD_STEPS).canvas.filled.size);
+    }
+    assert.equal(filled[0], 0, "nothing where the hold starts");
+    for (let step = 1; step <= HOLD_STEPS; step++) {
+      assert.ok(filled[step] > filled[step - 1], `step ${step} over step ${step - 1}`);
+    }
+    assert.equal(filled[HOLD_STEPS], T.column(B.ELEV_MIN).canvas.filled.size,
+      "the whole top face where the hold ends");
+  });
+
+  it("answers one mask per step, whatever progress a frame of the hold reads", () => {
+    const masks = new Set();
+    for (let i = 0; i <= HOLD_SAMPLES; i++) masks.add(T.holdMask(i / HOLD_SAMPLES));
+    assert.equal(masks.size, HOLD_STEPS + 1);
   });
 });

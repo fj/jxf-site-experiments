@@ -149,6 +149,19 @@ const colourRuns = (sprite, x, colour) => {
 };
 
 describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
+  // The tests read a facing the way sprites-tiles.js does, so the reading is
+  // pinned here before anything leans on it.
+  it("names each facing for the slope it shows and the side its high edge is on, once", () => {
+    const read = B.VIEW_FACINGS.map((vf) => `${seesSlope(vf)} ${onLeft(vf)}`);
+    assert.equal(new Set(read).size, B.VIEW_FACINGS.length, read.join(", "));
+    for (const viewFacing of B.VIEW_FACINGS) {
+      const twin = mirrorFacing(viewFacing);
+      assert.ok(B.VIEW_FACINGS.includes(twin), `${viewFacing} mirrors ${twin}`);
+      assert.equal(seesSlope(twin), seesSlope(viewFacing), `${viewFacing}: the same slope`);
+      assert.notEqual(onLeft(twin), onLeft(viewFacing), `${viewFacing}: the other side`);
+    }
+  });
+
   it("mirrors a wedge left to right when the facing puts its high edge on the left", () => {
     for (const shape of SLOPED) {
       for (const viewFacing of B.VIEW_FACINGS) {

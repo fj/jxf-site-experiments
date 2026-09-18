@@ -393,6 +393,18 @@ describe("tiles: holdMask", () => {
       "the whole top face where the hold ends");
   });
 
+  it("wipes the tile from its bottom corner upward, a step at a time", () => {
+    let reached = B.TILE_H;                  // no row of the tile is wiped yet
+    for (let step = 1; step <= HOLD_STEPS; step++) {
+      const art = rows(T.holdMask(step / HOLD_STEPS));
+      const at = `step ${step}`;
+      assert.ok(art[art.length - 1].includes(INK), `${at}: keeps the bottom corner`);
+      assert.ok(topInkRow(art) < reached, `${at}: reaches over the step before`);
+      reached = topInkRow(art);
+    }
+    assert.equal(reached, 0, "the whole tile where the hold ends");
+  });
+
   it("answers one mask per step, whatever progress a frame of the hold reads", () => {
     const masks = new Set();
     for (let i = 0; i <= HOLD_SAMPLES; i++) masks.add(T.holdMask(i / HOLD_SAMPLES));

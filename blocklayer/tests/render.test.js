@@ -283,6 +283,21 @@ describe("render: the new-tile badge", () => {
   });
 });
 
+describe("render: the order a tile is drawn in", () => {
+  it("draws every overlay over the column, so nothing a tile carries is buried", () => {
+    const s = stage();
+    const tile = turnedTile(s, 0, 0, "ramp");
+    decorOn(s, 0, 0);
+    marksOn(s, 0, 0, 1);
+    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.hold = { x: tile.x, y: tile.y, progress: HOLD_PROGRESS };
+    s.draw();
+    assert.deepEqual(s.names(), [
+      "grid", "column", "ramp", "hold", "outline", "decor", "mark", "label", "compass", "label"
+    ]);
+  });
+});
+
 describe("render: the see-through tiles", () => {
   it("draws a column see-through while the tiles are not opaque, and solid while they are", () => {
     for (const [opaque, alpha] of [[false, TRANSPARENT_ALPHA], [true, FULL_ALPHA]]) {

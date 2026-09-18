@@ -1,8 +1,9 @@
 /*
- * Helpers for the sprite tests. canvasDocument() is a document whose canvases
- * remember every pixel filled on them, with what and how many times, so a
- * module that draws can run in node; rows() reads a sprite's art back as
- * string art; headHeavy() tells an arrow's head from its tail.
+ * The canvas, faked for any test of a module that draws. canvasDocument() is a
+ * document whose canvases remember every pixel filled on them, with what and
+ * how many times, and encode a url that stands for those pixels; rows() reads
+ * a sprite's art back as string art; headHeavy() tells an arrow's head from
+ * its tail.
  */
 "use strict";
 
@@ -18,6 +19,10 @@ function fakeCanvas() {
     if (!keys.has(style)) keys.set(style, keys.size + 1);
     return keys.get(style);
   };
+  // A stand-in for the encoder: canvases with the same pixels answer the same
+  // url, and canvases with different pixels answer different ones.
+  canvas.toDataURL = () => "data:fake," +
+    [...canvas.filled].map(([at, style]) => `${at}=${style}`).join(";");
   canvas.getContext = () => {
     const ctx = { fillStyle: "", imageSmoothingEnabled: true };
     ctx.fillRect = (x, y, w, h) => {

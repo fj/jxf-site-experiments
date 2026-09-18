@@ -15,6 +15,7 @@ const TRANSPARENT_ALPHA = 0.45; // how solid render.js draws a see-through tile
 const TILE_ELEV = 2;            // blocks under a tile, so a top read wrong lands elsewhere
 const HOLD_PROGRESS = 0.4;      // part way through the hold that removes a tile
 const WEDGE_OF = { block: null, ramp: "ramp", stairs: "stairs" };
+const MARKS_PER_ROW = 3;        // marks render.js lays in a row before it starts another
 
 // render.js over a recording pixel layer: every sprite module answers a
 // tagged stand-in, and each draw of one is logged with its name, where it
@@ -134,6 +135,19 @@ const marksOn = (s, x, y, count) => {
   keys.forEach((key) => s.B.level.toggleMark(s.state.level, x, y, key));
   return keys;
 };
+
+// The marks drawn, gathered into the rows they lie in, the lowest row first.
+const markRows = (s) => {
+  const rows = new Map();
+  drawsNamed(s, "mark").forEach(([, x, y]) => {
+    if (!rows.has(y)) rows.set(y, []);
+    rows.get(y).push(x);
+  });
+  return [...rows.keys()].sort((a, b) => b - a)
+    .map((y) => ({ y, xs: rows.get(y).sort((a, b) => a - b) }));
+};
+
+const middleOf = (xs) => (xs[0] + xs[xs.length - 1]) / 2;
 
 describe("render: the elevation labels", () => {
   it("labels each column with its elevation, as a plain number", () => {
@@ -386,5 +400,90 @@ describe("render: the highlight ring", () => {
     s.add(0, 0, TILE_ELEV);
     s.draw();
     assert.deepEqual(drawsNamed(s, "outline"), []);
+  });
+});
+
+describe("render: the decor a tile carries", () => {
+  it("stands the tile's own decor object on its top face", () => {
+    const s = stage();
+    const tile = s.add(0, 0, TILE_ELEV);
+    const key = decorOn(s, 0, 0);
+    s.draw();
+    const [, x, y] = drawNamed(s, "decor");
+    assert.deepEqual([x, y], anchorOf(s, tile));
+    assert.deepEqual(s.asked("decor"), [[key]]);
+  });
+
+  it("stands a slope's decor a block over the tile's elevation, where its top is", () => {
+    const s = stage();
+    const tile = turnedTile(s, 0, 0, "ramp");
+    decorOn(s, 0, 0);
+    s.draw();
+    const [cx, cy] = anchorOf(s, tile);
+    const [, x, y] = drawNamed(s, "decor");
+    assert.deepEqual([x, y], [cx, cy - s.B.BLOCK_H]);
+  });
+
+  it("stands no decor while the decor layer is off", () => {
+    const s = stage();
+    s.add(0, 0, TILE_ELEV);
+    decorOn(s, 0, 0);
+    s.state.layers.decor = false;
+    s.draw();
+    assert.deepEqual(drawsNamed(s, "decor"), []);
+    assert.deepEqual(s.asked("decor"), []);
+  });
+});
+
+describe("render: the marks a tile carries", () => {
+  it("lays the marks in rows of three that stack up from the tile's top", () => {
+    const s = stage();
+    const tile = s.add(0, 0, TILE_ELEV);
+    const keys = marksOn(s, 0, 0, MARKS_PER_ROW + 1);
+    s.draw();
+    const [cx, cy] = anchorOf(s, tile);
+    const rows = markRows(s);
+    assert.equal(drawsNamed(s, "mark").length, keys.length);
+    assert.deepEqual(rows.map((row) => row.xs.length), [MARKS_PER_ROW, 1]);
+    assert.equal(rows[0].y, cy, "the first row lies on the tile's top");
+    assert.ok(rows[1].y < rows[0].y, "the next row stacks over it");
+    for (const row of rows) assert.equal(middleOf(row.xs), cx, `the row at ${row.y}`);
+    const [left, middle, right] = rows[0].xs;
+    assert.ok(left < middle && middle < right, "a full row spreads across the tile");
+    assert.equal(middle - left, right - middle, "evenly spaced");
+  });
+
+  it("lifts the marks clear of a decor object that shares the tile", () => {
+    const bare = stage();
+    bare.add(0, 0, TILE_ELEV);
+    marksOn(bare, 0, 0, 1);
+    bare.draw();
+
+    const shared = stage();
+    shared.add(0, 0, TILE_ELEV);
+    marksOn(shared, 0, 0, 1);
+    decorOn(shared, 0, 0);
+    shared.draw();
+
+    const lift = markRows(bare)[0].y - markRows(shared)[0].y;
+    assert.ok(lift > DECOR_OY, `lifted ${lift}, over a decor object ${DECOR_OY} tall`);
+  });
+
+  it("turns every mark with the view, so it points where its direction points on screen", () => {
+    const s = stage();
+    s.add(0, 0, TILE_ELEV);
+    const keys = marksOn(s, 0, 0, 1);
+    s.B.view.rotate(s.state.view, 1);
+    s.draw();
+    assert.deepEqual(s.asked("mark"), [[keys[0], s.state.view.rot]]);
+  });
+
+  it("lays no mark while the marks layer is off", () => {
+    const s = stage();
+    s.add(0, 0, TILE_ELEV);
+    marksOn(s, 0, 0, 1);
+    s.state.layers.marks = false;
+    s.draw();
+    assert.deepEqual(drawsNamed(s, "mark"), []);
   });
 });

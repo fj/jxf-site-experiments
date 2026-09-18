@@ -8,6 +8,7 @@ const WIDTH = 400;
 const HEIGHT = 300;
 const SCALE = 2;
 const PANS = [{ x: 0, y: 0 }, { x: 7, y: -3 }, { x: -40, y: 120 }];
+const ROTS = [0, 1, 2, 3];      // the quarter turns the view is read at
 const COMPASS_SIZE = 24;        // the stand-in compass, which the badge sits under
 const DECOR_OY = 20;            // ...and how tall the stand-in decor object stands
 const FULL_ALPHA = 1;
@@ -486,12 +487,14 @@ describe("render: the marks a tile carries", () => {
   });
 
   it("turns every mark with the view, so it points where its direction points on screen", () => {
-    const s = stage();
-    s.add(0, 0, TILE_ELEV);
-    const keys = marksOn(s, 0, 0, 1);
-    s.B.view.rotate(s.state.view, 1);
-    s.draw();
-    assert.deepEqual(s.asked("mark"), [[keys[0], s.state.view.rot]]);
+    for (const rot of ROTS) {
+      const s = stage();
+      s.add(0, 0, TILE_ELEV);
+      const keys = marksOn(s, 0, 0, 1);
+      s.B.view.rotate(s.state.view, rot);
+      s.draw();
+      assert.deepEqual(s.asked("mark"), [[keys[0], rot]], `rot ${rot}`);
+    }
   });
 
   it("lays no mark while the marks layer is off", () => {

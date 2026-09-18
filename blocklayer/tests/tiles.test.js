@@ -121,6 +121,7 @@ describe("tiles: ghost", () => {
 const SLOPED = ["ramp", "stairs"];       // the shapes that stand on a wedge
 const RINGS = ["select", "hover"];       // the kinds of highlight a tile is ringed with
 const WEDGE_ELEV = B.ELEV_MIN + 1;       // a wedge rises a block over its elevation
+const TREADS = 4;                        // the flat steps a flight of stairs climbs in
 
 // A view facing names the screen side a tile's high edge is on: up, which
 // shows the slope, or down, which sees it edge-on, then right or left.
@@ -133,6 +134,19 @@ const wedgeOf = (shape, elev, viewFacing) => T[shape](elev, viewFacing);
 const inkDown = (art, x) => art.filter((row) => row.charAt(x) === INK).length;
 const topInkRow = (art) => art.findIndex((row) => row.includes(INK));
 const brightness = (hex) => P.parseHex(hex).reduce((sum, channel) => sum + channel, 0);
+
+// How many times a colour starts down a column of a sprite: each flat face the
+// column crosses counts once.
+const colourRuns = (sprite, x, colour) => {
+  let runs = 0;
+  let inRun = false;
+  for (let y = 0; y < sprite.canvas.height; y++) {
+    const here = sprite.canvas.filled.get(`${x},${y}`) === colour;
+    if (here && !inRun) runs++;
+    inRun = here;
+  }
+  return runs;
+};
 
 describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
   it("mirrors a wedge left to right when the facing puts its high edge on the left", () => {
@@ -171,6 +185,15 @@ describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
           assert.equal(aBlockOverTheFarCorner.charAt(HALF_W), INK, `${at}: over the corner`);
         }
       }
+    }
+  });
+
+  it("climbs a flight of stairs in flat treads, where a ramp climbs one unbroken slope", () => {
+    for (const viewFacing of B.VIEW_FACINGS.filter(seesSlope)) {
+      const flats = (shape) =>
+        colourRuns(wedgeOf(shape, WEDGE_ELEV, viewFacing), HALF_W, top(WEDGE_ELEV));
+      assert.equal(flats("stairs"), TREADS, `stairs ${viewFacing}`);
+      assert.equal(flats("ramp"), 0, `ramp ${viewFacing}`);
     }
   });
 

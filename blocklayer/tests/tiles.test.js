@@ -118,6 +118,146 @@ describe("tiles: ghost", () => {
   });
 });
 
+const SLOPED = ["ramp", "stairs"];       // the shapes that stand on a wedge
+const RINGS = ["select", "hover"];       // the kinds of highlight a tile is ringed with
+const WEDGE_ELEV = B.ELEV_MIN + 1;       // a wedge rises a block over its elevation
+
+// A view facing names the screen side a tile's high edge is on: up, which
+// shows the slope, or down, which sees it edge-on, then right or left.
+const seesSlope = (viewFacing) => viewFacing.charAt(0) === "u";
+const onLeft = (viewFacing) => viewFacing.charAt(1) === "l";
+const mirrorFacing = (viewFacing) => viewFacing.charAt(0) + (onLeft(viewFacing) ? "r" : "l");
+const SLOPE_IN_VIEW = B.VIEW_FACINGS.find(seesSlope);
+
+const wedgeOf = (shape, elev, viewFacing) => T[shape](elev, viewFacing);
+const inkDown = (art, x) => art.filter((row) => row.charAt(x) === INK).length;
+const topInkRow = (art) => art.findIndex((row) => row.includes(INK));
+const brightness = (hex) => P.parseHex(hex).reduce((sum, channel) => sum + channel, 0);
+
+describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
+  it("mirrors a wedge left to right when the facing puts its high edge on the left", () => {
+    for (const shape of SLOPED) {
+      for (const viewFacing of B.VIEW_FACINGS) {
+        const art = rows(wedgeOf(shape, WEDGE_ELEV, viewFacing));
+        const twin = rows(wedgeOf(shape, WEDGE_ELEV, mirrorFacing(viewFacing)));
+        assert.deepEqual(art, P.hflip(twin), `${shape} ${viewFacing}`);
+        assert.notDeepEqual(art, twin, `${shape} ${viewFacing} is not its own mirror`);
+      }
+    }
+  });
+
+  it("stands a block tall down the side its high edge is on, an edge down the other", () => {
+    for (const shape of SLOPED) {
+      for (const viewFacing of B.VIEW_FACINGS) {
+        const art = rows(wedgeOf(shape, WEDGE_ELEV, viewFacing));
+        const sides = [0, B.TILE_W - 1];
+        const high = onLeft(viewFacing) ? sides[0] : sides[1];
+        const low = onLeft(viewFacing) ? sides[1] : sides[0];
+        const at = `${shape} ${viewFacing}`;
+        assert.ok(inkDown(art, high) > B.BLOCK_H, `${at}: its high side`);
+        assert.ok(inkDown(art, low) < B.BLOCK_H, `${at}: its low side`);
+      }
+    }
+  });
+
+  it("rises over the tile's far corner only from a facing that shows the slope", () => {
+    for (const shape of SLOPED) {
+      for (const viewFacing of B.VIEW_FACINGS) {
+        const sprite = wedgeOf(shape, WEDGE_ELEV, viewFacing);
+        const aBlockOverTheFarCorner = rows(sprite)[sprite.oy - HALF_H - B.BLOCK_H];
+        const at = `${shape} ${viewFacing}`;
+        assert.equal(aBlockOverTheFarCorner.includes(INK), seesSlope(viewFacing), at);
+        if (seesSlope(viewFacing)) {
+          assert.equal(aBlockOverTheFarCorner.charAt(HALF_W), INK, `${at}: over the corner`);
+        }
+      }
+    }
+  });
+
+  it("sets every wedge down on the tile's diamond, where the column under it ends", () => {
+    const flat = T.column(B.ELEV_MIN);
+    for (const shape of SLOPED) {
+      for (const viewFacing of B.VIEW_FACINGS) {
+        const sprite = wedgeOf(shape, WEDGE_ELEV, viewFacing);
+        assert.deepEqual(rows(sprite).slice(sprite.oy), rows(flat).slice(flat.oy),
+          `${shape} ${viewFacing}`);
+      }
+    }
+  });
+
+  it("shades the side face a wedge shows like a block's on that side, whichever way it faces", () => {
+    for (const elev of ELEVATIONS) {
+      for (const viewFacing of B.VIEW_FACINGS) {
+        const side = onLeft(viewFacing) ? "left" : "right";
+        const tones = colours(T.ramp(elev, viewFacing));
+        assert.ok(tones.has(face(elev, side)), `elevation ${elev} ${viewFacing}: a ${side} face`);
+      }
+    }
+  });
+
+  it("shades a slope darker than the tile's top and lighter than its sides, at every elevation", () => {
+    for (const elev of ELEVATIONS) {
+      const tones = colours(T.ramp(elev, SLOPE_IN_VIEW));
+      const at = `elevation ${elev}`;
+      const slope = [...tones].find((c) => c !== B.COLORS.outline && c !== face(elev, "right"));
+      assert.ok(brightness(slope) < brightness(top(elev)), `${at}: under its top`);
+      assert.ok(brightness(slope) > brightness(face(elev, "left")), `${at}: over its sides`);
+    }
+  });
+});
+
+describe("tiles: outline", () => {
+  it("rings the wedge a sloped tile stands on, up to its high edge", () => {
+    for (const kind of RINGS) {
+      for (const shape of SLOPED) {
+        for (const viewFacing of B.VIEW_FACINGS) {
+          const ring = T.outline(shape, viewFacing, kind);
+          const wedge = wedgeOf(shape, WEDGE_ELEV, viewFacing);
+          const art = rows(wedge);
+          const at = `${shape} ${viewFacing} ${kind}`;
+          rows(ring).forEach((row, y) => {
+            [...row].forEach((ch, x) => {
+              if (ch === INK) assert.equal(art[y].charAt(x), INK, `${at}: (${x}, ${y}) off it`);
+            });
+          });
+          assert.equal(topInkRow(rows(ring)), topInkRow(art), `${at}: up to its high edge`);
+          assert.ok(ring.canvas.filled.size < wedge.canvas.filled.size, `${at}: a ring, not a fill`);
+        }
+      }
+    }
+  });
+
+  it("mirrors a ring with the wedge it rings", () => {
+    for (const kind of RINGS) {
+      for (const shape of SLOPED) {
+        for (const viewFacing of B.VIEW_FACINGS) {
+          const art = rows(T.outline(shape, viewFacing, kind));
+          const twin = rows(T.outline(shape, mirrorFacing(viewFacing), kind));
+          assert.deepEqual(art, P.hflip(twin), `${shape} ${viewFacing} ${kind}`);
+        }
+      }
+    }
+  });
+
+  it("rings a block with its top diamond alone, the same from every facing", () => {
+    for (const kind of RINGS) {
+      const ring = T.outline("block", SLOPE_IN_VIEW, kind);
+      const art = rows(ring);
+      assert.equal(topInkRow(art), ring.oy - HALF_H, `${kind}: no higher than its top face`);
+      for (const viewFacing of B.VIEW_FACINGS) {
+        assert.deepEqual(rows(T.outline("block", viewFacing, kind)), art, `${kind} ${viewFacing}`);
+      }
+    }
+  });
+
+  it("draws a select ring thicker than a hover ring, each in its own colour", () => {
+    const [select, hover] = RINGS.map((kind) => T.outline("ramp", SLOPE_IN_VIEW, kind));
+    assert.deepEqual(colours(select), new Set([B.COLORS.select]));
+    assert.deepEqual(colours(hover), new Set([B.COLORS.hover]));
+    assert.ok(select.canvas.filled.size > hover.canvas.filled.size);
+  });
+});
+
 const art = rows(T.grid());
 const wrap = (n, size) => ((n % size) + size) % size;
 

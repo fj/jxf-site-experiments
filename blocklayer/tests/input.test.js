@@ -3,6 +3,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { load, tile: makeTile } = require("./load");
+const palette = require("./palette");
 
 const WIDTH = 400;
 const HEIGHT = 300;
@@ -73,12 +74,13 @@ function fakeCanvas() {
 // added answers as its tile from then on, as the level would.
 function rig() {
   const clock = fakeWindow();
-  const B = load(["config.js", "input.js"], clock.window);
+  const B = palette.colors(load(["config.js", "input.js"], clock.window));
   const canvas = fakeCanvas();
   const hits = new Map();
   const added = new Set();
   const calls = [];
   let selected = null;
+  let color = B.DEFAULT_COLOR;
   const record = (name) => (...args) => { calls.push([name, ...args]); };
   const key = (x, y) => `${x},${y}`;
   const pick = (x, y) => {
@@ -103,7 +105,10 @@ function rig() {
     setShape: record("setShape"),
     cycleFacing: record("cycleFacing"),
     setDecor: record("setDecor"),
-    toggleMark: record("toggleMark")
+    toggleMark: record("toggleMark"),
+    // app.js makes the key it is handed the foreground, as setColor does there.
+    color: () => color,
+    setColor: (key) => { record("setColor")(key); color = key; }
   };
   B.input.attach(canvas, handlers);
   return {
@@ -467,10 +472,10 @@ describe("input: keys on the selected tile", () => {
   it("no key the marks left behind toggles a mark, shifted or not", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
-    for (const key of ["q", "e", "z", "c"]) {
+    for (const key of ["q", "e", "z"]) {
       assert.equal(r.fire("keydown", { key }).prevented, false, key);
     }
-    for (const key of ["Q", "E", "A", "D", "Z", "C"]) {
+    for (const key of ["Q", "E", "A", "D", "Z"]) {
       assert.equal(r.fire("keydown", { key, ...SHIFT }).prevented, false, key);
     }
     for (const key of ["W", "S"]) r.fire("keydown", { key, ...SHIFT });
@@ -542,6 +547,40 @@ describe("input: the elevation keys", () => {
   });
 });
 
+describe("input: the colour keys", () => {
+  const KEYS = palette.PALETTE.map((entry) => entry.key);
+  const FROM = KEYS.indexOf(palette.DEFAULT_COLOR);
+  const round = (n) => KEYS[(((FROM + n) % KEYS.length) + KEYS.length) % KEYS.length];
+  const walk = (step) => KEYS.map((entry, i) => round(step * (i + 1)));
+
+  // The whole palette, pressed key by key, so the last step is the one that wraps.
+  function press(key, props) {
+    const r = rig();
+    for (let i = 0; i < KEYS.length; i++) {
+      assert.equal(r.fire("keydown", { key, ...props }).prevented, true, key);
+    }
+    return r.of("setColor").flat();
+  }
+
+  it("C steps the foreground on through the palette and wraps at the end", () => {
+    assert.deepEqual(press("c"), walk(1));
+    assert.equal(walk(1).pop(), palette.DEFAULT_COLOR, "the walk comes back round");
+  });
+
+  it("Shift+C steps it back through the palette and wraps at the start", () => {
+    assert.deepEqual(press("C", SHIFT), walk(-1));
+  });
+
+  it("paints by the same call with a tile selected and without one", () => {
+    const r = rig();
+    assert.equal(r.fire("keydown", { key: "c" }).prevented, true);
+    r.select({ x: 1, y: 1 });
+    assert.equal(r.fire("keydown", { key: "c" }).prevented, true);
+    assert.equal(r.fire("keydown", { key: "C", ...SHIFT }).prevented, true);
+    assert.deepEqual(r.of("setColor"), [[round(1)], [round(2)], [round(1)]]);
+  });
+});
+
 describe("input: keyFor", () => {
   const B = load(["config.js", "input.js"]);
   const keyFor = B.input.keyFor;
@@ -568,6 +607,11 @@ describe("input: keyFor", () => {
   it("names a shifted key with Shift+ before it", () => {
     assert.equal(keyFor("raiseAll", 1), "Shift+W");
     assert.equal(keyFor("raiseAll", -1), "Shift+S");
+  });
+
+  it("names the colour step on and the colour step back", () => {
+    assert.equal(keyFor("cycleColor", 1), "C");
+    assert.equal(keyFor("cycleColor", -1), "Shift+C");
   });
 
   it("names a key for every mark, the eight arrows as a rose around the jump", () => {

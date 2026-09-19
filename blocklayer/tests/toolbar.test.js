@@ -154,7 +154,8 @@ const BUTTONS = [
   }),
   ...B.PALETTE.map((entry) => of({
     act: "color", arg: entry.key, label: entry.label,
-    shows: pictured(B.tiles.swatch(entry.key)), fires: ["setColor", entry.key]
+    shows: pictured(B.tiles.swatch(entry.key)), fires: ["setColor", entry.key],
+    calls: [["cycleColor", 1], ["cycleColor", -1]]
   })),
   ...B.DECOR.map((d) => of({
     act: "decor", arg: d.key, label: d.label,

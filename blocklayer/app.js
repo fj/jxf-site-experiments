@@ -256,6 +256,7 @@
     },
     pick: pick,
     selected: function () { return state.selected; },
+    color: function () { return state.color; },
     hover: function (hit) {
       if (B.view.sameHit(hit, state.hover)) return;
       state.hover = hit;

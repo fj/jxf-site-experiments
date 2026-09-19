@@ -2,7 +2,8 @@
  * Blocklayer — the pointer, wheel and keyboard on the canvas, read as editing
  * gestures: click or drag over empty cells to add, click a tile to select it,
  * wheel over the selection to elevate it, hold the right button to remove,
- * and keys that move the view, move the level, or edit the selected tile.
+ * and keys that move the view, move the level, step the foreground colour, or
+ * edit the selected tile.
  * Nothing here knows the level; every gesture ends in one of the handlers.
  * keyFor() names the key bound to a handler call, for the toolbar's tooltips.
  */
@@ -37,6 +38,14 @@
     s: ["raise", -1]
   };
 
+  var CYCLE_COLOR = "cycleColor";   // the step input.js turns into a setColor
+
+  // C steps the foreground colour on through the palette and Shift+C steps it
+  // back, each ending in the setColor a swatch click makes.
+  var COLOR_KEYS = {
+    c: [CYCLE_COLOR, 1]
+  };
+
   var TILE_KEYS = {
     a: ["cycleFacing", -1],
     d: ["cycleFacing", 1],
@@ -61,11 +70,14 @@
   // 1 to 5 toggle the decor, in toolbar order.
   B.DECOR.forEach(function (d, i) { TILE_KEYS[String(i + 1)] = ["setDecor", d.key]; });
 
-  // Shift makes the elevation keys act on every tile at once; no other key
-  // does anything with Shift held.
+  // Shift makes the elevation keys act on every tile at once.
   var SHIFT_LEVEL_KEYS = {
     w: ["raiseAll", 1],
     s: ["raiseAll", -1]
+  };
+
+  var SHIFT_COLOR_KEYS = {
+    c: [CYCLE_COLOR, -1]
   };
 
   var REMOVE_KEYS = ["Delete", "Backspace"];      // swallowed even with no selection
@@ -82,6 +94,13 @@
     return null;
   }
 
+  // The palette key `step` places on from `from`, wrapping at each end.
+  function steppedColor(from, step) {
+    var keys = B.PALETTE.map(function (entry) { return entry.key; });
+    var n = keys.length;
+    return keys[(((keys.indexOf(from) + step) % n) + n) % n];
+  }
+
   // A letter in upper case; an arrow key by its direction; the rest as typed.
   function keyName(key) {
     if (key.indexOf(ARROW_KEY) === 0) return key.slice(ARROW_KEY.length);
@@ -93,9 +112,11 @@
   function keyFor(handler, arg) {
     var key = boundKey(VIEW_KEYS, handler, arg) ||
       boundKey(LEVEL_KEYS, handler, arg) ||
+      boundKey(COLOR_KEYS, handler, arg) ||
       boundKey(TILE_KEYS, handler, arg);
     if (key) return keyName(key);
-    key = boundKey(SHIFT_LEVEL_KEYS, handler, arg);
+    key = boundKey(SHIFT_LEVEL_KEYS, handler, arg) ||
+      boundKey(SHIFT_COLOR_KEYS, handler, arg);
     return key ? SHIFT_NAME + keyName(key) : null;
   }
 
@@ -210,6 +231,12 @@
       handlers.hover(pick(e));
     }
 
+    // A colour step resolves into the setColor call a swatch click makes: it
+    // reads the foreground back and paints with the palette key beside it.
+    function colorAction(action) {
+      return action && ["setColor", steppedColor(handlers.color(), action[1])];
+    }
+
     function call(action) {
       handlers[action[0]].apply(null, action.slice(1));
     }
@@ -224,8 +251,8 @@
     // Whether the key edited the level or the selected tile.
     function edit(e) {
       var key = e.key.toLowerCase();
-      if (e.shiftKey) return run(SHIFT_LEVEL_KEYS[key]);
-      if (LEVEL_KEYS[key]) return run(LEVEL_KEYS[key]);
+      if (e.shiftKey) return run(SHIFT_LEVEL_KEYS[key] || colorAction(SHIFT_COLOR_KEYS[key]));
+      if (run(LEVEL_KEYS[key] || colorAction(COLOR_KEYS[key]))) return true;
       if (!handlers.selected()) return false;
       if (TILE_KEYS[key]) return run(TILE_KEYS[key]);
       if (key !== REMOVE_SELECTED_KEY) return false;

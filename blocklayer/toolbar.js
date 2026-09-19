@@ -213,8 +213,10 @@
   // selected it picks the colour a new tile gets.
   function colorGroup(refs, handlers) {
     var el = group("color");
+    var keyFor = B.input.keyFor;
+    var stepKeys = keyFor("cycleColor", 1) + EITHER_KEY + keyFor("cycleColor", -1);
     B.PALETTE.forEach(function (entry) {
-      var btn = toggle("color", entry.key, entry.label, function () {
+      var btn = toggle("color", entry.key, titled(entry.label, stepKeys), function () {
         handlers.setColor(entry.key);
       });
       image(btn, B.tiles.swatch(entry.key));

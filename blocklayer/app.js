@@ -204,29 +204,17 @@
     if (any) edited();
   }
 
-  function without(cells, x, y) {
-    return cells.filter(function (cell) { return !B.sameCell(cell, x, y); });
-  }
-
-  // The one writer of the selection. It is replaced, never changed in place,
-  // so a list handed out stays whole while the level is edited under it.
+  // The one writer of the selection.
   function setSelection(cells) {
     state.selection = cells;
   }
 
-  // ...and the toolbar and the canvas follow it at once.
+  // ...and the toolbar and the canvas follow it at once, unless the selection
+  // module answered with the very list that was there.
   function selectCells(cells) {
+    if (cells === state.selection) return;
     setSelection(cells);
     changed();
-  }
-
-  // The tiles join the selection; the cells already in it keep their place.
-  function addCells(tiles) {
-    var next = state.selection.slice();
-    tiles.forEach(function (tile) {
-      if (!B.inCells(next, tile.x, tile.y)) next.push({ x: tile.x, y: tile.y });
-    });
-    if (next.length > state.selection.length) selectCells(next);
   }
 
   // The height the next tile gets, which the elevation keys move when there is
@@ -240,7 +228,7 @@
 
   function remove(x, y) {
     if (!B.level.remove(state.level, x, y)) return;
-    setSelection(without(state.selection, x, y));
+    setSelection(B.selection.remove(state.selection, x, y));
     edited();
   }
 
@@ -302,17 +290,16 @@
       edited();
     },
     select: function (x, y) {
-      selectCells([{ x: x, y: y }]);
+      selectCells(B.selection.only(x, y));
     },
-    // The cell joins the selection as the newest of it, or leaves it.
     toggleSelect: function (x, y) {
-      if (B.inCells(state.selection, x, y)) selectCells(without(state.selection, x, y));
-      else selectCells(state.selection.concat([{ x: x, y: y }]));
+      selectCells(B.selection.toggle(state.selection, x, y));
     },
     // A sweep's two client corners: every tile inside joins the selection.
     selectBox: function (x0, y0, x1, y1) {
       var box = baseBox(x0, y0, x1, y1);
-      if (box) addCells(B.view.within(state.view, state.level, box));
+      if (!box) return;
+      selectCells(B.selection.add(state.selection, B.view.within(state.view, state.level, box)));
     },
     // The rectangle the sweep is drawing, for the renderer; box(null) ends it.
     box: function (x0, y0, x1, y1) {

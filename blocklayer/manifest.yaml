@@ -24,6 +24,7 @@ scripts:
   - level.js
   - file.js
   - view.js
+  - selection.js
   - demo.js
   - sprites-tiles.js
   - sprites-decor.js

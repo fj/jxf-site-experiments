@@ -191,7 +191,7 @@
     function dropSelection(tile) {
       var cells = handlers.selection();
       if (!cells.length) return;
-      if (tile && B.inCells(cells, tile.x, tile.y)) return;
+      if (tile && B.selection.holds(cells, tile.x, tile.y)) return;
       handlers.deselect();
     }
 
@@ -288,7 +288,7 @@
     function onWheel(e) {
       var hit = pick(e);
       if (!e.deltaY || !hit || !hit.tile) return;
-      if (!B.inCells(handlers.selection(), hit.tile.x, hit.tile.y)) return;
+      if (!B.selection.holds(handlers.selection(), hit.tile.x, hit.tile.y)) return;
       e.preventDefault();
       handlers.raise(e.deltaY < 0 ? 1 : -1);
       handlers.hover(pick(e));

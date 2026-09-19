@@ -35,12 +35,7 @@ const BOX_DASH_PX = 3;                       // ...and how long each dash along 
 // colour, and clearing the scene empties both logs, as clearing a canvas
 // empties it.
 function stage() {
-  const B = load(["config.js", "level.js", "view.js", "render.js"]);
-  // The change that turns the selection into a list adds this to config.js.
-  // Once it lands these tests bind to the real one, and say so if it differs.
-  if (!B.inCells) {
-    B.inCells = (cells, x, y) => cells.some((cell) => cell.x === x && cell.y === y);
-  }
+  const B = load(["config.js", "level.js", "view.js", "selection.js", "render.js"]);
   const draws = [];
   const fills = [];
   const calls = new Map();

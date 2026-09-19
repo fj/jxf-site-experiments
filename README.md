@@ -240,10 +240,11 @@ The scene is drawn at the sprites' own scale on an offscreen canvas and blitted
 up by a whole number, so pixels stay square. Every sprite is built in code from
 the palette in `config.js` — nothing is a bitmap file. Modules on the
 `BlockLayer` namespace, in load order: `config.js`, `pixel.js` (anchored
-sprites, string-art, shading, memoizing), `level.js`, `file.js`, `view.js` and
-`demo.js` (the pure models: tiles and their edits and validation; the
-`*.blocklayer.json` file a level is saved to and opened from; rotation,
-projection, picking, the frame and the way in from a pointer; the level a first
+sprites, string-art, shading, memoizing), `level.js`, `file.js`, `view.js`,
+`selection.js` and `demo.js` (the pure models: tiles and their edits and
+validation; the `*.blocklayer.json` file a level is saved to and opened from;
+rotation, projection, picking, the frame and the way in from a pointer; which
+cells are chosen, which every module asks `selection.js`; the level a first
 visit starts with — all unit-tested under `tests/`), `sprites-tiles.js`,
 `sprites-decor.js`,
 `sprites-marks.js`, `sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`,

@@ -82,6 +82,13 @@ function boot(tiles = []) {
     shown() {
       return [this.ctl("width").value, this.ctl("height").value].map(Number);
     },
+    modal() {
+      const el = descend(mount).find((one) => one.getAttribute("role") === "dialog");
+      assert.ok(el, "no modal");
+      return el;
+    },
+    // The sentence the modal puts the count in.
+    text() { return descend(this.modal()).find((el) => el.tag === "p").textContent; },
     find(act, arg) {
       const btn = descend(mount).find((el) =>
         el.getAttribute("data-act") === act && el.getAttribute("data-arg") === String(arg));
@@ -133,5 +140,70 @@ describe("app: the board's size", () => {
       r.find(act, arg).fire("click");
       assert.equal(r.of("clampPan").length, before + 1, act);
     }
+  });
+});
+
+// A board of four tiles in a row, which a width of 2 cuts in half.
+const ROW = [[0, 0], [1, 0], [2, 0], [3, 0]];
+const KEPT = [[0, 0], [1, 0]];
+const NARROW = 2;
+const DROPPED = ROW.length - KEPT.length;
+
+describe("app: a shrink that would lose tiles", () => {
+  const asking = () => {
+    const r = boot(ROW);
+    r.type("width", NARROW);
+    return r;
+  };
+
+  it("changes nothing at all, and asks with the count of what would go", () => {
+    const r = asking();
+    assert.deepEqual(r.level.size, { w: START.w, h: START.h }, "the board is untouched");
+    assert.deepEqual(r.cells(), ROW, "and so is every tile");
+    assert.deepEqual(r.of("resize"), [], "the level was never resized");
+    assert.equal(r.modal().hidden, false);
+    assert.equal(r.text(), `${DROPPED} tiles fall outside the new board.`);
+  });
+
+  it("keeps showing the number the reader typed while it asks", () => {
+    assert.deepEqual(asking().shown(), [NARROW, START.h]);
+  });
+
+  it("resizes and drops the tiles when the reader goes ahead", () => {
+    const r = asking();
+    r.ctl("confirm").fire("click");
+    assert.equal(r.modal().hidden, true);
+    assert.deepEqual(r.level.size, { w: NARROW, h: START.h });
+    assert.deepEqual(r.cells(), KEPT);
+    assert.deepEqual(r.shown(), [NARROW, START.h]);
+  });
+
+  it("changes nothing and puts the boxes back when the reader cancels", () => {
+    const r = asking();
+    r.ctl("cancel").fire("click");
+    assert.equal(r.modal().hidden, true);
+    assert.deepEqual(r.level.size, { w: START.w, h: START.h });
+    assert.deepEqual(r.cells(), ROW);
+    assert.deepEqual(r.shown(), [START.w, START.h], "back to the board's real size");
+  });
+
+  it("takes Escape as the cancel and Enter as the go-ahead", () => {
+    const escaped = asking();
+    escaped.modal().fire("keydown", { key: "Escape" });
+    assert.deepEqual(escaped.cells(), ROW);
+    assert.deepEqual(escaped.shown(), [START.w, START.h]);
+
+    const entered = asking();
+    entered.modal().fire("keydown", { key: "Enter" });
+    assert.deepEqual(entered.cells(), KEPT);
+    assert.deepEqual(entered.level.size, { w: NARROW, h: START.h });
+  });
+
+  it("asks again, with a fresh count, when the reader tries another shrink", () => {
+    const r = asking();
+    r.ctl("cancel").fire("click");
+    r.type("width", ROW.length - 1);
+    assert.equal(r.modal().hidden, false);
+    assert.equal(r.text(), "1 tile falls outside the new board.");
   });
 });

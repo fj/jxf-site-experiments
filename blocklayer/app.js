@@ -29,7 +29,8 @@
     selection: [],
     box: null,
     hover: null,
-    hold: null
+    hold: null,
+    pending: null
   };
 
   var canvas = null;
@@ -241,6 +242,7 @@
   // The board takes the new size and loses the tiles outside it, which leave
   // the selection with them.
   function resizeBoard(w, h) {
+    state.pending = null;
     B.level.resize(state.level, w, h).forEach(function (tile) {
       setSelection(B.selection.remove(state.selection, tile.x, tile.y));
     });
@@ -255,7 +257,23 @@
     pan: function (facing) { B.view.pan(state.view, facing, PAN_STEP); moved(); },
     rotate: function (turns) { B.view.rotate(state.view, turns); moved(); },
     zoom: function (delta) { B.view.zoom(state.view, delta); moved(); },
-    resize: resizeBoard,
+    // A shrink that would drop tiles changes nothing until the reader says so.
+    resize: function (w, h) {
+      var lost = B.level.outside(state.level, w, h);
+      if (!lost.length) {
+        resizeBoard(w, h);
+        return;
+      }
+      state.pending = { w: w, h: h, lost: lost.length };
+      changed();
+    },
+    confirmResize: function () {
+      if (state.pending) resizeBoard(state.pending.w, state.pending.h);
+    },
+    cancelResize: function () {
+      state.pending = null;
+      changed();
+    },
     toggleLayer: function (name) {
       if (!(name in state.layers)) return;
       state.layers[name] = !state.layers[name];
@@ -379,14 +397,22 @@
     return row;
   }
 
-  function buildSkeleton(mount) {
-    var layout = element("div", "layout");
-    var stage = element("div", "stage");
+  // The canvas and the modal that covers it, which the rows below stay clear of.
+  function boardBox() {
+    var board = element("div", "board");
     canvas = element("canvas", "canvas");
     canvas.tabIndex = 0;
     canvas.setAttribute("aria-label", "Level");
+    board.appendChild(canvas);
+    board.appendChild(bounds.modal);
+    return board;
+  }
+
+  function buildSkeleton(mount) {
+    var layout = element("div", "layout");
+    var stage = element("div", "stage");
     status = statusLine();
-    stage.appendChild(canvas);
+    stage.appendChild(boardBox());
     stage.appendChild(captionRow());
     stage.appendChild(status);
     layout.appendChild(toolbar.el);

@@ -643,3 +643,100 @@ describe("view: frame", () => {
     assert.deepEqual(V.frame(canvas, 8), { w: 125, h: 75, ox: 62, oy: 37 });
   });
 });
+
+describe("view: basePoint", () => {
+  const RECT = { left: 40, top: 10 };   // where the canvas sits on the page
+  const CSS_W = 400;                    // the content box, in CSS px
+  const CSS_H = 200;
+  const RATIO = 2;                      // device pixels per CSS pixel
+  const BORDER_X = 3;                   // px of border down the canvas's left side
+  const BORDER_Y = 5;                   // ...and across its top
+  const SCALE = 4;                      // zoom 2 at that ratio
+  const HALF = 0.5;
+
+  // A canvas whose bitmap covers its box at the device's ratio, with no border.
+  function canvasAt(over = {}) {
+    return {
+      clientWidth: CSS_W,
+      clientHeight: CSS_H,
+      clientLeft: 0,
+      clientTop: 0,
+      width: CSS_W * RATIO,
+      height: CSS_H * RATIO,
+      getBoundingClientRect: () => ({ left: RECT.left, top: RECT.top }),
+      ...over
+    };
+  }
+
+  const bordered = () => canvasAt({ clientLeft: BORDER_X, clientTop: BORDER_Y });
+
+  // The client point of (cx, cy) in the canvas's own content box, in CSS px.
+  const client = (canvas, cx, cy) =>
+    [RECT.left + canvas.clientLeft + cx, RECT.top + canvas.clientTop + cy];
+
+  it("puts the frame's origin under the centre of the content box, border or none", () => {
+    for (const canvas of [canvasAt(), bordered()]) {
+      const middle = client(canvas, CSS_W * HALF, CSS_H * HALF);
+      assert.deepEqual(V.basePoint(canvas, SCALE, middle[0], middle[1]), { x: 0, y: 0 });
+    }
+  });
+
+  it("measures in base pixels, so the content box reaches half a frame each way", () => {
+    const canvas = bordered();
+    const frame = V.frame(canvas, SCALE);
+    const topLeft = client(canvas, 0, 0);
+    const bottomRight = client(canvas, CSS_W, CSS_H);
+    assert.deepEqual(V.basePoint(canvas, SCALE, topLeft[0], topLeft[1]),
+      { x: -frame.ox, y: -frame.oy });
+    assert.deepEqual(V.basePoint(canvas, SCALE, bottomRight[0], bottomRight[1]),
+      { x: frame.w - frame.ox, y: frame.h - frame.oy });
+  });
+
+  it("takes the border off, so the same client point falls further in on a bordered canvas", () => {
+    const plain = V.basePoint(canvasAt(), SCALE, RECT.left + 100, RECT.top + 50);
+    const inside = V.basePoint(bordered(), SCALE, RECT.left + 100, RECT.top + 50);
+    assert.deepEqual({ x: plain.x - inside.x, y: plain.y - inside.y },
+      { x: BORDER_X * RATIO / SCALE, y: BORDER_Y * RATIO / SCALE });
+  });
+
+  it("counts the bitmap's own pixels, not the box's, when the two differ", () => {
+    const at = (canvas) => V.basePoint(canvas, SCALE, ...client(canvas, 100, 50));
+    assert.deepEqual(at(canvasAt()), { x: -50, y: -25 });
+    assert.deepEqual(at(canvasAt({ width: CSS_W, height: CSS_H })), { x: -25, y: -12.5 });
+  });
+
+  it("reads each side against its own bitmap, which rounding leaves at its own ratio", () => {
+    const canvas = canvasAt({ width: CSS_W * RATIO, height: CSS_H });
+    const point = client(canvas, 100, 50);
+    assert.deepEqual(V.basePoint(canvas, SCALE, point[0], point[1]), { x: -50, y: -12.5 });
+  });
+
+  it("answers the same base point at any ratio, since the bitmap grows with it", () => {
+    const wide = canvasAt({ width: CSS_W * RATIO * 2, height: CSS_H * RATIO * 2 });
+    const point = client(wide, 100, 50);
+    assert.deepEqual(V.basePoint(wide, SCALE * 2, point[0], point[1]),
+      V.basePoint(canvasAt(), SCALE, point[0], point[1]));
+  });
+
+  it("has no answer for a canvas with no size", () => {
+    for (const over of [{ clientWidth: 0 }, { clientHeight: 0 }]) {
+      const canvas = canvasAt(over);
+      assert.equal(V.basePoint(canvas, SCALE, RECT.left, RECT.top), null, JSON.stringify(over));
+    }
+  });
+
+  it("hands pick the point it needs: a click on a tile's top face finds that tile", () => {
+    const canvas = bordered();
+    const frame = V.frame(canvas, SCALE);
+    const { view, level } = scene();
+    const tall = L.add(level, 1, -1, B.NEW_TILE_ELEV);
+    const p = V.project(view, tall.x, tall.y, L.top(tall));
+    // Back the other way: base px to the content box's own CSS px.
+    const cx = (frame.ox + p.sx) * SCALE / RATIO;
+    const cy = (frame.oy + p.sy) * SCALE / RATIO;
+    const point = client(canvas, cx, cy);
+    const at = V.basePoint(canvas, SCALE, point[0], point[1]);
+    assert.deepEqual(at, { x: p.sx, y: p.sy });
+    assert.deepEqual(V.pick(view, level, at.x, at.y), { tile: tall });
+  });
+});

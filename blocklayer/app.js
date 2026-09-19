@@ -151,39 +151,22 @@
     resize();
   }
 
-  // A client point in base-canvas pixels about the frame's origin: the space
-  // the view projects into. The bitmap is stretched over the canvas's content
-  // box, inside its border. Null when the canvas has no size.
-  function basePoint(clientX, clientY) {
-    var cssW = canvas.clientWidth;
-    var cssH = canvas.clientHeight;
-    if (!cssW || !cssH) return null;
-    var s = scale();
-    var rect = canvas.getBoundingClientRect();
-    var frame = B.view.frame(canvas, s);
-    return {
-      x: (clientX - rect.left - canvas.clientLeft) * (canvas.width / cssW) / s - frame.ox,
-      y: (clientY - rect.top - canvas.clientTop) * (canvas.height / cssH) / s - frame.oy
-    };
+  // Where a client point falls in the space the view projects into.
+  function at(clientX, clientY) {
+    return B.view.basePoint(canvas, scale(), clientX, clientY);
   }
 
   function pick(clientX, clientY) {
-    var at = basePoint(clientX, clientY);
-    return at && B.view.pick(state.view, state.level, at.x, at.y);
+    var p = at(clientX, clientY);
+    return p && B.view.pick(state.view, state.level, p.x, p.y);
   }
 
-  // Two client corners as a rectangle in the same space, the lower corner
-  // first whichever way the sweep ran.
+  // Two client corners as a rectangle in the same space, in the order swept:
+  // both the renderer and view.within read them either way round.
   function baseBox(x0, y0, x1, y1) {
-    var a = basePoint(x0, y0);
-    var b = basePoint(x1, y1);
-    if (!a || !b) return null;
-    return {
-      x0: Math.min(a.x, b.x),
-      y0: Math.min(a.y, b.y),
-      x1: Math.max(a.x, b.x),
-      y1: Math.max(a.y, b.y)
-    };
+    var a = at(x0, y0);
+    var b = at(x1, y1);
+    return a && b ? { x0: a.x, y0: a.y, x1: b.x, y1: b.y } : null;
   }
 
   // ---- Render --------------------------------------------------------------

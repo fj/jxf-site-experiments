@@ -243,8 +243,9 @@ the palette in `config.js` — nothing is a bitmap file. Modules on the
 sprites, string-art, shading, memoizing), `level.js`, `file.js`, `view.js` and
 `demo.js` (the pure models: tiles and their edits and validation; the
 `*.blocklayer.json` file a level is saved to and opened from; rotation,
-projection, picking, the frame; the level a first visit starts with — all
-unit-tested under `tests/`), `sprites-tiles.js`, `sprites-decor.js`,
+projection, picking, the frame and the way in from a pointer; the level a first
+visit starts with — all unit-tested under `tests/`), `sprites-tiles.js`,
+`sprites-decor.js`,
 `sprites-marks.js`, `sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`,
 and `app.js` last, with the kit's `shared/png.js` for the file download.
 The level autosaves to `localStorage`, and a `.blocklayer.json` dropped on the

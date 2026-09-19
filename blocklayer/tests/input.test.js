@@ -339,6 +339,72 @@ describe("input: hold to remove", () => {
   });
 });
 
+describe("input: the right button and the selection", () => {
+  it("a right press on an empty cell drops the selection and starts no hold", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: SECONDARY });
+    r.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.calls, [["deselect"]]);
+  });
+
+  it("a right press on another tile drops the selection, then holds to remove that tile", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    r.fire("pointerdown", { ...r.at(50, 50, tile(2, 2)), button: SECONDARY });
+    assert.deepEqual(r.calls, [["deselect"], ["hold", 2, 2, 0]]);
+    r.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.of("remove"), [[2, 2]]);
+    assert.deepEqual(r.of("deselect"), [[]]);
+  });
+
+  it("a tile that shares a row or a column with the selection is another tile", () => {
+    for (const hit of [tile(1, 2), tile(2, 1)]) {
+      const where = `${hit.tile.x},${hit.tile.y}`;
+      const r = rig();
+      r.select({ x: 1, y: 1 });
+      r.fire("pointerdown", { ...r.at(50, 50, hit), button: SECONDARY });
+      assert.deepEqual(r.of("deselect"), [[]], where);
+      assert.deepEqual(r.of("hold"), [[hit.tile.x, hit.tile.y, 0]], where);
+    }
+  });
+
+  it("a right press off the canvas drops the selection and starts no hold", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    r.at(WIDTH + 5, 10, tile(9, 9));
+    r.fire("pointerdown", { clientX: WIDTH + 5, clientY: 10, button: SECONDARY });
+    assert.deepEqual(r.calls, [["deselect"]]);
+  });
+
+  it("a right press on the selected tile keeps the selection and still removes it", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: SECONDARY });
+    assert.deepEqual(r.of("hold"), [[1, 1, 0]]);
+    r.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.of("remove"), [[1, 1]]);
+    assert.deepEqual(r.of("deselect"), []);
+  });
+
+  it("with nothing selected, a right press deselects nothing, on a tile or off one", () => {
+    const r = rig();
+    r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: SECONDARY });
+    r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: SECONDARY });
+    r.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.of("deselect"), []);
+    assert.deepEqual(r.of("remove"), [[1, 1]]);
+  });
+
+  it("a left press leaves the selection to the select handler", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: PRIMARY });
+    r.fire("pointerdown", { ...r.at(50, 50, tile(2, 2)), button: PRIMARY });
+    assert.deepEqual(r.of("deselect"), []);
+  });
+});
+
 describe("input: the wheel", () => {
   it("raises or lowers the selected tile under the pointer and swallows the event", () => {
     const r = rig();

@@ -2,8 +2,9 @@
  * Blocklayer — the pointer, wheel and keyboard on the canvas, read as editing
  * gestures: click or drag over empty cells to add, click a tile to select it,
  * wheel over the selection to elevate it, hold the right button to remove,
- * and keys that move the view, move the level, step the foreground colour, or
- * edit the selected tile.
+ * press the right button off the selected tile to deselect, and keys that move
+ * the view, move the level, step the foreground colour, or edit the selected
+ * tile.
  * Nothing here knows the level; every gesture ends in one of the handlers.
  * keyFor() names the key bound to a handler call, for the toolbar's tooltips.
  */
@@ -180,6 +181,14 @@
       if (selected) handlers.remove(selected.x, selected.y);
     }
 
+    // The selection survives a right button only on the selected tile itself.
+    function dropSelection(tile) {
+      var selected = handlers.selected();
+      if (!selected) return;
+      if (B.sameCell(tile, selected.x, selected.y)) return;
+      handlers.deselect();
+    }
+
     function onDown(e) {
       if (e.button !== PRIMARY_BUTTON && e.button !== SECONDARY_BUTTON) return;
       e.preventDefault();
@@ -191,9 +200,11 @@
         lastCell = null;
         if (hit && hit.cell) handlers.hover(addCell(e, hit.cell));
         else if (hit && hit.tile) handlers.select(hit.tile.x, hit.tile.y);
-      } else if (hit && hit.tile) {
-        startHold(hit.tile);
+        return;
       }
+      var tile = hit && hit.tile;
+      dropSelection(tile);
+      if (tile) startHold(tile);
     }
 
     function onMove(e) {

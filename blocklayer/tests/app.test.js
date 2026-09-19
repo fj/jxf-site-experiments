@@ -75,9 +75,13 @@ function levelText(size) {
 }
 
 // A file opens at once, with no text of its own: what the text becomes is
-// file.js's, which each test says for itself.
+// file.js's, which each test says for itself. A file marked unreadable fails
+// the way a browser fails one it cannot read.
 globalThis.FileReader = class {
-  readAsText() { this.onload(); }
+  readAsText(file) {
+    if (file && file.unreadable) this.onerror();
+    else this.onload();
+  }
 };
 
 // The three calls the app makes on the level and the camera, logged on their
@@ -741,20 +745,30 @@ describe("app: a level opened from a file", () => {
   });
 
   it("opens the file the reader chooses with the picker", () => {
-    const r = opening(null);
+    const r = boot(PAIR);
     r.opened = r.B.level.create(OPENED.w, OPENED.h);
+    r.B.file.parse = () => r.opened;
     const picker = r.picker();
     picker.files = [{}];
     picker.fire("change");
     assert.equal(r.frame().level, r.opened);
   });
 
-  it("says so on the status line when the file is no level, and changes nothing", () => {
+  it("says so on the status line when the file is no level, and changes nothing", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
     const r = opening(null);
     assert.equal(r.status().textContent, NOT_A_LEVEL);
     assert.equal(r.frame().level, r.level, "the level on the board is untouched");
     assert.deepEqual(r.cells(), PAIR);
     assert.deepEqual(r.selected(), [PAIR[0]], "and so is the selection");
+  });
+
+  it("says the same of a file the browser will not read", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = boot(PAIR);
+    r.canvas.fire("drop", { dataTransfer: { files: [{ unreadable: true }] } });
+    assert.equal(r.status().textContent, NOT_A_LEVEL);
+    assert.deepEqual(r.cells(), PAIR);
   });
 
   it("takes the message off the status line after its time", (t) => {
@@ -764,6 +778,15 @@ describe("app: a level opened from a file", () => {
     assert.equal(r.status().textContent, NOT_A_LEVEL, "still there a moment short of it");
     t.mock.timers.tick(1);
     assert.equal(r.status().textContent, "");
+  });
+
+  it("gives a later message its own full time, however near the last one was", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = opening(null);
+    t.mock.timers.tick(r.B.STATUS_MS - 1);
+    r.canvas.fire("drop", DROP);
+    t.mock.timers.tick(1);
+    assert.equal(r.status().textContent, NOT_A_LEVEL, "the first message's timer was stopped");
   });
 });
 
@@ -806,7 +829,8 @@ describe("app: a file dragged over the canvas", () => {
   it("takes the mark off when the file is dropped", () => {
     const r = boot();
     r.canvas.fire("dragover");
-    r.canvas.fire("drop", { dataTransfer: null });
+    const dropped = r.canvas.fire("drop", { dataTransfer: null });
+    assert.equal(dropped.prevented, true, "the browser does not open the file itself");
     assert.equal(marked(r), false);
   });
 });

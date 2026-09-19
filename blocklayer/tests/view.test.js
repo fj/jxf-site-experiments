@@ -180,76 +180,6 @@ describe("view: order", () => {
   });
 });
 
-describe("view: hit", () => {
-  const view = V.create();
-  const COLUMN_ELEV = 4;                          // the blocks under the tile most tests probe
-  const block = tile({ x: 0, y: 0, elev: COLUMN_ELEV });
-  const columnH = (COLUMN_ELEV - B.FLOOR) * B.BLOCK_H;
-
-  // dx, dy from the centre of the tile's own elevation: the top face of a
-  // block, the foot of a slope.
-  function hitAt(t, dx, dy) {
-    const at = V.project(view, t.x, t.y, t.elev);
-    return V.hit(view, t, at.sx + dx, at.sy + dy);
-  }
-
-  it("is true inside the top diamond and on its upper outline", () => {
-    const inside = [[0, 0], [0, -7], [10, 0], [-10, 0], [15, 0], [8, -3], [0, 7]];
-    const upperEdge = [[0, -8], [8, -4], [-8, -4]];
-    for (const [dx, dy] of [...inside, ...upperEdge]) {
-      assert.equal(hitAt(block, dx, dy), true, `${dx},${dy}`);
-    }
-  });
-
-  it("is true on the side faces down to the floor", () => {
-    for (const [dx, dy] of [[0, 40], [-15, 20], [15, 20], [0, columnH + 8], [15, columnH]]) {
-      assert.equal(hitAt(block, dx, dy), true, `${dx},${dy}`);
-    }
-  });
-
-  it("is false just outside the silhouette, its side vertices included", () => {
-    const outside = [[17, 0], [-17, 0], [0, -9], [10, -4], [-10, -4], [16, -1]];
-    const sideVertices = [[16, 0], [-16, 0], [16, columnH]];
-    for (const [dx, dy] of [...outside, ...sideVertices]) {
-      assert.equal(hitAt(block, dx, dy), false, `${dx},${dy}`);
-    }
-  });
-
-  it("is false below the column's bottom", () => {
-    for (const [dx, dy] of [[0, columnH + 9], [10, columnH + 4], [16, columnH + 1]]) {
-      assert.equal(hitAt(block, dx, dy), false, `${dx},${dy}`);
-    }
-  });
-
-  it("is the top diamond alone for a tile with no blocks under it", () => {
-    const flat = tile({ x: 0, y: 0, elev: B.ELEV_MIN });
-    for (const [dx, dy] of [[0, 0], [0, 7], [0, -7], [15, 0], [-15, 0], [8, -3]]) {
-      assert.equal(hitAt(flat, dx, dy), true, `${dx},${dy}`);
-    }
-    for (const [dx, dy] of [[0, 9], [0, -9], [16, 0], [10, 5], [10, -5]]) {
-      assert.equal(hitAt(flat, dx, dy), false, `${dx},${dy}`);
-    }
-  });
-
-  it("rises one block for a ramp or stairs but still stands on the same floor", () => {
-    for (const shape of ["ramp", "stairs"]) {
-      const sloped = tile({ x: 0, y: 0, elev: COLUMN_ELEV, shape });
-      assert.equal(hitAt(sloped, 0, -B.BLOCK_H - 4), true, shape);
-      assert.equal(hitAt(sloped, 0, columnH + 8), true, shape);
-      assert.equal(hitAt(sloped, 0, columnH + 9), false, shape);
-    }
-    assert.equal(hitAt(block, 0, -B.BLOCK_H - 4), false);
-  });
-
-  it("follows the tile through rotation and pan", () => {
-    const turned = viewAt(3, { x: 40, y: -30 });
-    const t = tile({ x: 2, y: -1, elev: 1 });
-    const p = V.project(turned, 2, -1, 1);
-    assert.equal(V.hit(turned, t, p.sx, p.sy), true);
-    assert.equal(V.hit(turned, t, p.sx + B.TILE_W / 2 + 1, p.sy), false);
-  });
-});
-
 describe("view: pick", () => {
   // The hole a ring of four neighbours leaves, which each of them paints over:
   //     .X.
@@ -288,14 +218,12 @@ describe("view: pick", () => {
     assert.deepEqual(V.pick(view, level, p.sx, p.sy - 7), { tile: front });
   });
 
-  it("returns the front-most tile where two overlap and each where they do not", () => {
+  it("returns the tile whose top face is under the point, not the one whose side is", () => {
     const { view, level } = scene();
     const behind = L.add(level, 0, 0, B.NEW_TILE_ELEV);
     const front = L.add(level, 1, 0, B.NEW_TILE_ELEV);
     const p = V.project(view, 0, 0, B.NEW_TILE_ELEV);
-    const overlap = { sx: p.sx + 8, sy: p.sy + 8 };
-    assert.equal(V.hit(view, behind, overlap.sx, overlap.sy), true);
-    assert.equal(V.hit(view, front, overlap.sx, overlap.sy), true);
+    const overlap = { sx: p.sx + 8, sy: p.sy + 8 };   // behind's side, front's top
     assert.deepEqual(V.pick(view, level, overlap.sx, overlap.sy), { tile: front });
     assert.deepEqual(V.pick(view, level, p.sx - 8, p.sy), { tile: behind });
     assert.deepEqual(V.pick(view, level, p.sx + 24, p.sy + 8), { tile: front });
@@ -324,6 +252,18 @@ describe("view: pick", () => {
           assert.deepEqual(V.pick(view, level, p.sx + dx, p.sy + dy), { tile: probe }, name);
         }
       }
+    }
+  });
+
+  it("leaves the points past a column's top diamond to the floor the ray reaches", () => {
+    const { view, level } = scene();
+    const TALL = 4;
+    L.add(level, 0, 0, TALL);
+    const p = V.project(view, 0, 0, TALL);
+    for (const [dx, dy] of [[17, 0], [-17, 0], [0, -9], [10, -4], [-10, -4]]) {
+      const at = { sx: p.sx + dx, sy: p.sy + dy };
+      const floor = V.cellAt(view, at.sx, at.sy, B.FLOOR);
+      assert.deepEqual(V.pick(view, level, at.sx, at.sy), { cell: floor }, `${dx},${dy}`);
     }
   });
 

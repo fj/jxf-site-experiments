@@ -98,16 +98,6 @@
     });
   }
 
-  function hit(view, tile, sx, sy) {
-    var top = B.level.top(tile);
-    var centre = project(view, tile.x, tile.y, top);
-    var height = (top - B.FLOOR) * B.BLOCK_H;
-    var dx = Math.abs(sx - centre.sx);
-    var dy = sy - centre.sy;
-    var edge = HALF_TILE_H * (1 - dx / HALF_TILE_W);
-    return dx < HALF_TILE_W && dy >= -edge && dy <= height + edge;
-  }
-
   // The first tile the ray from the eye through the point meets, else the cell
   // of the floor under it: where a new column's base would stand. The cell the
   // point falls in at each height, from the top down, is that ray. The floor is
@@ -161,7 +151,6 @@
     project: project,
     cellAt: cellAt,
     order: order,
-    hit: hit,
     pick: pick,
     sameHit: sameHit,
     viewFacing: viewFacing,

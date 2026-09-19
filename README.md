@@ -223,8 +223,11 @@ object (a chest, a rock, three crystal pillars) and any number of marks (eight
 compass arrows, a teleport, a rope, a jump). The view turns in
 quarter turns, zooms at whole-number factors, pans in the four compass
 directions, hides or shows the elevation labels, the marks and the decor, and
-draws the tiles solid or see-through. A light grey grid rules the floor under
-the scene. Editing happens on the canvas: hover shows where a tile would go,
+draws the tiles solid or see-through, and never so far past the board's edge
+that none of it is in sight. A light grey grid rules the board's floor, inside
+an outline that shows where the level ends; tiles live only on it. Editing
+happens on the canvas: hover shows where a tile would go, `Alt` with the
+pointer reads a tile out — elevation, colour, shape, decor —
 click or drag adds tiles, click selects one, `Ctrl` or `Cmd` with a click puts
 a tile in the selection or takes it out, `Shift` with a drag sweeps a box of
 them in, the wheel raises or lowers the selection, the right button held removes

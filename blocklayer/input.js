@@ -1,10 +1,11 @@
 /*
  * Blocklayer — the pointer, wheel and keyboard on the canvas, read as editing
  * gestures: click or drag over empty cells to add, click a tile to select it,
- * wheel over the selection to elevate it, hold the right button to remove,
- * press the right button off the selected tile to deselect, and keys that move
- * the view, move the level, step the foreground colour, or edit the selected
- * tile.
+ * Ctrl or Cmd with a click to toggle a tile in the selection, Shift with a
+ * drag to sweep every tile in a box into it, wheel over the selection to
+ * elevate it, hold the right button to remove, press the right button off the
+ * selection to deselect, and keys that move the view, move the level, step the
+ * foreground colour, or edit the selection.
  * Nothing here knows the level; every gesture ends in one of the handlers.
  * keyFor() names the key bound to a handler call, for the toolbar's tooltips.
  */
@@ -18,7 +19,7 @@
 
   // Each key names the handler it calls and what it passes. The view keys go
   // by e.key and the rest by its lowercase form. A level key acts whatever is
-  // selected; a tile key needs a selected tile.
+  // selected; a tile key needs a selection.
   var VIEW_KEYS = {
     ArrowUp: ["pan", "N"],
     ArrowRight: ["pan", "E"],
@@ -32,8 +33,8 @@
     Escape: ["deselect"]
   };
 
-  // The elevation keys raise and lower the selected tile, or the height a new
-  // tile gets when none is selected.
+  // The elevation keys raise and lower the selection, or the height a new tile
+  // gets when nothing is selected.
   var LEVEL_KEYS = {
     w: ["raise", 1],
     s: ["raise", -1]
@@ -126,6 +127,7 @@
     var dragging = false;
     var lastCell = null;
     var hold = null;
+    var sweep = null;       // where a shift drag began, in client space
 
     function inside(e) {
       var rect = canvas.getBoundingClientRect();
@@ -177,17 +179,62 @@
       handlers.hold(held.x, held.y, null);
     }
 
+    // The copy outlives the removals, which take each cell out of the
+    // selection as they go.
     function removeSelected() {
-      var selected = handlers.selected();
-      if (selected) handlers.remove(selected.x, selected.y);
+      handlers.selection().slice().forEach(function (cell) {
+        handlers.remove(cell.x, cell.y);
+      });
     }
 
-    // The selection survives a right button only on the selected tile itself.
+    // The selection survives a right button only on a tile it holds.
     function dropSelection(tile) {
-      var selected = handlers.selected();
-      if (!selected) return;
-      if (B.sameCell(tile, selected.x, selected.y)) return;
+      var cells = handlers.selection();
+      if (!cells.length) return;
+      if (tile && B.inCells(cells, tile.x, tile.y)) return;
       handlers.deselect();
+    }
+
+    // The box the sweep covers so far, from the press to the pointer. Both
+    // box() and selectBox() take the two corners in client space, as the
+    // pointer gives them, and in that order.
+    function trackSweep(e) {
+      handlers.box(sweep.x, sweep.y, e.clientX, e.clientY);
+    }
+
+    // Takes the box off the canvas and answers where the sweep began.
+    function clearSweep() {
+      var from = sweep;
+      sweep = null;
+      if (from) handlers.box(null);
+      return from;
+    }
+
+    // A release inside the canvas sweeps every tile in the box into the
+    // selection; one outside it selects nothing.
+    function endSweep(e) {
+      var from = clearSweep();
+      if (from && inside(e)) handlers.selectBox(from.x, from.y, e.clientX, e.clientY);
+    }
+
+    // Ctrl, or Cmd on a Mac, makes a press toggle the tile under it in the
+    // selection. Over an empty cell it does nothing at all, so a press that
+    // builds a selection can never lay a tile by accident. Shift makes the
+    // press sweep a box instead, which lays no tiles either.
+    function leftDown(e, hit) {
+      var tile = hit && hit.tile;
+      if (e.ctrlKey || e.metaKey) {
+        if (tile) handlers.toggleSelect(tile.x, tile.y);
+        return;
+      }
+      if (e.shiftKey) {
+        sweep = { x: e.clientX, y: e.clientY };
+        return;
+      }
+      dragging = true;
+      lastCell = null;
+      if (hit && hit.cell) handlers.hover(addCell(e, hit.cell));
+      else if (tile) handlers.select(tile.x, tile.y);
     }
 
     function onDown(e) {
@@ -199,10 +246,7 @@
       canvas.setPointerCapture(e.pointerId);
       var hit = pick(e);
       if (e.button === PRIMARY_BUTTON) {
-        dragging = true;
-        lastCell = null;
-        if (hit && hit.cell) handlers.hover(addCell(e, hit.cell));
-        else if (hit && hit.tile) handlers.select(hit.tile.x, hit.tile.y);
+        leftDown(e, hit);
         return;
       }
       var tile = hit && hit.tile;
@@ -211,6 +255,7 @@
     }
 
     function onMove(e) {
+      if (sweep) trackSweep(e);
       var hit = pick(e);
       var cell = hit && hit.cell;
       var tile = hit && hit.tile;
@@ -222,12 +267,16 @@
     }
 
     function onUp(e) {
-      if (e.button === PRIMARY_BUTTON) endDrag();
+      if (e.button === PRIMARY_BUTTON) {
+        endDrag();
+        endSweep(e);
+      }
       if (e.button === SECONDARY_BUTTON) cancelHold();
     }
 
     function onCancel() {
       endDrag();
+      clearSweep();
       cancelHold();
     }
 
@@ -238,8 +287,8 @@
 
     function onWheel(e) {
       var hit = pick(e);
-      var selected = handlers.selected();
-      if (!e.deltaY || !hit || !hit.tile || !B.sameCell(selected, hit.tile.x, hit.tile.y)) return;
+      if (!e.deltaY || !hit || !hit.tile) return;
+      if (!B.inCells(handlers.selection(), hit.tile.x, hit.tile.y)) return;
       e.preventDefault();
       handlers.raise(e.deltaY < 0 ? 1 : -1);
       handlers.hover(pick(e));
@@ -267,7 +316,7 @@
       var key = e.key.toLowerCase();
       if (e.shiftKey) return run(SHIFT_LEVEL_KEYS[key] || colorAction(SHIFT_COLOR_KEYS[key]));
       if (run(LEVEL_KEYS[key] || colorAction(COLOR_KEYS[key]))) return true;
-      if (!handlers.selected()) return false;
+      if (!handlers.selection().length) return false;
       if (TILE_KEYS[key]) return run(TILE_KEYS[key]);
       if (key !== REMOVE_SELECTED_KEY) return false;
       removeSelected();

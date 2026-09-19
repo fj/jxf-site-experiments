@@ -75,11 +75,13 @@ function fakeCanvas() {
 function rig() {
   const clock = fakeWindow();
   const B = load(["config.js", "input.js"], clock.window);
+  // config.js grows inCells in the change that makes the selection a list.
+  B.inCells = B.inCells || ((cells, x, y) => cells.some((c) => c.x === x && c.y === y));
   const canvas = fakeCanvas();
   const hits = new Map();
   const added = new Set();
   const calls = [];
-  let selected = null;
+  let selection = [];
   let color = B.DEFAULT_COLOR;
   const record = (name) => (...args) => { calls.push([name, ...args]); };
   const key = (x, y) => `${x},${y}`;
@@ -90,14 +92,23 @@ function rig() {
   };
   const handlers = {
     pick,
-    selected: () => selected,
+    selection: () => selection,
     hover: record("hover"),
     add: (x, y) => { record("add")(x, y); added.add(key(x, y)); },
     select: record("select"),
+    toggleSelect: record("toggleSelect"),
+    box: record("box"),
+    selectBox: record("selectBox"),
     raise: record("raise"),
     raiseAll: record("raiseAll"),
     hold: record("hold"),
-    remove: record("remove"),
+    // app.js takes a tile it removes out of the selection, in place, as a
+    // model that hands the same list to every caller would.
+    remove: (x, y) => {
+      record("remove")(x, y);
+      const at = selection.findIndex((c) => c.x === x && c.y === y);
+      if (at !== -1) selection.splice(at, 1);
+    },
     pan: record("pan"),
     rotate: record("rotate"),
     zoom: record("zoom"),
@@ -121,7 +132,7 @@ function rig() {
       hits.set(`${x},${y}`, hit);
       return { clientX: x, clientY: y };
     },
-    select(cell) { selected = cell; },
+    select(...cells) { selection = cells; },
     of(name) { return calls.filter((c) => c[0] === name).map((c) => c.slice(1)); },
     fire(type, props) { return canvas.fire(type, props); }
   };
@@ -246,6 +257,177 @@ describe("input: adding by click and drag", () => {
     assert.equal(r.canvas.focused, false);
     assert.equal(r.canvas.captured, null);
     assert.equal(e.prevented, false);
+  });
+});
+
+// Ctrl and Cmd are one gesture: a Mac reads Cmd, and Ctrl+click there also
+// makes the context menu the canvas swallows.
+const TOGGLE_KEYS = [{ ctrlKey: true }, { metaKey: true }];
+
+describe("input: Ctrl or Cmd to toggle a tile in the selection", () => {
+  it("toggles the tile under the pointer and selects nothing outright", () => {
+    for (const modifier of TOGGLE_KEYS) {
+      const r = rig();
+      r.select({ x: 2, y: 2 });
+      r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: PRIMARY, ...modifier });
+      assert.deepEqual(r.calls, [["toggleSelect", 1, 1]], Object.keys(modifier)[0]);
+    }
+  });
+
+  // Which way it goes is the handler's to decide, so a tile already in the
+  // selection takes the same call.
+  it("toggles a tile that is already in the selection", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 });
+    r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: PRIMARY, ctrlKey: true });
+    assert.deepEqual(r.calls, [["toggleSelect", 1, 1]]);
+  });
+
+  it("on an empty cell it does nothing at all, and is still swallowed", () => {
+    for (const modifier of TOGGLE_KEYS) {
+      const r = rig();
+      const a = r.at(10, 10, cell(0, 0));
+      const e = r.fire("pointerdown", { ...a, button: PRIMARY, ...modifier });
+      r.tick(r.B.HOLD_MS);
+      assert.deepEqual(r.calls, [], Object.keys(modifier)[0]);
+      assert.equal(e.prevented, true);
+    }
+  });
+
+  it("starts no drag, on a tile or on an empty cell", () => {
+    for (const hit of [tile(1, 1), cell(0, 0)]) {
+      const r = rig();
+      const from = r.at(20, 20, hit);
+      const c = r.at(50, 20, cell(2, 1));
+      r.fire("pointerdown", { ...from, button: PRIMARY, ctrlKey: true });
+      r.fire("pointermove", c);
+      assert.deepEqual(r.of("add"), []);
+    }
+  });
+
+  it("wins over Shift: the press toggles the tile and sweeps no box", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    const to = r.at(50, 50, cell(2, 2));
+    r.fire("pointerdown", { ...t, button: PRIMARY, ctrlKey: true, shiftKey: true });
+    r.fire("pointermove", to);
+    r.fire("pointerup", { ...to, button: PRIMARY });
+    assert.deepEqual(r.of("toggleSelect"), [[1, 1]]);
+    assert.deepEqual(r.of("box"), []);
+    assert.deepEqual(r.of("selectBox"), []);
+  });
+});
+
+const OFF_CANVAS = { clientX: WIDTH + 5, clientY: 10 };
+
+describe("input: Shift to sweep a box of tiles into the selection", () => {
+  it("reports the box from the press to the pointer, then selects it at the release", () => {
+    const r = rig();
+    r.select({ x: 9, y: 9 });
+    const from = r.at(10, 10, cell(0, 0));
+    const over = r.at(40, 30, cell(1, 0));
+    const to = r.at(70, 50, cell(2, 0));
+    r.fire("pointerdown", { ...from, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", over);
+    r.fire("pointermove", to);
+    assert.deepEqual(r.of("box"), [[10, 10, 40, 30], [10, 10, 70, 50]]);
+    // The button may outlast the key that started the sweep.
+    r.fire("pointerup", { ...to, button: PRIMARY });
+    assert.deepEqual(r.of("box").pop(), [null]);
+    assert.deepEqual(r.of("selectBox"), [[10, 10, 70, 50]]);
+    assert.deepEqual(r.of("select"), []);
+    assert.deepEqual(r.of("deselect"), []);
+  });
+
+  // The corners go to the handlers as they were swept, from the press: which
+  // one is the lower and which the higher is the handler's to sort out.
+  it("a sweep up and to the left keeps the press corner first", () => {
+    const r = rig();
+    const from = r.at(70, 50, cell(2, 0));
+    const to = r.at(10, 10, cell(0, 0));
+    r.fire("pointerdown", { ...from, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", to);
+    r.fire("pointerup", { ...to, button: PRIMARY });
+    assert.deepEqual(r.of("box"), [[70, 50, 10, 10], [null]]);
+    assert.deepEqual(r.of("selectBox"), [[70, 50, 10, 10]]);
+  });
+
+  it("the press is swallowed and captures the pointer, as any other is", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const e = r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true, pointerId: 7 });
+    assert.equal(e.prevented, true);
+    assert.equal(r.canvas.captured, 7);
+  });
+
+  // The capture keeps the pointer events coming, so the sweep goes on over
+  // the edge of the canvas, as a drag that adds tiles does.
+  it("survives a trip off the canvas and back", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const b = r.at(40, 30, cell(1, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", OFF_CANVAS);
+    r.fire("pointerleave", OFF_CANVAS);
+    r.fire("pointermove", b);
+    r.fire("pointerup", { ...b, button: PRIMARY });
+    assert.deepEqual(r.of("selectBox"), [[10, 10, 40, 30]]);
+  });
+
+  it("a shift click that never moves sweeps a box of no size and reports none", () => {
+    const r = rig();
+    const a = r.at(20, 20, tile(1, 1));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointerup", { ...a, button: PRIMARY });
+    assert.deepEqual(r.of("selectBox"), [[20, 20, 20, 20]]);
+    assert.deepEqual(r.of("box"), [[null]]);
+    assert.deepEqual(r.of("select"), []);
+    assert.deepEqual(r.of("add"), []);
+  });
+
+  it("adds no tiles, even when the sweep crosses empty cells", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const b = r.at(40, 10, cell(1, 0));
+    const c = r.at(70, 10, cell(2, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", b);
+    r.fire("pointermove", c);
+    r.fire("pointerup", { ...c, button: PRIMARY });
+    assert.deepEqual(r.of("add"), []);
+    assert.deepEqual(r.of("selectBox"), [[10, 10, 70, 10]]);
+  });
+
+  it("a cancelled sweep clears the box and selects nothing, then or on the release", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const b = r.at(40, 30, cell(1, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", b);
+    r.fire("pointercancel", b);
+    assert.deepEqual(r.of("box").pop(), [null]);
+    r.fire("pointerup", { ...b, button: PRIMARY });
+    assert.deepEqual(r.of("selectBox"), []);
+  });
+
+  it("a sweep that ends off the canvas clears the box and selects nothing", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", OFF_CANVAS);
+    r.fire("pointerup", { ...OFF_CANVAS, button: PRIMARY });
+    assert.deepEqual(r.of("box"), [[10, 10, OFF_CANVAS.clientX, OFF_CANVAS.clientY], [null]]);
+    assert.deepEqual(r.of("selectBox"), []);
+  });
+
+  it("the pointer moving with no sweep under way reports no box", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY });
+    r.fire("pointermove", r.at(40, 10, cell(1, 0)));
+    r.fire("pointerup", { ...a, button: PRIMARY });
+    assert.deepEqual(r.of("box"), []);
+    assert.deepEqual(r.of("selectBox"), []);
   });
 });
 
@@ -396,6 +578,17 @@ describe("input: the right button and the selection", () => {
     assert.deepEqual(r.of("deselect"), []);
   });
 
+  it("a right press keeps a selection of several on a tile in it, and drops it on one outside", () => {
+    for (const [hit, deselects] of [[tile(2, 2), []], [tile(3, 3), [[]]]]) {
+      const where = `${hit.tile.x},${hit.tile.y}`;
+      const r = rig();
+      r.select({ x: 1, y: 1 }, { x: 2, y: 2 });
+      r.fire("pointerdown", { ...r.at(50, 50, hit), button: SECONDARY });
+      assert.deepEqual(r.of("deselect"), deselects, where);
+      assert.deepEqual(r.of("hold"), [[hit.tile.x, hit.tile.y, 0]], where);
+    }
+  });
+
   it("with nothing selected, a right press deselects nothing, on a tile or off one", () => {
     const r = rig();
     r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: SECONDARY });
@@ -425,6 +618,14 @@ describe("input: the wheel", () => {
     assert.equal(up.prevented, true);
     assert.equal(down.prevented, true);
     assert.deepEqual(r.of("hover"), [[tile(1, 1)], [tile(1, 1)]]);
+  });
+
+  it("raises a tile that is one of several selected", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 });
+    const t = r.at(50, 50, tile(2, 2));
+    assert.equal(r.fire("wheel", { ...t, deltaY: -100 }).prevented, true);
+    assert.deepEqual(r.of("raise"), [[1]]);
   });
 
   it("does nothing over an unselected tile, an empty cell, or with no vertical delta", () => {
@@ -467,10 +668,20 @@ describe("input: the keyboard", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
     r.fire("keydown", { key: "Delete" });
+    r.select({ x: 1, y: 1 });
     r.fire("keydown", { key: "Backspace" });
-    r.select(null);
+    r.select();
     assert.equal(r.fire("keydown", { key: "Delete" }).prevented, true);
     assert.deepEqual(r.of("remove"), [[1, 1], [1, 1]]);
+  });
+
+  // Each removal takes its cell out of the selection, so the last cell is
+  // reached only by a key that reads the whole selection first.
+  it("Delete removes every tile in the selection, oldest first", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 });
+    assert.equal(r.fire("keydown", { key: "Delete" }).prevented, true);
+    assert.deepEqual(r.of("remove"), [[1, 1], [2, 2], [3, 3]]);
   });
 
   it("Escape deselects", () => {
@@ -577,6 +788,13 @@ describe("input: keys on the selected tile", () => {
   it("x removes the selected tile", () => {
     const r = pressOnSelected([["x"]]);
     assert.deepEqual(r.calls, [["remove", 1, 1]]);
+  });
+
+  it("x removes every tile in the selection, oldest first", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 });
+    assert.equal(r.fire("keydown", { key: "x" }).prevented, true);
+    assert.deepEqual(r.of("remove"), [[1, 1], [2, 2], [3, 3]]);
   });
 
   it("with nothing selected, every tile key does nothing and is not swallowed", () => {

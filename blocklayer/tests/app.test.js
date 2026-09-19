@@ -472,6 +472,26 @@ describe("app: the controls that change the selection", () => {
     r.canvas.fire("keydown", { key: "Escape" });
     assert.deepEqual(r.selected(), []);
   });
+
+  it("sweeps a box with Shift, and takes every tile inside it in", () => {
+    const r = boot(PAIR);
+    r.canvas.fire("pointerdown", { ...r.over(0, 0), button: PRIMARY, shiftKey: true });
+    r.canvas.fire("pointermove", r.over(1, 0));
+    assert.ok(r.frame().box, "the rectangle the sweep is drawing");
+    r.canvas.fire("pointerup", { ...r.over(1, 0), button: PRIMARY });
+    assert.equal(r.frame().box, null, "which goes when the sweep ends");
+    assert.deepEqual(r.selected(), PAIR);
+  });
+});
+
+describe("app: what the pointer is over", () => {
+  it("hands the renderer the tile under the pointer, and none once it leaves", () => {
+    const r = boot(PAIR);
+    r.canvas.fire("pointermove", r.over(0, 0));
+    assert.equal(r.frame().hover.tile, r.tileAt(0, 0));
+    r.canvas.fire("pointerleave", r.over(0, 0));
+    assert.equal(r.frame().hover, null);
+  });
 });
 
 describe("app: the board's size", () => {

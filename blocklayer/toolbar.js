@@ -1,13 +1,15 @@
 /*
  * Blocklayer — the toolbar: a column of pixel-art buttons that pan, turn and
- * zoom the view, show or hide its layers, and edit the selected tile's shape,
- * facing, colour, decor and marks, and save, open or clear the level. The
- * colour buttons pick the foreground when no tile is selected. The direction
- * buttons are a compass rose that does not turn with the view. The DOM is
- * built once; sync() sets every pressed and disabled state from the app's
- * state, and the two icons that follow it (solid, facing), leaving an icon
- * alone when it already shows the right glyph. element() and icon() lend the
- * toolbar's builders to the rest of the interface.
+ * zoom the view, show or hide its layers, and edit the selected tiles' shape,
+ * facing, colour, decor and marks, and save, open or clear the level. A toggle
+ * is pressed only when every selected tile carries its value, so a selection
+ * that disagrees shows none pressed. The colour buttons pick the foreground
+ * when no tile is selected. The direction buttons are a compass rose that does
+ * not turn with the view. The DOM is built once; sync() sets every pressed and
+ * disabled state from the app's state, and the two icons that follow it
+ * (solid, facing), leaving an icon alone when it already shows the right
+ * glyph. element() and icon() lend the toolbar's builders to the rest of the
+ * interface.
  */
 (function () {
   "use strict";
@@ -125,20 +127,49 @@
     btn.setAttribute("aria-pressed", on ? "true" : "false");
   }
 
-  // A toggle that edits the selected tile: enabled when there is one, and
-  // pressed when `on`.
-  function syncToggle(btn, tile, on) {
-    btn.disabled = !tile;
-    press(btn, !!tile && !!on);
+  // A toggle that edits the selection: enabled while it holds a tile, and
+  // pressed while every tile in it carries the value.
+  function syncToggle(btn, tiles, carries) {
+    btn.disabled = !tiles.length;
+    press(btn, tiles.length > 0 && tiles.every(carries));
   }
 
   function opaqueIcon(opaque) {
     return opaque ? "opaque" : "transparent";
   }
 
-  function selectedTile(state) {
-    var sel = state.selected;
-    return sel ? B.level.get(state.level, sel.x, sel.y) : null;
+  function tileAt(state, cell) {
+    return cell ? B.level.get(state.level, cell.x, cell.y) : null;
+  }
+
+  function selectedTiles(state) {
+    var tiles = [];
+    state.selection.forEach(function (cell) {
+      var tile = tileAt(state, cell);
+      if (tile) tiles.push(tile);
+    });
+    return tiles;
+  }
+
+  // The tile a button that shows one value reads: the one on the last cell the
+  // selection took.
+  function anchorTile(state) {
+    return tileAt(state, state.selection[state.selection.length - 1]);
+  }
+
+  // A tile from before the colours carries none; it reads as the foreground.
+  function colorOf(tile, foreground) {
+    return tile.color || foreground;
+  }
+
+  // The colour every selected tile carries, the foreground while none is
+  // selected, and nothing while they disagree.
+  function shownColor(tiles, foreground) {
+    var shown = tiles.length ? colorOf(tiles[0], foreground) : foreground;
+    for (var i = 1; i < tiles.length; i++) {
+      if (colorOf(tiles[i], foreground) !== shown) return null;
+    }
+    return shown;
   }
 
   function markByDir(dir) {
@@ -349,17 +380,25 @@
       setGlyph(refs.opaqueIcon, opaqueIcon(state.opaque));
     }
 
-    function syncTile(tile) {
+    // One slope in the selection is enough to turn, and the arrow shows the
+    // anchor's facing.
+    function syncTiles(tiles, anchor) {
       B.SHAPES.forEach(function (shape) {
-        syncToggle(refs.shapes[shape], tile, tile && tile.shape === shape);
+        syncToggle(refs.shapes[shape], tiles, function (tile) {
+          return tile.shape === shape;
+        });
       });
-      refs.facing.disabled = !tile || !B.level.sloped(tile);
-      setArrow(refs.facingIcon, tile ? tile.facing : B.FACINGS[0]);
+      refs.facing.disabled = !tiles.some(function (tile) { return B.level.sloped(tile); });
+      setArrow(refs.facingIcon, anchor ? anchor.facing : B.FACINGS[0]);
       B.DECOR.forEach(function (d) {
-        syncToggle(refs.decor[d.key], tile, tile && tile.decor === d.key);
+        syncToggle(refs.decor[d.key], tiles, function (tile) {
+          return tile.decor === d.key;
+        });
       });
       B.MARKS.forEach(function (m) {
-        syncToggle(refs.marks[m.key], tile, tile && tile.marks.indexOf(m.key) >= 0);
+        syncToggle(refs.marks[m.key], tiles, function (tile) {
+          return tile.marks.indexOf(m.key) >= 0;
+        });
       });
     }
 
@@ -370,11 +409,10 @@
     }
 
     function sync(state) {
-      var tile = selectedTile(state);
+      var tiles = selectedTiles(state);
       syncLayers(state);
-      syncTile(tile);
-      // The selected tile's colour, or else the foreground.
-      syncColors((tile && tile.color) || state.color);
+      syncTiles(tiles, anchorTile(state));
+      syncColors(shownColor(tiles, state.color));
     }
 
     return { el: el, sync: sync };

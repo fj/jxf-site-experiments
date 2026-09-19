@@ -641,12 +641,19 @@ describe("app: the controls that move the view", () => {
     for (let i = 0; i < times; i++) r.find(act, arg).fire("click");
   };
 
+  // One press, and the redraw it must ask for. Every frame already asked for
+  // has to have run first.
+  const pressed = (r, act, arg) => {
+    push(r, act, arg);
+    assert.equal(r.waiting(), 1, `${act} ${arg} asks for a redraw`);
+  };
+
   it("pans the camera, and back again on the opposite press", () => {
     const r = boot();
     const home = { ...r.frame().view.pan };
-    push(r, "pan", "N");
+    pressed(r, "pan", "N");
     assert.notDeepEqual({ ...r.frame().view.pan }, home, "the camera moved");
-    push(r, "pan", "S");
+    pressed(r, "pan", "S");
     assert.deepEqual(r.frame().view.pan, home, "and came back");
   });
 
@@ -661,7 +668,7 @@ describe("app: the controls that move the view", () => {
   it("turns the view a quarter at a time, round either way", () => {
     const r = boot();
     assert.equal(r.frame().view.rot, 0);
-    push(r, "rotate", 1);
+    pressed(r, "rotate", 1);
     assert.equal(r.frame().view.rot, 1);
     push(r, "rotate", -1, 2);
     assert.equal(r.frame().view.rot, 3, "and round the far side of the turn");
@@ -672,7 +679,7 @@ describe("app: the controls that move the view", () => {
     const r = boot();
     const span = r.B.ZOOM_MAX - r.B.ZOOM_MIN;
     assert.equal(r.frame().view.zoom, r.B.ZOOM_DEFAULT);
-    push(r, "zoom", 1);
+    pressed(r, "zoom", 1);
     assert.equal(r.frame().view.zoom, r.B.ZOOM_DEFAULT + 1);
     push(r, "zoom", -1, span);
     assert.equal(r.frame().view.zoom, r.B.ZOOM_MIN, "no further out than the range allows");
@@ -686,9 +693,9 @@ describe("app: the controls that move the view", () => {
     const r = boot();
     assert.deepEqual(r.frame().layers, LAYERS, "every layer shows to start with");
     for (const name of Object.keys(LAYERS)) {
-      push(r, "layer", name);
+      pressed(r, "layer", name);
       assert.deepEqual(r.frame().layers, { ...LAYERS, [name]: false }, name);
-      push(r, "layer", name);
+      pressed(r, "layer", name);
       assert.deepEqual(r.frame().layers, LAYERS, `${name} again`);
     }
   });
@@ -696,9 +703,9 @@ describe("app: the controls that move the view", () => {
   it("turns the tiles see-through, and solid again", () => {
     const r = boot();
     assert.equal(r.frame().opaque, true);
-    push(r, "opaque", "");
+    pressed(r, "opaque", "");
     assert.equal(r.frame().opaque, false);
-    push(r, "opaque", "");
+    pressed(r, "opaque", "");
     assert.equal(r.frame().opaque, true);
   });
 });

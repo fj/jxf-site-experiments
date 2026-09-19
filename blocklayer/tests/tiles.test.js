@@ -121,10 +121,12 @@ describe("tiles: column", () => {
 });
 
 describe("tiles: swatch", () => {
-  it("draws the top face alone, outlined, in the colour it is asked for", () => {
+  const SQUARE = 16;             // the swatch's side, so a button holds it whole
+
+  it("draws a square of the colour it is asked for, outlined", () => {
     for (const color of COLORS) {
       const art = T.swatch(color);
-      assert.deepEqual([art.canvas.width, art.canvas.height], [B.TILE_W, B.TILE_H], color);
+      assert.deepEqual([art.canvas.width, art.canvas.height], [SQUARE, SQUARE], color);
       assert.deepEqual(colours(art), new Set([top(color), B.COLORS.outline]), color);
     }
   });
@@ -134,8 +136,11 @@ describe("tiles: swatch", () => {
     assert.equal(new Set(urls).size, COLORS.length);
   });
 
-  it("draws the art a tile with no blocks draws in the same colour", () => {
-    assert.deepEqual(rows(T.swatch(COLOR)), rows(T.column(COLOR, B.FLOOR)));
+  it("draws the tile's top face at half its size, so its rows step 2:1", () => {
+    const art = rows(T.swatch(COLOR)).filter((row) => row.includes(INK));
+    const widths = art.map((row) => row.replace(/^\.*/, "").replace(/\.*$/, "").length);
+    assert.deepEqual(widths, [4, 8, 12, 16, 16, 12, 8, 4]);
+    assert.equal(art.length, SQUARE / 2);
   });
 });
 

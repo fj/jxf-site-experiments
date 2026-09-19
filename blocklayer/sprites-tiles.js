@@ -25,6 +25,8 @@
   var U_SCALE = HALF_W + 0.5;
   var V_SCALE = HALF_H + 0.25;
   var ROW_STEP = 2;                      // px a diamond row grows on each side: the 2:1 slope
+  var SWATCH_SIZE = 16;                  // the swatch's square, with its diamond half as tall
+  var SWATCH_H = SWATCH_SIZE / 2;
   var PIXEL_CENTRE = 0.5;
   var SLOPE_SHADE = -0.08;
   var SEAM_SHADE = -0.18;                // between two stacked blocks
@@ -318,10 +320,16 @@
 
   // ---- The column ----------------------------------------------------------
 
+  // Pixel row y of a diamond `halfW` wide and `halfH` rows from its middle:
+  // where the row starts and how wide it is.
+  function rowOf(y, halfW, halfH) {
+    var k = y < halfH ? y : 2 * halfH - 1 - y;
+    return { x: halfW - ROW_STEP * (k + 1), w: 2 * ROW_STEP * (k + 1) };
+  }
+
   // Pixel row y of the top diamond: where it starts and how wide it is.
   function diamondRow(y) {
-    var k = y < HALF_H ? y : H - 1 - y;
-    return { x: HALF_W - ROW_STEP * (k + 1), w: 2 * ROW_STEP * (k + 1) };
+    return rowOf(y, HALF_W, HALF_H);
   }
 
   // A line along the diamond's lower edges, `dy` pixels down: the ROW_STEP
@@ -368,10 +376,19 @@
     return P.sprite(c, HALF_W, HALF_H);
   }
 
-  // A colour's top face alone, as a tile with no blocks: the art on the button
-  // that picks it.
+  // A colour's top face at half size, outlined, square so it sits in a button
+  // beside the other art: the button that picks the colour shows this.
   function swatch(color) {
-    return column(color, B.FLOOR);
+    var c = P.canvas(SWATCH_SIZE, SWATCH_SIZE);
+    var ctx = P.context(c);
+    var top = (SWATCH_SIZE - SWATCH_H) / 2;
+    ctx.fillStyle = topColor(color);
+    for (var y = 0; y < SWATCH_H; y++) {
+      var row = rowOf(y, SWATCH_SIZE / 2, SWATCH_H / 2);
+      ctx.fillRect(row.x, top + y, row.w, 1);
+    }
+    outlinePass(c);
+    return P.sprite(c, SWATCH_SIZE / 2, SWATCH_SIZE / 2);
   }
 
   // ---- The floor grid ------------------------------------------------------

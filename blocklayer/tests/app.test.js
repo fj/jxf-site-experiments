@@ -36,13 +36,31 @@ let scheduled = [];
 globalThis.requestAnimationFrame = (fn) => scheduled.push(fn);
 globalThis.cancelAnimationFrame = () => {};
 
-// A storage that holds one string, as localStorage does.
+// A storage that holds one string, as localStorage does, and keeps every text
+// it was written.
 function storing(text = null) {
-  const kept = { text };
+  const kept = { text, writes: [] };
   return Object.assign(kept, {
     getItem() { return kept.text; },
-    setItem(key, value) { kept.text = value; }
+    setItem(key, value) {
+      kept.writes.push(value);
+      kept.text = value;
+    }
   });
+}
+
+// A window or a document that remembers its listeners, and the call that fires
+// one of them: what the app listens for on the page, a test can deliver.
+function listening(target) {
+  const byType = new Map();
+  target.addEventListener = (type, fn) => {
+    byType.set(type, (byType.get(type) || []).concat(fn));
+  };
+  return (type, props = {}) => {
+    const e = { key: "", altKey: false, ...props };
+    for (const fn of byType.get(type) || []) fn(e);
+    return e;
+  };
 }
 
 // A storage that throws on every call, as a browser with storage turned off.
@@ -89,16 +107,13 @@ function watchContract(B, calls) {
 function boot(tiles = [], storage = null) {
   const document = fakeDocument();
   const mount = document.createElement(MOUNT_TAG);
-  // The page's own listeners: input.js watches Alt there, so the canvas need
-  // never hold focus for the tip to come and go.
-  const onPage = new Map();
-  const window = {
-    document,
-    devicePixelRatio: DPR,
-    addEventListener(type, fn) { onPage.set(type, (onPage.get(type) || []).concat(fn)); }
-  };
+  const window = { document, devicePixelRatio: DPR };
   if (storage) window.localStorage = storage;
-  document.addEventListener = () => {};
+  // The page's own listeners: input.js watches Alt on the window, so the
+  // canvas need never hold focus for the tip to come and go, and app.js
+  // watches the document for the page going out of sight.
+  const firePage = listening(window);
+  const fireDoc = listening(document);
   document.getElementById = () => mount;
 
   const B = load(MODULES, window);
@@ -157,12 +172,15 @@ function boot(tiles = [], storage = null) {
     press(x, y, props = {}) {
       canvas.fire("pointerdown", { ...this.over(x, y), button: PRIMARY, ...props });
     },
-    firePage(type, props = {}) {
-      const e = { key: "", altKey: false, ...props };
-      for (const fn of onPage.get(type) || []) fn(e);
-      return e;
+    firePage,
+    // The reader turns to another tab, and back.
+    hide(hidden = true) {
+      document.hidden = hidden;
+      fireDoc("visibilitychange");
     },
     cells() { return B.level.all(level).map((tile) => [tile.x, tile.y]).sort(); },
+    // Each text the storage was written, read back as the level it holds.
+    saved() { return storage ? storage.writes.map((text) => B.file.parse(text)) : []; },
     ctl(name) {
       const el = control(mount, name);
       assert.ok(el, `no ${name} control`);
@@ -210,6 +228,68 @@ describe("app: the level a visit starts on", () => {
     for (const [what, storage] of Object.entries(starts)) {
       assert.deepEqual(boot([], storage).shown(), [START.w, START.h], what);
     }
+  });
+});
+
+describe("app: saving the level", () => {
+  // The app on a storage of its own, with a tile at (0, 0) laid but no frame
+  // run yet.
+  const edited = () => {
+    const storage = storing();
+    const r = boot([], storage);
+    r.press(0, 0);
+    return r;
+  };
+
+  it("writes the edited level on the frame the edit asks for, and not before", () => {
+    const r = edited();
+    assert.deepEqual(r.saved(), [], "no frame has run yet");
+    r.frame();
+    assert.equal(r.saved().length, 1);
+    assert.deepEqual(r.B.level.all(r.saved()[0]).map((t) => [t.x, t.y]), [[0, 0]]);
+  });
+
+  it("writes once for a burst of edits, not once for each", () => {
+    const storage = storing();
+    const r = boot([], storage);
+    r.press(0, 0);
+    r.press(1, 0);
+    r.press(2, 0);
+    r.frame();
+    assert.equal(r.saved().length, 1);
+    assert.equal(r.B.level.count(r.saved()[0]), 3, "and the write holds every one");
+  });
+
+  it("writes nothing on a frame that no edit asked for", () => {
+    const r = boot([[0, 0]], storing());
+    r.frame();
+    r.find("rotate", 1).fire("click");
+    r.frame();
+    assert.deepEqual(r.saved(), [], "a turn of the camera is no edit");
+  });
+
+  it("writes what no frame has reached when the page goes away", () => {
+    for (const going of ["pagehide", "beforeunload"]) {
+      const r = edited();
+      r.firePage(going);
+      assert.equal(r.saved().length, 1, going);
+    }
+  });
+
+  it("writes what no frame has reached when the page goes out of sight", () => {
+    const r = edited();
+    r.hide(false);
+    assert.deepEqual(r.saved(), [], "a page still in sight is going nowhere");
+    r.hide(true);
+    assert.equal(r.saved().length, 1);
+  });
+
+  it("writes nothing more once a frame has saved the edit", () => {
+    const r = edited();
+    r.frame();
+    r.firePage("pagehide");
+    r.hide(true);
+    assert.equal(r.saved().length, 1);
   });
 });
 

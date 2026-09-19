@@ -414,6 +414,33 @@ describe("app: the controls that take tiles away", () => {
   });
 });
 
+describe("app: the controls that raise and lower", () => {
+  const elevOf = (r) => PAIR.map(([x, y]) => r.tileAt(x, y).elev);
+  const raise = (r, props = {}) => r.canvas.fire("keydown", { key: "w", ...props });
+
+  it("raises the selected tile and leaves the rest of the level standing", () => {
+    const r = boot(PAIR);
+    r.press(0, 0);
+    const [selected, other] = elevOf(r);
+    raise(r);
+    assert.deepEqual(elevOf(r), [selected + 1, other], "only the selection rose");
+  });
+
+  it("raises every tile on the board on Shift, selection or none", () => {
+    const r = boot(PAIR);
+    const before = elevOf(r);
+    raise(r, { shiftKey: true });
+    assert.deepEqual(elevOf(r), before.map((elev) => elev + 1));
+  });
+
+  it("moves the height the next tile gets while nothing is selected", () => {
+    const r = boot();
+    raise(r);
+    r.press(2, 2);
+    assert.equal(r.tileAt(2, 2).elev, r.B.NEW_TILE_ELEV + 1);
+  });
+});
+
 describe("app: the controls that change the selection", () => {
   it("selects a tile, takes another in and out with Ctrl, and drops the lot on Escape", () => {
     const r = boot(PAIR);

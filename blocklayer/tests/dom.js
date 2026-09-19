@@ -54,15 +54,37 @@ function fakeElement(tag) {
   return el;
 }
 
-// A canvas is an element that also draws, so the sprites can be built on one
-// and the app can still listen on the one it shows.
+// A canvas is an element that also draws and takes the pointer, so the
+// sprites can be built on one and the app can still listen on the one it
+// shows. A test that picks by client point sets clientWidth and clientHeight,
+// which the box it reports follows.
+function fakeCanvasElement(drawing) {
+  const el = Object.assign(fakeElement("canvas"), drawing, {
+    clientWidth: 0,
+    clientHeight: 0,
+    clientLeft: 0,
+    clientTop: 0,
+    setPointerCapture() {},
+    releasePointerCapture() {}
+  });
+  el.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    right: el.clientWidth,
+    bottom: el.clientHeight,
+    width: el.clientWidth,
+    height: el.clientHeight
+  });
+  return el;
+}
+
 function fakeDocument() {
   const canvases = canvasDocument();
   const doc = {
     activeElement: null,
     createElement(tag) {
       const el = tag === "canvas"
-        ? Object.assign(fakeElement(tag), canvases.createElement(tag))
+        ? fakeCanvasElement(canvases.createElement(tag))
         : fakeElement(tag);
       el.focus = () => {
         doc.activeElement = el;

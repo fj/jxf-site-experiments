@@ -80,6 +80,7 @@ describe("bounds: the size row", () => {
       assert.equal(box.min, SIZE_MIN, name);
       assert.equal(box.max, SIZE_MAX, name);
       assert.equal(box.step, 1, name);
+      assert.equal(box.inputMode, "numeric", `${name}: digits on a touch keyboard`);
     }
   });
 

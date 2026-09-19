@@ -9,6 +9,11 @@ const SIZE_MIN = 2;
 const SIZE_MAX = 32;
 const START = { w: 8, h: 8 };
 const MOUNT_TAG = "div";
+const CANVAS_W = 480;
+const CANVAS_H = 320;
+const PRIMARY = 0;
+const ALT_DOWN = { key: "Alt", altKey: true };
+const ALT_UP = { key: "Alt", altKey: false };
 
 // Every module the page loads, in the manifest's order, less the kit's file
 // download, which only a save reaches, and app.js, which boots on the level
@@ -24,6 +29,12 @@ const MODULES = [
 // runs keeps the renderer out of a test of the wiring.
 globalThis.requestAnimationFrame = () => 1;
 globalThis.cancelAnimationFrame = () => {};
+
+// A file opens at once, with no text of its own: what the text becomes is
+// file.js's, which each test says for itself.
+globalThis.FileReader = class {
+  readAsText() { this.onload(); }
+};
 
 // The three calls the other changes in flight bring, standing in for the real
 // ones: a board of w by h holds the cells from 0 up to each bound, and a
@@ -68,10 +79,28 @@ function boot(tiles = []) {
 
   load(["app.js"], window);
 
+  // The canvas takes a size only the page can give it, and the view app.js
+  // boots with, so a test can name the client point a tile sits under.
+  const canvas = descend(mount).find((el) => el.tag === "canvas");
+  Object.assign(canvas, {
+    clientWidth: CANVAS_W, clientHeight: CANVAS_H, width: CANVAS_W, height: CANVAS_H
+  });
+  const view = B.view.create();
+  const scale = view.zoom;
+
   return {
     B,
     level,
     calls,
+    canvas,
+    // Where on the page the top face of the tile at (x, y) is drawn, or the
+    // floor of that cell while no tile stands there.
+    over(x, y) {
+      const standing = B.level.get(level, x, y);
+      const origin = B.view.frame(canvas, scale);
+      const at = B.view.project(view, x, y, standing ? B.level.top(standing) : B.FLOOR);
+      return { clientX: (at.sx + origin.ox) * scale, clientY: (at.sy + origin.oy) * scale };
+    },
     of(name) { return calls.filter((c) => c[0] === name).map((c) => c.slice(1)); },
     cells() { return B.level.all(level).map((tile) => [tile.x, tile.y]).sort(); },
     ctl(name) {
@@ -205,5 +234,91 @@ describe("app: a shrink that would lose tiles", () => {
     r.type("width", ROW.length - 1);
     assert.equal(r.modal().hidden, false);
     assert.equal(r.text(), "1 tile falls outside the new board.");
+  });
+
+  // A cell left behind in the selection would claim whatever tile is laid
+  // there next, so the drop must take it out.
+  it("takes a dropped tile's cell out of the selection, not just the tile", () => {
+    const r = boot(ROW);
+    const going = ROW[ROW.length - 1];
+    r.canvas.fire("pointerdown", { ...r.over(...going), button: PRIMARY });
+    assert.equal(r.find("shape", "block").disabled, false, "the tile is selected");
+    r.type("width", NARROW);
+    r.ctl("confirm").fire("click");
+    assert.equal(r.find("shape", "block").disabled, true, "and gone with the tile");
+
+    r.type("width", START.w);
+    r.canvas.fire("pointerdown", { ...r.over(...going), button: PRIMARY });
+    assert.deepEqual(r.cells().pop(), going, "a tile stands on that cell again");
+    assert.equal(r.find("shape", "block").disabled, true, "and it is nobody's selection");
+  });
+
+  it("keeps a tile the shrink spares in the selection", () => {
+    const r = boot(ROW);
+    r.canvas.fire("pointerdown", { ...r.over(...KEPT[0]), button: PRIMARY });
+    r.type("width", NARROW);
+    r.ctl("confirm").fire("click");
+    assert.equal(r.find("shape", "block").disabled, false);
+  });
+});
+
+describe("app: a level opened from a file", () => {
+  const OPENED = { w: 4, h: 3 };
+  const DROP = { dataTransfer: { files: [{}] }, preventDefault() {} };
+
+  // The picker and the drop both read the file, then hand what file.js makes
+  // of it to the app; what it makes is the other change in flight's business.
+  const opening = () => {
+    const r = boot();
+    const other = r.B.level.create();
+    other.size = { ...OPENED };
+    r.B.file.parse = () => other;
+    r.canvas.fire("drop", DROP);
+    return r;
+  };
+
+  it("moves the size row and the camera onto the opened board", () => {
+    const r = opening();
+    assert.deepEqual(r.shown(), [OPENED.w, OPENED.h]);
+    assert.deepEqual(r.of("clampPan").pop(), [OPENED.w, OPENED.h]);
+  });
+});
+
+describe("app: Alt over a tile", () => {
+  const TILE = [2, 3];
+  const tipOf = (r) => r.ctl("tip");
+  const said = (r) => tipOf(r).children.filter((l) => !l.hidden).map((l) => l.textContent);
+
+  const hovering = (props) => {
+    const r = boot([TILE]);
+    r.canvas.fire("pointermove", { ...r.over(...TILE), ...props });
+    return r;
+  };
+
+  it("opens a panel that names the tile, and only while Alt is held", () => {
+    assert.equal(tipOf(hovering({})).hidden, true, "no Alt, no panel");
+    const r = hovering({ altKey: true });
+    assert.equal(tipOf(r).hidden, false);
+    const tile = r.B.level.get(r.level, ...TILE);
+    assert.deepEqual(said(r), [
+      `Elevation ${tile.elev}`,
+      r.B.PALETTE.filter((c) => c.key === tile.color)[0].label,
+      r.B.toolbar.shapeLabel(tile.shape)
+    ]);
+  });
+
+  it("goes as soon as Alt is let go, without the pointer moving", () => {
+    const r = hovering({ altKey: true });
+    r.canvas.fire("keyup", ALT_UP);
+    assert.equal(tipOf(r).hidden, true);
+    r.canvas.fire("keydown", ALT_DOWN);
+    assert.equal(tipOf(r).hidden, false, "and comes back the same way");
+  });
+
+  it("shows nothing over an empty cell, Alt or no Alt", () => {
+    const r = boot([TILE]);
+    const bare = r.over(...TILE);
+    r.canvas.fire("pointermove", { clientX: bare.clientX, clientY: 0, altKey: true });
+    assert.equal(tipOf(r).hidden, true);
   });
 });

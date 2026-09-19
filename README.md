@@ -217,18 +217,21 @@ kind — `card.js`, `inventory.js`, `features.js`, `spells.js` — with
 An isometric pixel-art level editor. A level is a set of tiles on an integer
 grid; each tile is a column of as many blocks as its elevation (0 to 7, where a
 tile at 0 has no block and its top face lies on the floor), shaped as a block, a
-ramp or a flight of stairs rising to the next level on one side, carrying at
-most one decor object (a chest, a rock, three crystal pillars) and any number of
-marks (eight compass arrows, a teleport, a rope, a jump). The view turns in
+ramp or a flight of stairs rising to the next level on one side, painted from a
+palette of ten (the rainbow's seven and three greys), carrying at most one decor
+object (a chest, a rock, three crystal pillars) and any number of marks (eight
+compass arrows, a teleport, a rope, a jump). The view turns in
 quarter turns, zooms at whole-number factors, pans in the four compass
 directions, hides or shows the elevation labels, the marks and the decor, and
 draws the tiles solid or see-through. A light grey grid rules the floor under
 the scene. Editing happens on the canvas: hover shows where a tile would go,
 click or drag adds tiles, click selects one, the wheel raises or lowers the
-selected tile, and the right button held removes one. The keyboard does the
-same work: `W` and `S` move the selected tile, or the height a new tile gets
-when nothing is selected, `Shift+W` and `Shift+S` move the whole level, and the
-marks sit in a compass rose under the right hand. The toolbar is icons only.
+selected tile, the right button held removes one, and the right button away
+from the selected tile drops the selection. The keyboard does the same work:
+`W` and `S` move the selected tile, or the height a new tile gets when nothing
+is selected, `Shift+W` and `Shift+S` move the whole level, `C` steps the colour
+new tiles are painted, and the marks sit in a compass rose under the right hand.
+The toolbar is icons only.
 
 The scene is drawn at the sprites' own scale on an offscreen canvas and blitted
 up by a whole number, so pixels stay square. Every sprite is built in code from

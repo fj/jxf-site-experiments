@@ -99,9 +99,10 @@
   }
 
   // The first tile the ray from the eye through the point meets, else the cell
-  // of the floor under it: where a new column's base would stand. The cell the
-  // point falls in at each height, from the top down, is that ray. The floor is
-  // the last step, so the cell it answers with is always empty.
+  // of the floor under it: where a new column's base would stand. The ray
+  // crosses two cells a block; reading only the one at each whole height lets
+  // the floor win a side face, which is what keeps a walled-in cell reachable.
+  // The floor is the last step, so the cell it answers with is always empty.
   function pick(view, level, sx, sy) {
     for (var z = B.ELEV_MAX; z >= B.FLOOR; z--) {
       var cell = cellAt(view, sx, sy, z);

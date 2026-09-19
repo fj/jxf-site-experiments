@@ -120,6 +120,25 @@ describe("tiles: column", () => {
   });
 });
 
+describe("tiles: swatch", () => {
+  it("draws the top face alone, outlined, in the colour it is asked for", () => {
+    for (const color of COLORS) {
+      const art = T.swatch(color);
+      assert.deepEqual([art.canvas.width, art.canvas.height], [B.TILE_W, B.TILE_H], color);
+      assert.deepEqual(colours(art), new Set([top(color), B.COLORS.outline]), color);
+    }
+  });
+
+  it("gives every colour a swatch of its own", () => {
+    const urls = COLORS.map((color) => P.dataUrl(T.swatch(color)));
+    assert.equal(new Set(urls).size, COLORS.length);
+  });
+
+  it("draws the art a tile with no blocks draws in the same colour", () => {
+    assert.deepEqual(rows(T.swatch(COLOR)), rows(T.column(COLOR, B.FLOOR)));
+  });
+});
+
 describe("tiles: label", () => {
   it("spells every elevation, and keeps the '+' that a change badge spells with", () => {
     for (const elev of ELEVATIONS) {

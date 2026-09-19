@@ -1,6 +1,7 @@
 /*
  * Blocklayer — the tile sprites: the flat top, the column of blocks under it,
- * the wedges of ramps and stairs, and the marks the editor lays over a tile.
+ * the wedges of ramps and stairs, the swatch a colour button shows, and the
+ * marks the editor lays over a tile.
  * Faces are flat polygons in the tile's own (u, v, z) frame, rasterised one
  * pixel column at a time; a pass over the finished pixels then draws the dark
  * outline wherever a face meets another face or the background.
@@ -367,6 +368,12 @@
     return P.sprite(c, HALF_W, HALF_H);
   }
 
+  // A colour's top face alone, as a tile with no blocks: the art on the button
+  // that picks it.
+  function swatch(color) {
+    return column(color, B.FLOOR);
+  }
+
   // ---- The floor grid ------------------------------------------------------
 
   // The two upper edges of the cell centred on (cx, cy): the ROW_STEP pixels
@@ -506,6 +513,7 @@
   B.tiles = {
     grid: P.memo(grid),
     column: P.memo(column),
+    swatch: P.memo(swatch),
     ramp: P.memo(function (color, elev, viewFacing) {
       return wedge(color, rampShape(viewFacing));
     }),

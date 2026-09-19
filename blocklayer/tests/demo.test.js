@@ -20,6 +20,20 @@ describe("demo: the first level", () => {
     assert.deepEqual(L.fromJSON(JSON.parse(JSON.stringify(L.toJSON(demo)))), demo);
   });
 
+  const xs = tiles.map((t) => t.x);
+  const ys = tiles.map((t) => t.y);
+  const laidOut = { w: Math.max(...xs) + 1, h: Math.max(...ys) + 1 };
+
+  it("lays out a full rectangle of tiles from the first cell, none of it lost", () => {
+    assert.deepEqual([Math.min(...xs), Math.min(...ys)], [0, 0]);
+    assert.equal(tiles.length, laidOut.w * laidOut.h);
+  });
+
+  it("leaves empty tiles past the layout, so the board's edges are in sight", () => {
+    assert.ok(demo.size.w > laidOut.w, `${demo.size.w} wide over ${laidOut.w}`);
+    assert.ok(demo.size.h > laidOut.h, `${demo.size.h} tall over ${laidOut.h}`);
+  });
+
   it("is a fresh level each time", () => {
     const other = B.demo.level();
     assert.deepEqual(other, demo);

@@ -13,12 +13,19 @@ const DECOR_KEYS = B.DECOR.map((d) => d.key);
 const MARK_KEYS = B.MARKS.map((m) => m.key);
 const OTHER_COLOR = COLOR_KEYS.find((key) => key !== B.DEFAULT_COLOR);
 
+// A board that is not square, so a size read the wrong way round shows.
+const BOARD = { w: 3, h: 4 };
+const ON_BOARD = [[0, 0], [BOARD.w - 1, 0], [0, BOARD.h - 1], [BOARD.w - 1, BOARD.h - 1]];
+// The cell just past each edge, and the one past the far corner.
+const OFF_BOARD = [[-1, 0], [0, -1], [BOARD.w, 0], [0, BOARD.h], [BOARD.w, BOARD.h]];
+
 describe("level: tiles", () => {
-  it("starts empty", () => {
+  it("starts empty, on a board of the default size", () => {
     const level = L.create();
     assert.equal(L.count(level), 0);
     assert.deepEqual(L.all(level), []);
     assert.equal(L.get(level, 0, 0), null);
+    assert.deepEqual(level.size, B.SIZE_DEFAULT);
   });
 
   it("keys a cell as x,y", () => {
@@ -62,6 +69,22 @@ describe("level: tiles", () => {
     assert.equal(L.count(level), 1);
   });
 
+  it("refuses a cell off the board and adds nothing", () => {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (const [x, y] of OFF_BOARD) {
+      assert.equal(L.add(level, x, y), null, `${x},${y}`);
+    }
+    assert.equal(L.count(level), 0);
+  });
+
+  it("adds at every corner of the board", () => {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (const [x, y] of ON_BOARD) {
+      assert.equal(L.add(level, x, y).x, x, `${x},${y}`);
+    }
+    assert.equal(L.count(level), ON_BOARD.length);
+  });
+
   it("removes a tile and reports whether anything went", () => {
     const level = L.create();
     L.add(level, 0, 0);
@@ -71,20 +94,155 @@ describe("level: tiles", () => {
     assert.equal(L.count(level), 0);
   });
 
-  it("clears every tile", () => {
-    const level = L.create();
+  it("clears every tile and keeps the board", () => {
+    const level = L.create(BOARD.w, BOARD.h);
     L.add(level, 0, 0);
     L.add(level, 1, 1);
     L.clear(level);
     assert.equal(L.count(level), 0);
     assert.equal(L.get(level, 1, 1), null);
+    assert.deepEqual(level.size, BOARD);
   });
 
   it("lists all tiles", () => {
     const level = L.create();
     const a = L.add(level, 0, 0);
-    const b = L.add(level, -1, 5);
+    const b = L.add(level, 1, 5);
     assert.deepEqual(new Set(L.all(level)), new Set([a, b]));
+  });
+});
+
+describe("level: the board", () => {
+  it("runs from one tile square to sixty-four, and starts twelve by twelve", () => {
+    assert.deepEqual([B.SIZE_MIN, B.SIZE_MAX], [1, 64]);
+    assert.deepEqual(B.SIZE_DEFAULT, { w: 12, h: 12 });
+  });
+
+  it("takes the size it is given", () => {
+    assert.deepEqual(L.create(BOARD.w, BOARD.h).size, BOARD);
+  });
+
+  it("falls back to the default for a side it is given none", () => {
+    assert.deepEqual(L.create().size, B.SIZE_DEFAULT);
+    assert.deepEqual(L.create(BOARD.w).size, { w: BOARD.w, h: B.SIZE_DEFAULT.h });
+    assert.deepEqual(L.create(undefined, BOARD.h).size, { w: B.SIZE_DEFAULT.w, h: BOARD.h });
+  });
+
+  it("falls back for a side that is no number at all", () => {
+    for (const bad of [null, "3", NaN, Infinity, -Infinity, {}]) {
+      assert.deepEqual(L.create(bad, bad).size, B.SIZE_DEFAULT, inspect(bad));
+    }
+  });
+
+  it("clamps a size at both ends of the range", () => {
+    assert.deepEqual(L.create(0, -1).size, { w: B.SIZE_MIN, h: B.SIZE_MIN });
+    assert.deepEqual(L.create(B.SIZE_MAX + 1, B.SIZE_MAX * 2).size,
+      { w: B.SIZE_MAX, h: B.SIZE_MAX });
+  });
+
+  it("rounds a fractional size to whole tiles", () => {
+    assert.deepEqual(L.create(3.2, 4.7).size, { w: 3, h: 5 });
+    assert.deepEqual(L.create(B.SIZE_MIN - 0.4, B.SIZE_MAX + 0.4).size,
+      { w: B.SIZE_MIN, h: B.SIZE_MAX });
+  });
+});
+
+describe("level: inside", () => {
+  it("holds every cell of the board, from the first to the last", () => {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (let y = 0; y < BOARD.h; y++) {
+      for (let x = 0; x < BOARD.w; x++) assert.equal(L.inside(level, x, y), true, `${x},${y}`);
+    }
+  });
+
+  it("leaves out the cell just past each edge", () => {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (const [x, y] of OFF_BOARD) {
+      assert.equal(L.inside(level, x, y), false, `${x},${y}`);
+    }
+  });
+
+  it("holds the one cell of the smallest board and nothing around it", () => {
+    const level = L.create(B.SIZE_MIN, B.SIZE_MIN);
+    assert.equal(L.inside(level, 0, 0), true);
+    for (const [x, y] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      assert.equal(L.inside(level, x, y), false, `${x},${y}`);
+    }
+  });
+});
+
+describe("level: outside and resize", () => {
+  const SMALLER = { w: 2, h: 2 };
+  // The cells past that smaller board, and the cells still on it, in the order
+  // the level is given them, which is not the order toJSON sorts them into.
+  const DROPPED = [[BOARD.w - 1, BOARD.h - 1], [BOARD.w - 1, 0], [0, BOARD.h - 1]];
+  const KEPT = [[0, 0], [1, 1]];
+  const LAID_OUT = [DROPPED[0], KEPT[0], DROPPED[1], KEPT[1], DROPPED[2]];
+
+  const cellsOf = (tiles) => tiles.map((t) => [t.x, t.y]);
+
+  function board() {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (const [x, y] of LAID_OUT) L.add(level, x, y);
+    return level;
+  }
+
+  it("names the tiles a smaller board would drop, in the level's own order", () => {
+    assert.deepEqual(cellsOf(L.outside(board(), SMALLER.w, SMALLER.h)), DROPPED);
+  });
+
+  it("names the tiles themselves, not copies of them", () => {
+    const level = board();
+    const [first] = L.outside(level, SMALLER.w, SMALLER.h);
+    assert.equal(first, L.get(level, DROPPED[0][0], DROPPED[0][1]));
+  });
+
+  it("names nothing for a board that grows, or one of the same size", () => {
+    const level = board();
+    assert.deepEqual(L.outside(level, BOARD.w + 1, BOARD.h + 1), []);
+    assert.deepEqual(L.outside(level, BOARD.w, BOARD.h), []);
+  });
+
+  it("changes nothing at all while naming them", () => {
+    const level = board();
+    const before = structuredClone(level);
+    L.outside(level, SMALLER.w, SMALLER.h);
+    assert.deepEqual(level, before);
+  });
+
+  it("clamps the size it is asked about, so a board of no size keeps one cell", () => {
+    const pastTheFirstCell = LAID_OUT.filter(([x, y]) => !(x === 0 && y === 0));
+    assert.deepEqual(cellsOf(L.outside(board(), 0, 0)), pastTheFirstCell);
+  });
+
+  it("resizes, drops what no longer fits and keeps the rest", () => {
+    const level = board();
+    assert.deepEqual(cellsOf(L.resize(level, SMALLER.w, SMALLER.h)), DROPPED);
+    assert.deepEqual(level.size, SMALLER);
+    assert.equal(L.count(level), KEPT.length);
+    for (const [x, y] of KEPT) assert.ok(L.get(level, x, y), `${x},${y} stays`);
+    for (const [x, y] of DROPPED) assert.equal(L.get(level, x, y), null, `${x},${y} goes`);
+  });
+
+  it("drops nothing when the board grows", () => {
+    const level = board();
+    assert.deepEqual(L.resize(level, BOARD.w + 1, BOARD.h + 1), []);
+    assert.deepEqual(level.size, { w: BOARD.w + 1, h: BOARD.h + 1 });
+    assert.equal(L.count(level), LAID_OUT.length);
+  });
+
+  it("clamps and rounds the new size, as create does", () => {
+    const level = board();
+    L.resize(level, B.SIZE_MAX + 1, BOARD.h + 0.4);
+    assert.deepEqual(level.size, { w: B.SIZE_MAX, h: BOARD.h });
+  });
+
+  it("leaves a board that takes the cells the new one holds and refuses the rest", () => {
+    const level = board();
+    L.resize(level, SMALLER.w, SMALLER.h);
+    assert.equal(L.add(level, DROPPED[0][0], DROPPED[0][1]), null);
+    L.remove(level, KEPT[0][0], KEPT[0][1]);
+    assert.ok(L.add(level, KEPT[0][0], KEPT[0][1]));
   });
 });
 
@@ -418,24 +576,25 @@ describe("level: toggleMark", () => {
 });
 
 describe("level: toJSON", () => {
-  it("writes version 2 and the tiles sorted by y then x", () => {
-    const level = L.create();
+  it("writes version 3, the board's size, and the tiles sorted by y then x", () => {
+    const level = L.create(BOARD.w, BOARD.h);
     L.add(level, 2, 1);
     L.add(level, 0, 1);
-    L.add(level, 5, 0, 4, OTHER_COLOR);
-    L.setShape(level, 5, 0, "stairs");
-    L.setFacing(level, 5, 0, "S");
-    L.setDecor(level, 5, 0, "rock");
-    L.toggleMark(level, 5, 0, "teleport");
+    L.add(level, 2, 0, 4, OTHER_COLOR);
+    L.setShape(level, 2, 0, "stairs");
+    L.setFacing(level, 2, 0, "S");
+    L.setDecor(level, 2, 0, "rock");
+    L.toggleMark(level, 2, 0, "teleport");
     const plain = {
       elev: B.NEW_TILE_ELEV, color: B.DEFAULT_COLOR,
       shape: "block", facing: "N", decor: null, marks: []
     };
     assert.deepEqual(L.toJSON(level), {
-      version: 2,
+      version: 3,
+      size: BOARD,
       tiles: [
         {
-          x: 5, y: 0, elev: 4, color: OTHER_COLOR,
+          x: 2, y: 0, elev: 4, color: OTHER_COLOR,
           shape: "stairs", facing: "S", decor: "rock", marks: ["teleport"]
         },
         { x: 0, y: 1, ...plain },
@@ -444,27 +603,31 @@ describe("level: toJSON", () => {
     });
   });
 
-  it("writes an empty level as no tiles", () => {
-    assert.deepEqual(L.toJSON(L.create()), { version: 2, tiles: [] });
+  it("writes an empty level as its board and no tiles", () => {
+    assert.deepEqual(L.toJSON(L.create()), {
+      version: 3, size: B.SIZE_DEFAULT, tiles: []
+    });
   });
 
   it("is stable regardless of insertion order", () => {
     const a = L.create();
     const b = L.create();
-    for (const [x, y] of [[3, 3], [-1, 0], [0, -1], [2, 3]]) L.add(a, x, y);
-    for (const [x, y] of [[2, 3], [0, -1], [3, 3], [-1, 0]]) L.add(b, x, y);
+    for (const [x, y] of [[3, 3], [1, 0], [0, 1], [2, 3]]) L.add(a, x, y);
+    for (const [x, y] of [[2, 3], [0, 1], [3, 3], [1, 0]]) L.add(b, x, y);
     assert.deepEqual(L.toJSON(a), L.toJSON(b));
   });
 
   it("returns fresh data that does not alias the level", () => {
-    const level = L.create();
+    const level = L.create(BOARD.w, BOARD.h);
     const tile = L.add(level, 0, 0);
     L.toggleMark(level, 0, 0, "rope");
     const data = L.toJSON(level);
     data.tiles[0].marks.push("jump");
     data.tiles[0].elev = 3;
+    data.size.w = BOARD.w + 1;
     assert.deepEqual(tile.marks, ["rope"]);
     assert.equal(tile.elev, B.NEW_TILE_ELEV);
+    assert.deepEqual(level.size, BOARD);
   });
 });
 
@@ -475,8 +638,70 @@ describe("level: fromJSON", () => {
     }
   });
 
-  it("reads an empty level as an empty level", () => {
-    assert.deepEqual(L.fromJSON({ version: 2, tiles: [] }), L.create());
+  it("reads an empty level as an empty level on the smallest board", () => {
+    assert.deepEqual(L.fromJSON({ version: 2, tiles: [] }),
+      L.create(B.SIZE_MIN, B.SIZE_MIN));
+  });
+
+  it("reads the board size the file names", () => {
+    assert.deepEqual(L.fromJSON({ version: 3, size: BOARD, tiles: [] }).size, BOARD);
+  });
+
+  it("takes the smallest board that holds the tiles when the file names no size", () => {
+    const level = L.fromJSON({ version: 2, tiles: [tile({ x: 1, y: 2 }), tile({ x: 3, y: 0 })] });
+    assert.deepEqual(level.size, { w: 4, h: 3 });
+    assert.ok(L.get(level, 1, 2), "the tile stays where it was");
+    assert.ok(L.get(level, 3, 0), "and so does the other");
+  });
+
+  it("takes that board for a size it cannot read", () => {
+    const tiles = [tile({ x: 1, y: 2 })];
+    const fitted = { w: 2, h: 3 };
+    const bad = [
+      null, "3", 12, [], {}, { w: 2 }, { h: 3 }, { w: "2", h: 3 }, { w: 2.5, h: 3 },
+      { w: B.SIZE_MIN - 1, h: 3 }, { w: 2, h: B.SIZE_MAX + 1 }, { w: NaN, h: 3 }
+    ];
+    for (const size of bad) {
+      assert.deepEqual(L.fromJSON({ version: 3, size, tiles }).size, fitted, inspect(size));
+    }
+  });
+
+  // The board starts at 0,0, so a file written before it existed can name a
+  // cell no board holds.
+  it("drops a tile at a negative cell instead of shifting the board to hold it", () => {
+    const level = L.fromJSON({
+      version: 2,
+      tiles: [tile({ x: -3, y: 0 }), tile({ x: 0, y: -4 }), tile({ x: 1, y: 2 })]
+    });
+    assert.deepEqual(level.size, { w: 2, h: 3 });
+    assert.equal(L.count(level), 1);
+    assert.deepEqual(L.get(level, 1, 2), tile({ x: 1, y: 2 }));
+  });
+
+  it("reads the smallest board a file can name", () => {
+    const level = L.fromJSON({
+      version: 3,
+      size: { w: B.SIZE_MIN, h: B.SIZE_MIN },
+      tiles: [tile({ x: 0, y: 0 }), tile({ x: 1, y: 0 })]
+    });
+    assert.deepEqual(level.size, { w: B.SIZE_MIN, h: B.SIZE_MIN });
+    assert.equal(L.count(level), 1);
+  });
+
+  it("clamps the fitted board to the largest one, dropping what will not fit", () => {
+    const level = L.fromJSON({ tiles: [tile({ x: 0, y: 0 }), tile({ x: B.SIZE_MAX, y: 0 })] });
+    assert.deepEqual(level.size, { w: B.SIZE_MAX, h: B.SIZE_MIN });
+    assert.equal(L.count(level), 1);
+  });
+
+  it("drops a tile that stands off the board the file names", () => {
+    const level = L.fromJSON({
+      version: 3,
+      size: { w: 2, h: 2 },
+      tiles: [tile({ x: 0, y: 0 }), tile({ x: 2, y: 0 }), tile({ x: 0, y: 2 }), tile({ x: -1, y: 0 })]
+    });
+    assert.equal(L.count(level), 1);
+    assert.deepEqual(L.get(level, 0, 0), tile({ x: 0, y: 0 }));
   });
 
   it("drops fields it does not know", () => {
@@ -556,14 +781,20 @@ describe("level: fromJSON", () => {
     assert.equal(L.get(level, 1, 2).elev, B.ELEV_MAX - 1);
   });
 
+  it("brings back a board with more room than its tiles need", () => {
+    const level = L.create(B.SIZE_MAX, B.SIZE_MAX);
+    L.add(level, 0, 0);
+    assert.deepEqual(L.fromJSON(JSON.parse(JSON.stringify(L.toJSON(level)))), level);
+  });
+
   it("round-trips through toJSON", () => {
-    const level = L.create();
-    L.add(level, -2, 3, 2, OTHER_COLOR);
-    L.setShape(level, -2, 3, "ramp");
-    L.setFacing(level, -2, 3, "S");
-    L.setDecor(level, -2, 3, "crystal-yellow");
-    L.toggleMark(level, -2, 3, "arrow-sw");
-    L.toggleMark(level, -2, 3, "teleport");
+    const level = L.create(BOARD.w, BOARD.h);
+    L.add(level, 2, 3, 2, OTHER_COLOR);
+    L.setShape(level, 2, 3, "ramp");
+    L.setFacing(level, 2, 3, "S");
+    L.setDecor(level, 2, 3, "crystal-yellow");
+    L.toggleMark(level, 2, 3, "arrow-sw");
+    L.toggleMark(level, 2, 3, "teleport");
     L.add(level, 4, 0, B.ELEV_MIN);
     assert.deepEqual(L.fromJSON(JSON.parse(JSON.stringify(L.toJSON(level)))), level);
   });

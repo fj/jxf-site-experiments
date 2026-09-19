@@ -12,6 +12,10 @@
   B.PREFIX = "experiment-ext-blk-";
   B.STORAGE_KEY = "experiment-ext-blk-level";
 
+  B.SIZE_MIN = 1;          // the board, in tiles across and down
+  B.SIZE_MAX = 64;
+  B.SIZE_DEFAULT = { w: 12, h: 12 };
+
   B.ELEV_MIN = 0;
   B.ELEV_MAX = 7;
   B.FLOOR = B.ELEV_MIN;    // a tile at ELEV_MIN has no blocks: its top is the ground

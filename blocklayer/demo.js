@@ -1,8 +1,9 @@
 /*
  * Blocklayer — the level a first visit starts with: a plateau with a raised
  * square reached by a ramp and by stairs, a stepped tower, terraces down
- * to flat ground, every decor object and a few marks, so the first screenshot
- * shows every feature and both ends of the elevation range. The slopes were
+ * to flat ground, every decor object and a few marks, on a board with empty
+ * tiles around them, so the first screenshot shows every feature, both ends
+ * of the elevation range and the edges of the board. The slopes were
  * placed to be in sight at the first view's rotation; demo.test.js checks that
  * against view.js, which is why this loads after it.
  */
@@ -35,6 +36,13 @@
     { elev: PLATEAU_ELEV - 1, color: "blue" },
     { elev: B.ELEV_MIN, color: "indigo" }
   ];
+  // The board takes a margin of empty tiles past the layout, so the first
+  // screenshot shows its edges.
+  var BOARD_MARGIN = 2;
+  var BOARD = {
+    w: PLATEAU_SIZE + BOARD_MARGIN,
+    h: PLATEAU_SIZE + TERRACES.length + BOARD_MARGIN
+  };
   var DECOR_AT = [
     { x: 4, y: 1, decor: "chest" },
     { x: 0, y: 4, decor: "rock" },
@@ -52,7 +60,7 @@
 
   function level() {
     var L = B.level;
-    var lvl = L.create();
+    var lvl = L.create(BOARD.w, BOARD.h);
     var x, y, row, step;
     for (y = 0; y < PLATEAU_SIZE; y++) {
       for (x = 0; x < PLATEAU_SIZE; x++) L.add(lvl, x, y, PLATEAU_ELEV, PLATEAU_COLOR);

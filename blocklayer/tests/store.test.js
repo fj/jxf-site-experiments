@@ -100,7 +100,7 @@ describe("store: read", () => {
 
 describe("store: write", () => {
   it("writes the level as the file's own text, under the key config.js names", () => {
-    const level = levelOf([[0, 0], [-1, 3]]);
+    const level = levelOf([[0, 0], [1, 3]]);
     const kept = storage();
     S.write(kept, level);
     assert.deepEqual(kept.writes, [[B.STORAGE_KEY, F.serialize(level)]]);

@@ -13,9 +13,13 @@ const TWO_SPACE_INDENT = 2;
 const COLOR_KEYS = B.PALETTE.map((c) => c.key);
 const OTHER_COLOR = COLOR_KEYS.find((key) => key !== B.DEFAULT_COLOR);
 
+// A board with more room than its tiles need, so its size cannot be read back
+// from where they stand.
+const BOARD = { w: 5, h: 6 };
+
 // A few tiles that between them use every field a tile can carry.
 function sampleLevel() {
-  const level = L.create();
+  const level = L.create(BOARD.w, BOARD.h);
   L.add(level, 0, 0, 0);
   L.add(level, 1, 0, 2, OTHER_COLOR);
   L.setShape(level, 1, 0, "ramp");
@@ -23,7 +27,7 @@ function sampleLevel() {
   L.setDecor(level, 1, 0, "chest");
   L.toggleMark(level, 1, 0, "arrow-n");
   L.toggleMark(level, 1, 0, "rope");
-  L.add(level, -2, 3, B.ELEV_MIN);
+  L.add(level, 2, 3, B.ELEV_MIN);
   return level;
 }
 
@@ -41,8 +45,9 @@ describe("file: serialize", () => {
     assert.equal(F.serialize(level), expected);
   });
 
-  it("writes an empty level", () => {
-    assert.equal(F.serialize(L.create()), '{\n  "version": 2,\n  "tiles": []\n}\n');
+  it("writes an empty level as its board and no tiles", () => {
+    assert.equal(F.serialize(L.create(B.SIZE_MIN, B.SIZE_MIN)),
+      '{\n  "version": 3,\n  "size": {\n    "w": 1,\n    "h": 1\n  },\n  "tiles": []\n}\n');
   });
 });
 
@@ -50,6 +55,10 @@ describe("file: parse", () => {
   it("round-trips a level that uses every field", () => {
     const level = F.parse(F.serialize(sampleLevel()));
     assert.deepEqual(level, sampleLevel());
+  });
+
+  it("brings the board back at the size it was saved at", () => {
+    assert.deepEqual(F.parse(F.serialize(sampleLevel())).size, BOARD);
   });
 
   it("round-trips an empty level", () => {
@@ -91,6 +100,34 @@ describe("file: parse", () => {
       x: 0, y: 0, elev: 2, color: B.DEFAULT_COLOR,
       shape: "ramp", facing: "S", decor: "rock", marks: ["jump"]
     }));
+  });
+
+  it("opens a version 2 file, which names no size, on the board its tiles fit", () => {
+    const text = JSON.stringify({
+      version: 2,
+      tiles: [tile({ x: 0, y: 0 }), tile({ x: 3, y: 1 })]
+    });
+    const level = F.parse(text);
+    assert.deepEqual(level.size, { w: 4, h: 2 });
+    assert.deepEqual(L.get(level, 3, 1), tile({ x: 3, y: 1 }));
+  });
+
+  it("opens a file whose size is nonsense on that board too", () => {
+    for (const size of ["big", 0, { w: 0, h: 0 }, { w: 4 }, null]) {
+      const text = JSON.stringify({ version: 3, size, tiles: [tile({ x: 3, y: 1 })] });
+      assert.deepEqual(F.parse(text).size, { w: 4, h: 2 }, inspect(size));
+    }
+  });
+
+  it("drops a tile that stands off the board its own file names", () => {
+    const text = JSON.stringify({
+      version: 3,
+      size: { w: 2, h: 2 },
+      tiles: [tile({ x: 1, y: 1 }), tile({ x: 2, y: 1 })]
+    });
+    const level = F.parse(text);
+    assert.equal(L.count(level), 1);
+    assert.deepEqual(L.get(level, 1, 1), tile({ x: 1, y: 1 }));
   });
 
   it("drops a tile whose colour the palette does not hold", () => {

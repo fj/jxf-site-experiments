@@ -236,20 +236,22 @@ describe("view: pick", () => {
     assert.deepEqual(V.pick(view, level, p.sx + 4, p.sy + 20), { tile: only });
   });
 
-  it("picks a tile by its top face at every rotation, whatever its shape", () => {
+  it("picks a tile by its top face at every rotation, whatever its shape or height", () => {
     const at = { x: 2, y: -1 };
     const TOP_FACE = [[0, 0], [0, -7], [0, 7], [15, 0], [-15, 0], [8, -3]];
-    const PROBE_ELEV = 3;                // clear of the floor and of the ceiling
+    const MID_ELEV = 3;                  // clear of the floor; ELEV_MAX is the ceiling
     for (const rot of ROTS) {
-      for (const shape of B.SHAPES) {
-        const view = viewAt(rot, { x: 9, y: -5 });
-        const level = L.create();
-        const probe = L.add(level, at.x, at.y, PROBE_ELEV);
-        L.setShape(level, at.x, at.y, shape);
-        const p = V.project(view, at.x, at.y, L.top(probe));
-        for (const [dx, dy] of TOP_FACE) {
-          const name = `rot ${rot} ${shape} ${dx},${dy}`;
-          assert.deepEqual(V.pick(view, level, p.sx + dx, p.sy + dy), { tile: probe }, name);
+      for (const elev of [MID_ELEV, B.ELEV_MAX]) {
+        for (const shape of B.SHAPES) {
+          const view = viewAt(rot, { x: 9, y: -5 });
+          const level = L.create();
+          const probe = L.add(level, at.x, at.y, elev);
+          L.setShape(level, at.x, at.y, shape);
+          const p = V.project(view, at.x, at.y, L.top(probe));
+          for (const [dx, dy] of TOP_FACE) {
+            const name = `rot ${rot} elev ${elev} ${shape} ${dx},${dy}`;
+            assert.deepEqual(V.pick(view, level, p.sx + dx, p.sy + dy), { tile: probe }, name);
+          }
         }
       }
     }
@@ -328,6 +330,16 @@ describe("view: pick", () => {
     const clear = V.project(view, -reach - 1, -reach - 1, B.FLOOR);
     assert.deepEqual(V.pick(view, level, clear.sx, clear.sy),
       { cell: { x: -reach - 1, y: -reach - 1 } });
+  });
+
+  it("leaves the floor in front of a tile empty, since the ray stops at the floor", () => {
+    const { view, level } = scene();
+    const flat = L.add(level, 0, 0, B.ELEV_MIN);
+    const front = { x: 1, y: 1 };        // the next cell toward the eye
+    const p = V.project(view, front.x, front.y, B.FLOOR);
+    const own = V.project(view, flat.x, flat.y, B.FLOOR);
+    assert.deepEqual(V.pick(view, level, p.sx, p.sy), { cell: front });
+    assert.deepEqual(V.pick(view, level, own.sx, own.sy), { tile: flat });
   });
 
   it("flags a point on the line between two empty cells as an edge", () => {

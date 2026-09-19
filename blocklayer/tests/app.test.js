@@ -25,10 +25,34 @@ const MODULES = [
   "parts.js", "toolbar.js", "bounds.js", "tip.js"
 ];
 
+// The modules that make a file's text, in a namespace of their own: what a
+// storage holds is written before the app is booted on it.
+const FILE = load(["config.js", "level.js", "file.js"]);
+
 // app.js schedules its redraws on the bare global, and a frame that never
 // runs keeps the renderer out of a test of the wiring.
 globalThis.requestAnimationFrame = () => 1;
 globalThis.cancelAnimationFrame = () => {};
+
+// A storage that holds one string, as localStorage does.
+function storing(text = null) {
+  const kept = { text };
+  return Object.assign(kept, {
+    getItem() { return kept.text; },
+    setItem(key, value) { kept.text = value; }
+  });
+}
+
+// A storage that throws on every call, as a browser with storage turned off.
+function refusing() {
+  const deny = () => { throw new Error("storage is denied"); };
+  return { getItem: deny, setItem: deny };
+}
+
+// The text a storage holds a level of that size as.
+function levelText(size) {
+  return FILE.file.serialize(FILE.level.create(size.w, size.h));
+}
 
 // A file opens at once, with no text of its own: what the text becomes is
 // file.js's, which each test says for itself.
@@ -57,9 +81,10 @@ function watchContract(B, calls) {
   };
 }
 
-// The app booted into a mount of its own, on a level of `tiles` at the
-// starting size, with no storage to read or write.
-function boot(tiles = []) {
+// The app booted into a mount of its own, on the storage the test hands it —
+// none at all by default — and, with no level there, on a demo of `tiles` at
+// the starting size.
+function boot(tiles = [], storage = null) {
   const document = fakeDocument();
   const mount = document.createElement(MOUNT_TAG);
   // The page's own listeners: input.js watches Alt there, so the canvas need
@@ -70,6 +95,7 @@ function boot(tiles = []) {
     devicePixelRatio: 1,
     addEventListener(type, fn) { onPage.set(type, (onPage.get(type) || []).concat(fn)); }
   };
+  if (storage) window.localStorage = storage;
   document.addEventListener = () => {};
   document.getElementById = () => mount;
 
@@ -141,6 +167,27 @@ function boot(tiles = []) {
     }
   };
 }
+
+describe("app: the level a visit starts on", () => {
+  const STORED = { w: 5, h: 6 };     // a board the demo's is not
+
+  it("opens the level the storage kept", () => {
+    const r = boot([], storing(levelText(STORED)));
+    assert.deepEqual(r.shown(), [STORED.w, STORED.h]);
+  });
+
+  it("opens the demo when the storage keeps no level of its own", () => {
+    const starts = {
+      "a first visit": null,
+      "an empty storage": storing(),
+      "junk in storage": storing("not a level"),
+      "a storage that throws": refusing()
+    };
+    for (const [what, storage] of Object.entries(starts)) {
+      assert.deepEqual(boot([], storage).shown(), [START.w, START.h], what);
+    }
+  });
+});
 
 describe("app: the board's size", () => {
   it("starts the size row at the level's own size", () => {

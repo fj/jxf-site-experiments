@@ -253,7 +253,8 @@ sprites, string-art, shading, memoizing), `level.js`, `file.js`, `view.js`,
 edits and validation; the `*.blocklayer.json` file a level is saved to and
 opened from; rotation, projection, picking, the frame and the way in from a
 pointer; which cells are chosen, which every module asks `selection.js`; the
-level a first visit starts with; the level the browser keeps — all unit-tested
+level a first visit starts with, which `app.js` falls back on; the level the
+browser keeps, and nothing when it keeps none — all unit-tested
 under `tests/`), `sprites-tiles.js`, `sprites-decor.js`, `sprites-marks.js`,
 `sprites-icons.js`, `render.js`, `input.js`, `parts.js` (the elements, the
 icons and the shape vocabulary every panel builds from), `toolbar.js`,

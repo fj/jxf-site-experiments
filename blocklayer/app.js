@@ -16,7 +16,9 @@
   if (!B || !root) return;
 
   var storage = B.store.from(window);
-  var opening = B.store.read(storage);
+  // A first visit, junk in storage, or a storage that will not answer: the
+  // demo level is what the reader lands on.
+  var opening = B.store.read(storage) || B.demo.level();
 
   var state = {
     level: opening,

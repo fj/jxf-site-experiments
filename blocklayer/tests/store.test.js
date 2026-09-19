@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const { inspect } = require("node:util");
 const { load } = require("./load");
 
-const B = load(["config.js", "level.js", "file.js", "demo.js", "store.js"]);
+const B = load(["config.js", "level.js", "file.js", "store.js"]);
 const S = B.store;
 const L = B.level;
 const F = B.file;
@@ -65,29 +65,29 @@ describe("store: read", () => {
     assert.deepEqual(kept.reads, [B.STORAGE_KEY]);
   });
 
-  it("answers the demo level when the storage holds nothing", () => {
-    assert.deepEqual(S.read(storage()), B.demo.level());
+  it("answers nothing when the storage holds nothing", () => {
+    assert.equal(S.read(storage()), null);
   });
 
-  it("answers the demo level when what is stored is not a level", () => {
+  it("answers nothing when what is stored is not a level", () => {
     for (const text of ["", "not json", "[]", "{}", '{"tiles": 1}', "null"]) {
-      assert.deepEqual(S.read(storage(text)), B.demo.level(), inspect(text));
+      assert.equal(S.read(storage(text)), null, inspect(text));
     }
   });
 
-  it("answers an empty level that was stored, rather than the demo", () => {
+  it("answers an empty level that was stored, rather than nothing", () => {
     const empty = S.read(storage(F.serialize(L.create())));
     assert.deepEqual(empty, L.create());
     assert.equal(L.count(empty), 0);
   });
 
-  it("answers the demo level when the storage throws, and does not throw", () => {
+  it("answers nothing when the storage throws, and does not throw", () => {
     assert.doesNotThrow(() => S.read(refusing()));
-    assert.deepEqual(S.read(refusing()), B.demo.level());
+    assert.equal(S.read(refusing()), null);
   });
 
-  it("answers the demo level when there is no storage to read", () => {
-    assert.deepEqual(S.read(null), B.demo.level());
+  it("answers nothing when there is no storage to read", () => {
+    assert.equal(S.read(null), null);
   });
 
   it("answers a level of its own each time, which an edit cannot reach back into", () => {
@@ -113,7 +113,7 @@ describe("store: write", () => {
     assert.deepEqual(S.read(kept), level);
   });
 
-  it("writes an empty level, which reads back empty and not as the demo", () => {
+  it("writes an empty level, which reads back empty and not as nothing", () => {
     const kept = storage(F.serialize(levelOf([[0, 0]])));
     S.write(kept, L.create());
     assert.deepEqual(S.read(kept), L.create());

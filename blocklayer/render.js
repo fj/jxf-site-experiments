@@ -55,7 +55,7 @@
   }
 
   function outlineKind(state, tile) {
-    if (B.inCells(state.selection, tile.x, tile.y)) return "select";
+    if (B.selection.holds(state.selection, tile.x, tile.y)) return "select";
     if (B.sameCell(hoveredTile(state), tile.x, tile.y)) return "hover";
     return null;
   }

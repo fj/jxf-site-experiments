@@ -2,8 +2,8 @@
  * Blocklayer — the camera: where a world cell lands on the base canvas after
  * rotation and pan, the depth order tiles are drawn in, and the way back from
  * a pointer to the tile or the empty cell under it, or from a swept box to the
- * tiles it holds. Pure arithmetic; the only thing read from a canvas is its
- * size.
+ * tiles it holds. Pure arithmetic; all that is read from a canvas is its size
+ * and where it sits on the page.
  */
 (function () {
   "use strict";
@@ -125,8 +125,14 @@
 
   // The tiles a swept box holds: those whose top face's centre lies in it, in
   // the level's own order. The box is in the space project() answers, and its
-  // corners come in either order.
+  // corners come in either order. A box of no size is a click, so it takes the
+  // tile under its corner however the ray reaches it, which a box that caught
+  // only top faces would miss.
   function within(view, level, box) {
+    if (box.x0 === box.x1 && box.y0 === box.y1) {
+      var hit = pick(view, level, box.x0, box.y0);
+      return hit.tile ? [hit.tile] : [];
+    }
     var left = Math.min(box.x0, box.x1);
     var right = Math.max(box.x0, box.x1);
     var top = Math.min(box.y0, box.y1);
@@ -157,6 +163,22 @@
     return { w: w, h: h, ox: Math.floor(w / 2), oy: Math.floor(h / 2) };
   }
 
+  // A client point in the space project() answers: base pixels about the
+  // frame's origin. The bitmap is stretched over the canvas's content box,
+  // inside its border, and holds as many of its own pixels as it likes. Null
+  // when the canvas has no size.
+  function basePoint(canvas, scale, clientX, clientY) {
+    var cssW = canvas.clientWidth;
+    var cssH = canvas.clientHeight;
+    if (!cssW || !cssH) return null;
+    var rect = canvas.getBoundingClientRect();
+    var origin = frame(canvas, scale);
+    return {
+      x: (clientX - rect.left - canvas.clientLeft) * (canvas.width / cssW) / scale - origin.ox,
+      y: (clientY - rect.top - canvas.clientTop) * (canvas.height / cssH) / scale - origin.oy
+    };
+  }
+
   B.view = {
     create: create,
     rotate: rotate,
@@ -171,6 +193,7 @@
     within: within,
     sameHit: sameHit,
     viewFacing: viewFacing,
-    frame: frame
+    frame: frame,
+    basePoint: basePoint
   };
 })();

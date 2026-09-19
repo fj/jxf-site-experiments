@@ -1,10 +1,11 @@
 /*
  * Blocklayer — the app entry. Builds the toolbar, the canvas, the hint row
  * and the status line into the mount, keeps the one state object the renderer
- * reads, and maps every toolbar action and pointer gesture onto a level or
- * view mutation: each one redraws, refreshes the toolbar, and — when the
- * level changed — saves it on that redraw. The level also goes out to a file
- * and comes back from one, by the picker or dropped on the canvas.
+ * reads, and maps every toolbar action and pointer gesture onto a call to the
+ * modules that hold the rules: each one redraws, refreshes the toolbar, and —
+ * when the level changed — saves it on that redraw. The level also goes out to
+ * a file and comes back from one, by the picker or dropped on the canvas.
+ * Wiring only; what a gesture means belongs to the module it calls.
  */
 (function () {
   "use strict";
@@ -13,8 +14,10 @@
   var root = B && document.getElementById(B.MOUNT_ID);
   if (!B || !root) return;
 
+  var storage = B.store.from(window);
+
   var state = {
-    level: loadLevel(),
+    level: B.store.read(storage),
     view: B.view.create(),
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
@@ -31,35 +34,14 @@
   var status = null;
 
   // ---- Persistence ---------------------------------------------------------
-  // The try is for storage itself, which a browser may refuse to hand over.
-  function stored() {
-    try {
-      return B.file.parse(window.localStorage.getItem(B.STORAGE_KEY));
-    } catch (err) {
-      return null;
-    }
-  }
-
-  function loadLevel() {
-    return stored() || B.demo.level();
-  }
-
   var unsaved = false;
-
-  function save() {
-    try {
-      window.localStorage.setItem(B.STORAGE_KEY, B.file.serialize(state.level));
-    } catch (err) {
-      // Storage refused the level; it lives on in memory until the next edit.
-    }
-  }
 
   // Edits are saved once per frame, on the redraw every edit schedules; the
   // page going away flushes what no frame has reached yet.
   function flushSave() {
     if (!unsaved) return;
     unsaved = false;
-    save();
+    B.store.write(storage, state.level);
   }
 
   function watchLeaving() {
@@ -151,39 +133,22 @@
     resize();
   }
 
-  // A client point in base-canvas pixels about the frame's origin: the space
-  // the view projects into. The bitmap is stretched over the canvas's content
-  // box, inside its border. Null when the canvas has no size.
-  function basePoint(clientX, clientY) {
-    var cssW = canvas.clientWidth;
-    var cssH = canvas.clientHeight;
-    if (!cssW || !cssH) return null;
-    var s = scale();
-    var rect = canvas.getBoundingClientRect();
-    var frame = B.view.frame(canvas, s);
-    return {
-      x: (clientX - rect.left - canvas.clientLeft) * (canvas.width / cssW) / s - frame.ox,
-      y: (clientY - rect.top - canvas.clientTop) * (canvas.height / cssH) / s - frame.oy
-    };
+  // Where a client point falls in the space the view projects into.
+  function at(clientX, clientY) {
+    return B.view.basePoint(canvas, scale(), clientX, clientY);
   }
 
   function pick(clientX, clientY) {
-    var at = basePoint(clientX, clientY);
-    return at && B.view.pick(state.view, state.level, at.x, at.y);
+    var p = at(clientX, clientY);
+    return p && B.view.pick(state.view, state.level, p.x, p.y);
   }
 
-  // Two client corners as a rectangle in the same space, the lower corner
-  // first whichever way the sweep ran.
+  // Two client corners as a rectangle in the same space, in the order swept:
+  // both the renderer and view.within read them either way round.
   function baseBox(x0, y0, x1, y1) {
-    var a = basePoint(x0, y0);
-    var b = basePoint(x1, y1);
-    if (!a || !b) return null;
-    return {
-      x0: Math.min(a.x, b.x),
-      y0: Math.min(a.y, b.y),
-      x1: Math.max(a.x, b.x),
-      y1: Math.max(a.y, b.y)
-    };
+    var a = at(x0, y0);
+    var b = at(x1, y1);
+    return a && b ? { x0: a.x, y0: a.y, x1: b.x, y1: b.y } : null;
   }
 
   // ---- Render --------------------------------------------------------------
@@ -221,39 +186,17 @@
     if (any) edited();
   }
 
-  function without(cells, x, y) {
-    return cells.filter(function (cell) { return !B.sameCell(cell, x, y); });
-  }
-
-  // The one writer of the selection. It is replaced, never changed in place,
-  // so a list handed out stays whole while the level is edited under it.
+  // The one writer of the selection.
   function setSelection(cells) {
     state.selection = cells;
   }
 
-  // ...and the toolbar and the canvas follow it at once.
+  // ...and the toolbar and the canvas follow it at once, unless the selection
+  // module answered with the very list that was there.
   function selectCells(cells) {
+    if (cells === state.selection) return;
     setSelection(cells);
     changed();
-  }
-
-  // The tiles a sweep caught: those under the rectangle, or the one under the
-  // point when the rectangle has no size.
-  function swept(box) {
-    if (box.x0 !== box.x1 || box.y0 !== box.y1) {
-      return B.view.within(state.view, state.level, box);
-    }
-    var hit = B.view.pick(state.view, state.level, box.x0, box.y0);
-    return hit && hit.tile ? [hit.tile] : [];
-  }
-
-  // The tiles join the selection; the cells already in it keep their place.
-  function addCells(tiles) {
-    var next = state.selection.slice();
-    tiles.forEach(function (tile) {
-      if (!B.inCells(next, tile.x, tile.y)) next.push({ x: tile.x, y: tile.y });
-    });
-    if (next.length > state.selection.length) selectCells(next);
   }
 
   // The height the next tile gets, which the elevation keys move when there is
@@ -267,7 +210,7 @@
 
   function remove(x, y) {
     if (!B.level.remove(state.level, x, y)) return;
-    setSelection(without(state.selection, x, y));
+    setSelection(B.selection.remove(state.selection, x, y));
     edited();
   }
 
@@ -329,17 +272,16 @@
       edited();
     },
     select: function (x, y) {
-      selectCells([{ x: x, y: y }]);
+      selectCells(B.selection.only(x, y));
     },
-    // The cell joins the selection as the newest of it, or leaves it.
     toggleSelect: function (x, y) {
-      if (B.inCells(state.selection, x, y)) selectCells(without(state.selection, x, y));
-      else selectCells(state.selection.concat([{ x: x, y: y }]));
+      selectCells(B.selection.toggle(state.selection, x, y));
     },
     // A sweep's two client corners: every tile inside joins the selection.
     selectBox: function (x0, y0, x1, y1) {
       var box = baseBox(x0, y0, x1, y1);
-      if (box) addCells(swept(box));
+      if (!box) return;
+      selectCells(B.selection.add(state.selection, B.view.within(state.view, state.level, box)));
     },
     // The rectangle the sweep is drawing, for the renderer; box(null) ends it.
     box: function (x0, y0, x1, y1) {

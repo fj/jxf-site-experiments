@@ -528,16 +528,72 @@ describe("view: within", () => {
   });
 
   it("reads a slope by the top face a block over its elevation, as the renderer draws it", () => {
+    const PROBE = 1;                   // px each way, so the box has a size
+    const around = (p) =>
+      ({ x0: p.sx - PROBE, y0: p.sy - PROBE, x1: p.sx + PROBE, y1: p.sy + PROBE });
     for (const shape of B.SHAPES) {
       const { view, level } = patch(0, PANS[0], [[0, 0]]);
       L.setShape(level, 0, 0, shape);
       const tile = L.get(level, 0, 0);
-      const pinned = (p) => ({ x0: p.sx, y0: p.sy, x1: p.sx, y1: p.sy });
-      assert.deepEqual(V.within(view, level, pinned(topOf(view, level, [0, 0]))), [tile], shape);
+      assert.deepEqual(V.within(view, level, around(topOf(view, level, [0, 0]))), [tile], shape);
       const base = V.project(view, 0, 0, tile.elev);
       const onBase = L.sloped(tile) ? [] : [tile];
-      assert.deepEqual(V.within(view, level, pinned(base)), onBase, shape);
+      assert.deepEqual(V.within(view, level, around(base)), onBase, shape);
     }
+  });
+});
+
+describe("view: within a box of no size", () => {
+  const pinned = (p) => ({ x0: p.sx, y0: p.sy, x1: p.sx, y1: p.sy });
+
+  it("takes the tile under the corner, anywhere on its top face, as a click does", () => {
+    const TOP_FACE = [[0, 0], [0, -7], [0, 7], [15, 0], [-15, 0], [8, -3]];
+    for (const rot of ROTS) {
+      const view = viewAt(rot, { x: 9, y: -5 });
+      const level = L.create();
+      const only = L.add(level, 1, -2, B.NEW_TILE_ELEV);
+      const p = V.project(view, only.x, only.y, L.top(only));
+      for (const [dx, dy] of TOP_FACE) {
+        const corner = { sx: p.sx + dx, sy: p.sy + dy };
+        const name = `rot ${rot} ${dx},${dy}`;
+        assert.deepEqual(V.within(view, level, pinned(corner)), [only], name);
+        assert.deepEqual(V.pick(view, level, corner.sx, corner.sy), { tile: only }, `${name} click`);
+      }
+    }
+  });
+
+  it("takes a tile the click reaches by a side face, which no box of top faces holds", () => {
+    const view = V.create();
+    const level = L.create();
+    const TALL = 5;
+    const tall = L.add(level, 0, 0, TALL);
+    const top = V.project(view, 0, 0, TALL);
+    const side = { sx: top.sx, sy: top.sy + TALL * B.BLOCK_H };
+    assert.deepEqual(V.within(view, level, pinned(side)), [tall]);
+    const REACH = 2;                   // px each way: a box with a size, over the same point
+    assert.deepEqual(V.within(view, level, {
+      x0: side.sx - REACH, y0: side.sy - REACH, x1: side.sx + REACH, y1: side.sy + REACH
+    }), []);
+  });
+
+  it("takes nothing over an empty cell", () => {
+    const { view, level } = scene();
+    L.add(level, 3, 3, B.NEW_TILE_ELEV);
+    const p = V.project(view, 0, 0, B.FLOOR);
+    assert.deepEqual(V.within(view, level, pinned(p)), []);
+    assert.deepEqual(V.within(V.create(), L.create(), pinned(p)), []);
+  });
+
+  it("is a box, not a click, when only one side has no length", () => {
+    const view = V.create();
+    const level = L.create();
+    const near = L.add(level, 0, 0, B.NEW_TILE_ELEV);
+    const far = L.add(level, 1, 1, B.NEW_TILE_ELEV);
+    const a = V.project(view, near.x, near.y, L.top(near));
+    const b = V.project(view, far.x, far.y, L.top(far));
+    assert.equal(a.sx, b.sx, "the two tops share a column on screen");
+    assert.deepEqual(V.within(view, level, { x0: a.sx, y0: a.sy, x1: b.sx, y1: b.sy }),
+      [near, far]);
   });
 });
 
@@ -641,5 +697,102 @@ describe("view: frame", () => {
 
   it("keeps the origin on a whole pixel when the base size is odd", () => {
     assert.deepEqual(V.frame(canvas, 8), { w: 125, h: 75, ox: 62, oy: 37 });
+  });
+});
+
+describe("view: basePoint", () => {
+  const RECT = { left: 40, top: 10 };   // where the canvas sits on the page
+  const CSS_W = 400;                    // the content box, in CSS px
+  const CSS_H = 200;
+  const RATIO = 2;                      // device pixels per CSS pixel
+  const BORDER_X = 3;                   // px of border down the canvas's left side
+  const BORDER_Y = 5;                   // ...and across its top
+  const SCALE = 4;                      // zoom 2 at that ratio
+  const HALF = 0.5;
+
+  // A canvas whose bitmap covers its box at the device's ratio, with no border.
+  function canvasAt(over = {}) {
+    return {
+      clientWidth: CSS_W,
+      clientHeight: CSS_H,
+      clientLeft: 0,
+      clientTop: 0,
+      width: CSS_W * RATIO,
+      height: CSS_H * RATIO,
+      getBoundingClientRect: () => ({ left: RECT.left, top: RECT.top }),
+      ...over
+    };
+  }
+
+  const bordered = () => canvasAt({ clientLeft: BORDER_X, clientTop: BORDER_Y });
+
+  // The client point of (cx, cy) in the canvas's own content box, in CSS px.
+  const client = (canvas, cx, cy) =>
+    [RECT.left + canvas.clientLeft + cx, RECT.top + canvas.clientTop + cy];
+
+  it("puts the frame's origin under the centre of the content box, border or none", () => {
+    for (const canvas of [canvasAt(), bordered()]) {
+      const middle = client(canvas, CSS_W * HALF, CSS_H * HALF);
+      assert.deepEqual(V.basePoint(canvas, SCALE, middle[0], middle[1]), { x: 0, y: 0 });
+    }
+  });
+
+  it("measures in base pixels, so the content box reaches half a frame each way", () => {
+    const canvas = bordered();
+    const frame = V.frame(canvas, SCALE);
+    const topLeft = client(canvas, 0, 0);
+    const bottomRight = client(canvas, CSS_W, CSS_H);
+    assert.deepEqual(V.basePoint(canvas, SCALE, topLeft[0], topLeft[1]),
+      { x: -frame.ox, y: -frame.oy });
+    assert.deepEqual(V.basePoint(canvas, SCALE, bottomRight[0], bottomRight[1]),
+      { x: frame.w - frame.ox, y: frame.h - frame.oy });
+  });
+
+  it("takes the border off, so the same client point falls further in on a bordered canvas", () => {
+    const plain = V.basePoint(canvasAt(), SCALE, RECT.left + 100, RECT.top + 50);
+    const inside = V.basePoint(bordered(), SCALE, RECT.left + 100, RECT.top + 50);
+    assert.deepEqual({ x: plain.x - inside.x, y: plain.y - inside.y },
+      { x: BORDER_X * RATIO / SCALE, y: BORDER_Y * RATIO / SCALE });
+  });
+
+  it("counts the bitmap's own pixels, not the box's, when the two differ", () => {
+    const at = (canvas) => V.basePoint(canvas, SCALE, ...client(canvas, 100, 50));
+    assert.deepEqual(at(canvasAt()), { x: -50, y: -25 });
+    assert.deepEqual(at(canvasAt({ width: CSS_W, height: CSS_H })), { x: -25, y: -12.5 });
+  });
+
+  it("reads each side against its own bitmap, which rounding leaves at its own ratio", () => {
+    const canvas = canvasAt({ width: CSS_W * RATIO, height: CSS_H });
+    const point = client(canvas, 100, 50);
+    assert.deepEqual(V.basePoint(canvas, SCALE, point[0], point[1]), { x: -50, y: -12.5 });
+  });
+
+  it("answers the same base point at any ratio, since the bitmap grows with it", () => {
+    const wide = canvasAt({ width: CSS_W * RATIO * 2, height: CSS_H * RATIO * 2 });
+    const point = client(wide, 100, 50);
+    assert.deepEqual(V.basePoint(wide, SCALE * 2, point[0], point[1]),
+      V.basePoint(canvasAt(), SCALE, point[0], point[1]));
+  });
+
+  it("has no answer for a canvas with no size", () => {
+    for (const over of [{ clientWidth: 0 }, { clientHeight: 0 }]) {
+      const canvas = canvasAt(over);
+      assert.equal(V.basePoint(canvas, SCALE, RECT.left, RECT.top), null, JSON.stringify(over));
+    }
+  });
+
+  it("hands pick the point it needs: a click on a tile's top face finds that tile", () => {
+    const canvas = bordered();
+    const frame = V.frame(canvas, SCALE);
+    const { view, level } = scene();
+    const tall = L.add(level, 1, -1, B.NEW_TILE_ELEV);
+    const p = V.project(view, tall.x, tall.y, L.top(tall));
+    // Back the other way: base px to the content box's own CSS px.
+    const cx = (frame.ox + p.sx) * SCALE / RATIO;
+    const cy = (frame.oy + p.sy) * SCALE / RATIO;
+    const point = client(canvas, cx, cy);
+    const at = V.basePoint(canvas, SCALE, point[0], point[1]);
+    assert.deepEqual(at, { x: p.sx, y: p.sy });
+    assert.deepEqual(V.pick(view, level, at.x, at.y), { tile: tall });
   });
 });

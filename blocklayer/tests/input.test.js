@@ -74,9 +74,7 @@ function fakeCanvas() {
 // added answers as its tile from then on, as the level would.
 function rig() {
   const clock = fakeWindow();
-  const B = load(["config.js", "input.js"], clock.window);
-  // config.js grows inCells in the change that makes the selection a list.
-  B.inCells = B.inCells || ((cells, x, y) => cells.some((c) => c.x === x && c.y === y));
+  const B = load(["config.js", "selection.js", "input.js"], clock.window);
   const canvas = fakeCanvas();
   const hits = new Map();
   const added = new Set();

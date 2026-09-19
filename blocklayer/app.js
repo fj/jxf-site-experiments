@@ -21,6 +21,7 @@
     newElev: B.NEW_TILE_ELEV,
     color: B.DEFAULT_COLOR,
     selection: [],
+    box: null,
     hover: null,
     hold: null
   };
@@ -150,17 +151,39 @@
     resize();
   }
 
-  // The bitmap is stretched over the canvas's content box, inside its border.
-  function pick(clientX, clientY) {
+  // A client point in base-canvas pixels about the frame's origin: the space
+  // the view projects into. The bitmap is stretched over the canvas's content
+  // box, inside its border. Null when the canvas has no size.
+  function basePoint(clientX, clientY) {
     var cssW = canvas.clientWidth;
     var cssH = canvas.clientHeight;
     if (!cssW || !cssH) return null;
     var s = scale();
     var rect = canvas.getBoundingClientRect();
     var frame = B.view.frame(canvas, s);
-    var bx = (clientX - rect.left - canvas.clientLeft) * (canvas.width / cssW) / s;
-    var by = (clientY - rect.top - canvas.clientTop) * (canvas.height / cssH) / s;
-    return B.view.pick(state.view, state.level, bx - frame.ox, by - frame.oy);
+    return {
+      x: (clientX - rect.left - canvas.clientLeft) * (canvas.width / cssW) / s - frame.ox,
+      y: (clientY - rect.top - canvas.clientTop) * (canvas.height / cssH) / s - frame.oy
+    };
+  }
+
+  function pick(clientX, clientY) {
+    var at = basePoint(clientX, clientY);
+    return at && B.view.pick(state.view, state.level, at.x, at.y);
+  }
+
+  // Two client corners as a rectangle in the same space, the lower corner
+  // first whichever way the sweep ran.
+  function baseBox(x0, y0, x1, y1) {
+    var a = basePoint(x0, y0);
+    var b = basePoint(x1, y1);
+    if (!a || !b) return null;
+    return {
+      x0: Math.min(a.x, b.x),
+      y0: Math.min(a.y, b.y),
+      x1: Math.max(a.x, b.x),
+      y1: Math.max(a.y, b.y)
+    };
   }
 
   // ---- Render --------------------------------------------------------------
@@ -212,6 +235,25 @@
   function selectCells(cells) {
     setSelection(cells);
     changed();
+  }
+
+  // The tiles a sweep caught: those under the rectangle, or the one under the
+  // point when the rectangle has no size.
+  function swept(box) {
+    if (box.x0 !== box.x1 || box.y0 !== box.y1) {
+      return B.view.within(state.view, state.level, box);
+    }
+    var hit = B.view.pick(state.view, state.level, box.x0, box.y0);
+    return hit && hit.tile ? [hit.tile] : [];
+  }
+
+  // The tiles join the selection; the cells already in it keep their place.
+  function addCells(tiles) {
+    var next = state.selection.slice();
+    tiles.forEach(function (tile) {
+      if (!B.inCells(next, tile.x, tile.y)) next.push({ x: tile.x, y: tile.y });
+    });
+    if (next.length > state.selection.length) selectCells(next);
   }
 
   // The height the next tile gets, which the elevation keys move when there is
@@ -293,6 +335,16 @@
     toggleSelect: function (x, y) {
       if (B.inCells(state.selection, x, y)) selectCells(without(state.selection, x, y));
       else selectCells(state.selection.concat([{ x: x, y: y }]));
+    },
+    // A sweep's two client corners: every tile inside joins the selection.
+    selectBox: function (x0, y0, x1, y1) {
+      var box = baseBox(x0, y0, x1, y1);
+      if (box) addCells(swept(box));
+    },
+    // The rectangle the sweep is drawing, for the renderer; box(null) ends it.
+    box: function (x0, y0, x1, y1) {
+      state.box = x0 == null ? null : baseBox(x0, y0, x1, y1);
+      sched();
     },
     deselect: function () {
       selectCells([]);

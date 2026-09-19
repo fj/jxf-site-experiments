@@ -2,9 +2,10 @@
  * Blocklayer — drawing the scene. Everything is drawn once, at base scale, on
  * an offscreen canvas: the floor grid, then the columns back to front with
  * what stands on them and the ghost among them at its depth, then the labels,
- * the compass and the badge that names the height a new tile gets. That bitmap
- * is blitted to the visible canvas at `scale` (the view's zoom times the device
- * pixel ratio) with smoothing off, so every pixel stays a crisp square.
+ * the box a sweep is drawing, the compass and the badge that names the height
+ * a new tile gets. That bitmap is blitted to the visible canvas at `scale`
+ * (the view's zoom times the device pixel ratio) with smoothing off, so every
+ * pixel stays a crisp square.
  */
 (function () {
   "use strict";
@@ -20,6 +21,11 @@
   var BADGE_MARGIN = 4;         // base px between the compass and the badge under it
   var BADGE_SIGN = "+";         // so the badge reads as a height, not as a count
   var TRANSPARENT_ALPHA = 0.45; // how solid a see-through tile is drawn
+  var BOX_LINE = 1;             // base px the sweep box's line is wide
+  var BOX_DASH = 3;             // base px of each dash along it
+  // The dashes take these in turn, so the box reads on a light canvas and on a
+  // dark one.
+  var BOX_INKS = [B.COLORS.select, B.COLORS.outline];
 
   var base = null;
 
@@ -112,6 +118,32 @@
     return cell ? { x: cell.x, y: cell.y, elev: state.newElev } : null;
   }
 
+  // One side of the sweep box: dashes from (x, y), across or down, each in the
+  // next ink.
+  function drawSide(ctx, x, y, across, length) {
+    for (var at = 0, i = 0; at < length; at += BOX_DASH, i++) {
+      var dash = Math.min(BOX_DASH, length - at);
+      ctx.fillStyle = BOX_INKS[i % BOX_INKS.length];
+      if (across) ctx.fillRect(x + at, y, dash, BOX_LINE);
+      else ctx.fillRect(x, y + at, BOX_LINE, dash);
+    }
+  }
+
+  // The rectangle a sweep is drawing, on whole pixels. Its corners come in
+  // either order, and lie around the frame's origin as a projection does.
+  function drawBox(ctx, frame, box) {
+    var left = Math.round(frame.ox + Math.min(box.x0, box.x1));
+    var right = Math.round(frame.ox + Math.max(box.x0, box.x1));
+    var top = Math.round(frame.oy + Math.min(box.y0, box.y1));
+    var bottom = Math.round(frame.oy + Math.max(box.y0, box.y1));
+    var w = right - left + BOX_LINE;
+    var h = bottom - top + BOX_LINE;
+    drawSide(ctx, left, top, true, w);
+    drawSide(ctx, left, bottom, true, w);
+    drawSide(ctx, left, top, false, h);
+    drawSide(ctx, right, top, false, h);
+  }
+
   // The corner: the compass, and under it the height a new tile gets, which
   // the elevation keys move with nothing hovered to show it on.
   function drawCorner(ctx, state) {
@@ -145,6 +177,7 @@
       at.push(p);
     });
     drawLabels(ctx, state, tiles, at);
+    if (state.box) drawBox(ctx, frame, state.box);
     drawCorner(ctx, state);
 
     var out = canvas.getContext("2d");

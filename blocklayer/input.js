@@ -8,7 +8,7 @@
  * foreground colour, or edit the selection.
  * Nothing here knows the level; every gesture ends in one of the handlers.
  * Every hover reports what is under the pointer, whether Alt is held and where
- * the pointer is, and Alt coming or going reports the same again, so what
+ * the pointer is, and Alt coming or going picks the same point again, so what
  * reads the hover follows the key without a move.
  * keyFor() names the key bound to a handler call, for the toolbar's tooltips.
  */
@@ -132,29 +132,36 @@
     var hold = null;
     var sweep = null;       // where a shift drag began, in client space
     var alt = false;
-    var last = null;        // the hit last reported, and where the pointer was
+    var last = null;        // where the pointer was, in client space
 
-    // What the pointer is over, whether Alt is held and where the pointer is:
-    // the tip follows all three. Every pointer event carries the key's state,
-    // so Alt held before the pointer arrives counts as held.
+    // Every hover reports the same three things beside the hit: whether Alt is
+    // held and where the pointer is.
+    function report(hit, x, y) {
+      handlers.hover(hit, alt, x, y);
+    }
+
+    // Each pointer event carries the key's state, so Alt held before the
+    // pointer arrives counts as held.
     function hover(hit, e) {
       alt = !!e.altKey;
-      last = { hit: hit, x: e.clientX, y: e.clientY };
-      handlers.hover(hit, alt, e.clientX, e.clientY);
+      last = { clientX: e.clientX, clientY: e.clientY };
+      report(hit, e.clientX, e.clientY);
     }
 
-    // The pointer has left, so there is nothing under it and nowhere to say.
-    function hoverNothing() {
+    // The pointer has left: nothing is under it, and no place to look again.
+    function hoverNothing(e) {
+      alt = !!e.altKey;
       last = null;
-      handlers.hover(null);
+      report(null, e.clientX, e.clientY);
     }
 
-    // Alt comes and goes with the pointer still, and the hover goes again so
-    // the tip appears and disappears at once.
+    // Alt comes and goes with the pointer still. What is under the pointer is
+    // picked afresh, so an edit between the two reports cannot leave a stale
+    // hit behind.
     function trackAlt(e) {
       if (!!e.altKey === alt) return;
       alt = !!e.altKey;
-      if (last) handlers.hover(last.hit, alt, last.x, last.y);
+      if (last) report(pick(last), last.clientX, last.clientY);
     }
 
     function inside(e) {
@@ -308,9 +315,9 @@
       cancelHold();
     }
 
-    function onLeave() {
+    function onLeave(e) {
       cancelHold();
-      hoverNothing();
+      hoverNothing(e);
     }
 
     function onWheel(e) {

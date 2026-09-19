@@ -255,8 +255,11 @@ describe("input: adding by click and drag", () => {
     const r = rig();
     r.at(WIDTH + 5, 10, cell(9, 9));
     r.fire("pointermove", { clientX: WIDTH + 5, clientY: 10 });
-    r.fire("pointerleave", {});
-    assert.deepEqual(r.of("hover"), [[null, NO_ALT, WIDTH + 5, 10], [null]]);
+    r.fire("pointerleave", { clientX: WIDTH + 5, clientY: 10 });
+    assert.deepEqual(r.of("hover"), [
+      [null, NO_ALT, WIDTH + 5, 10],
+      [null, NO_ALT, WIDTH + 5, 10]
+    ], "the same shape of report either way");
   });
 
   it("a middle button press is ignored", () => {
@@ -934,15 +937,34 @@ describe("input: Alt with the hover", () => {
     assert.equal(r.of("hover").length, 2, "one report for the key going down");
   });
 
+  // The tile may be gone by the time Alt arrives, so the point is picked
+  // again rather than the old answer repeated.
+  it("picks the point afresh when Alt comes, so a gone tile is never reported", () => {
+    const r = rig();
+    r.fire("pointermove", r.at(20, 20, tile(1, 1)));
+    r.at(20, 20, cell(1, 1));
+    r.fire("keydown", ALT_DOWN);
+    assert.deepEqual(r.of("hover").pop(), [cell(1, 1), ALT, 20, 20]);
+  });
+
+  it("picks nothing when Alt comes with the pointer beyond the canvas", () => {
+    const r = rig();
+    r.at(WIDTH + 5, 10, tile(9, 9));
+    r.fire("pointermove", { clientX: WIDTH + 5, clientY: 10 });
+    r.fire("keydown", ALT_DOWN);
+    assert.deepEqual(r.of("hover").pop(), [null, ALT, WIDTH + 5, 10]);
+  });
+
   it("reports nothing at all when Alt moves with the pointer off the canvas", () => {
     const r = rig();
     r.fire("keydown", ALT_DOWN);
     r.fire("keyup", ALT_UP);
     assert.deepEqual(r.of("hover"), [], "there is no hit to report");
     r.fire("pointermove", r.at(20, 20, tile(1, 1)));
-    r.fire("pointerleave", {});
+    const leaving = r.of("hover").length;
+    r.fire("pointerleave", { clientX: 20, clientY: 20 });
     r.fire("keydown", ALT_DOWN);
-    assert.deepEqual(r.of("hover").pop(), [null], "and none once the pointer has left");
+    assert.equal(r.of("hover").length, leaving + 1, "only the leaving is reported");
   });
 
   it("swallows no key while Alt is held, so the canvas keys stay off", () => {

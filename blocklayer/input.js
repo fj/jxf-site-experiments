@@ -164,6 +164,12 @@
       if (last) report(pick(last), last.clientX, last.clientY);
     }
 
+    // The page has lost the keyboard, so the key is no longer held whatever
+    // the reader does next.
+    function dropAlt() {
+      trackAlt({ altKey: false });
+    }
+
     function inside(e) {
       var rect = canvas.getBoundingClientRect();
       return e.clientX >= rect.left && e.clientX < rect.right &&
@@ -375,8 +381,12 @@
     canvas.addEventListener("pointerleave", onLeave);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("keydown", onKey);
-    canvas.addEventListener("keyup", trackAlt);
     canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    // Alt is watched on the window, not the canvas: the reader may never have
+    // clicked the picture, and a page that loses focus never sees the key go.
+    window.addEventListener("keydown", trackAlt);
+    window.addEventListener("keyup", trackAlt);
+    window.addEventListener("blur", dropAlt);
   }
 
   B.input = { attach: attach, keyFor: keyFor, CYCLE_COLOR: CYCLE_COLOR };

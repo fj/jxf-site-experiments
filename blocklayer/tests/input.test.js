@@ -15,11 +15,13 @@ const NO_ALT = false;
 const ALT_DOWN = { key: "Alt", altKey: true };
 const ALT_UP = { key: "Alt", altKey: false };
 
-// A clock and a frame scheduler the test advances by hand.
+// A clock, a frame scheduler the test advances by hand, and the listeners the
+// page itself takes: Alt is watched there, not on the canvas.
 function fakeWindow() {
   let now = 0;
   let nextId = 1;
   let frames = [];
+  const listeners = new Map();
   const window = {
     performance: { now: () => now },
     requestAnimationFrame(fn) {
@@ -29,8 +31,16 @@ function fakeWindow() {
     },
     cancelAnimationFrame(id) {
       frames = frames.filter((f) => f.id !== id);
+    },
+    addEventListener(type, fn) {
+      listeners.set(type, (listeners.get(type) || []).concat(fn));
     }
   };
+  function firePage(type, props = {}) {
+    const e = { key: "", altKey: false, ...props };
+    for (const fn of listeners.get(type) || []) fn(e);
+    return e;
+  }
   function tick(ms) {
     const end = now + ms;
     while (now < end) {
@@ -40,7 +50,7 @@ function fakeWindow() {
       for (const f of due) f.fn(now);
     }
   }
-  return { window, tick, pending: () => frames.length };
+  return { window, tick, pending: () => frames.length, firePage };
 }
 
 function fakeCanvas() {
@@ -130,6 +140,7 @@ function rig() {
     calls,
     tick: clock.tick,
     pending: clock.pending,
+    firePage: clock.firePage,
     at(x, y, hit) {
       hits.set(`${x},${y}`, hit);
       return { clientX: x, clientY: y };
@@ -917,15 +928,43 @@ describe("input: Alt with the hover", () => {
     ]);
   });
 
+  // Alt is watched on the page, so the key counts even while the reader has
+  // never clicked the picture and the canvas holds no focus.
   it("reports it again when Alt is let go with the pointer still", () => {
     const r = rig();
     const t = r.at(20, 20, tile(1, 1));
     r.fire("pointermove", { ...t, altKey: true });
-    r.fire("keyup", ALT_UP);
+    r.firePage("keyup", ALT_UP);
     assert.deepEqual(r.of("hover"), [
       [tile(1, 1), ALT, 20, 20],
       [tile(1, 1), NO_ALT, 20, 20]
     ]);
+  });
+
+  it("takes Alt pressed on the page, with the canvas unfocused", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointermove", t);
+    r.firePage("keydown", ALT_DOWN);
+    assert.deepEqual(r.of("hover").pop(), [tile(1, 1), ALT, 20, 20]);
+    assert.equal(r.canvas.focused, false, "and asks for no focus to hear it");
+  });
+
+  // Alt+Tab takes the key away with no keyup to hear.
+  it("lets Alt go when the page loses the keyboard", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointermove", { ...t, altKey: true });
+    r.firePage("blur");
+    assert.deepEqual(r.of("hover").pop(), [tile(1, 1), NO_ALT, 20, 20]);
+  });
+
+  it("says nothing more when the page loses the keyboard with Alt already up", () => {
+    const r = rig();
+    r.fire("pointermove", r.at(20, 20, tile(1, 1)));
+    const said = r.of("hover").length;
+    r.firePage("blur");
+    assert.equal(r.of("hover").length, said);
   });
 
   it("reports nothing again while Alt is held down", () => {

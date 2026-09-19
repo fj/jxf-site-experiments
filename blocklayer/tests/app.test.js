@@ -62,7 +62,14 @@ function watchContract(B, calls) {
 function boot(tiles = []) {
   const document = fakeDocument();
   const mount = document.createElement(MOUNT_TAG);
-  const window = { document, devicePixelRatio: 1, addEventListener() {} };
+  // The page's own listeners: input.js watches Alt there, so the canvas need
+  // never hold focus for the tip to come and go.
+  const onPage = new Map();
+  const window = {
+    document,
+    devicePixelRatio: 1,
+    addEventListener(type, fn) { onPage.set(type, (onPage.get(type) || []).concat(fn)); }
+  };
   document.addEventListener = () => {};
   document.getElementById = () => mount;
 
@@ -100,6 +107,11 @@ function boot(tiles = []) {
       return { clientX: (at.sx + origin.ox) * scale, clientY: (at.sy + origin.oy) * scale };
     },
     of(name) { return calls.filter((c) => c[0] === name).map((c) => c.slice(1)); },
+    firePage(type, props = {}) {
+      const e = { key: "", altKey: false, ...props };
+      for (const fn of onPage.get(type) || []) fn(e);
+      return e;
+    },
     cells() { return B.level.all(level).map((tile) => [tile.x, tile.y]).sort(); },
     ctl(name) {
       const el = control(mount, name);
@@ -307,10 +319,16 @@ describe("app: Alt over a tile", () => {
 
   it("goes as soon as Alt is let go, without the pointer moving", () => {
     const r = hovering({ altKey: true });
-    r.canvas.fire("keyup", ALT_UP);
+    r.firePage("keyup", ALT_UP);
     assert.equal(tipOf(r).hidden, true);
-    r.canvas.fire("keydown", ALT_DOWN);
+    r.firePage("keydown", ALT_DOWN);
     assert.equal(tipOf(r).hidden, false, "and comes back the same way");
+  });
+
+  it("goes when the page loses the keyboard, which takes Alt with it", () => {
+    const r = hovering({ altKey: true });
+    r.firePage("blur");
+    assert.equal(tipOf(r).hidden, true);
   });
 
   it("shows nothing over an empty cell, Alt or no Alt", () => {

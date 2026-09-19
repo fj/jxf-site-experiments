@@ -198,7 +198,7 @@
       var btn = toggle("color", entry.key, titled(entry.label, stepKeys), function () {
         handlers.setColor(entry.key);
       });
-      P.image(btn, B.tiles.swatch(entry.key));
+      btn.appendChild(P.image(B.tiles.swatch(entry.key)));
       refs.colors[entry.key] = btn;
       el.appendChild(btn);
     });
@@ -210,7 +210,7 @@
     B.DECOR.forEach(function (d) {
       var title = titled(d.label, B.input.keyFor("setDecor", d.key));
       var btn = toggle("decor", d.key, title, function () { handlers.setDecor(d.key); });
-      P.image(btn, B.decor.icon(d.key));
+      btn.appendChild(P.image(B.decor.icon(d.key)));
       refs.decor[d.key] = btn;
       el.appendChild(btn);
     });
@@ -226,7 +226,7 @@
       var title = titled(m.label, B.input.keyFor("toggleMark", m.key));
       var btn = toggle("mark", m.key, title, function () { handlers.toggleMark(m.key); });
       if (m.dir) btn.appendChild(P.arrowIcon(m.dir));
-      else P.image(btn, B.marks.sprite(m.key, STILL_ROT));
+      else btn.appendChild(P.image(B.marks.sprite(m.key, STILL_ROT)));
       refs.marks[m.key] = btn;
       el.appendChild(btn);
     });

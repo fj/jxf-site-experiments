@@ -22,15 +22,15 @@
     return el;
   }
 
-  // Coloured pixel art on an element: a decor object or a still mark.
-  function image(parent, sprite) {
+  // Coloured pixel art as a picture: a decor object or a still mark.
+  function image(sprite) {
     var img = element("img", "image");
     img.alt = "";
     img.draggable = false;
     img.src = B.pixel.dataUrl(sprite);
     img.width = sprite.canvas.width * ICON_SCALE;
     img.height = sprite.canvas.height * ICON_SCALE;
-    parent.appendChild(img);
+    return img;
   }
 
   // A UI glyph is a mask over the element's text colour, which the stylesheet

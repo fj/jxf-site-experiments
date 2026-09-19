@@ -96,6 +96,7 @@ function rig() {
     hover: record("hover"),
     add: (x, y) => { record("add")(x, y); added.add(key(x, y)); },
     select: record("select"),
+    toggleSelect: record("toggleSelect"),
     raise: record("raise"),
     raiseAll: record("raiseAll"),
     hold: record("hold"),
@@ -254,6 +255,52 @@ describe("input: adding by click and drag", () => {
     assert.equal(r.canvas.focused, false);
     assert.equal(r.canvas.captured, null);
     assert.equal(e.prevented, false);
+  });
+});
+
+// Ctrl and Cmd are one gesture: a Mac reads Cmd, and Ctrl+click there also
+// makes the context menu the canvas swallows.
+const TOGGLE_KEYS = [{ ctrlKey: true }, { metaKey: true }];
+
+describe("input: Ctrl or Cmd to toggle a tile in the selection", () => {
+  it("toggles the tile under the pointer and selects nothing outright", () => {
+    for (const modifier of TOGGLE_KEYS) {
+      const r = rig();
+      r.select({ x: 2, y: 2 });
+      r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: PRIMARY, ...modifier });
+      assert.deepEqual(r.calls, [["toggleSelect", 1, 1]], Object.keys(modifier)[0]);
+    }
+  });
+
+  // Which way it goes is the handler's to decide, so a tile already in the
+  // selection takes the same call.
+  it("toggles a tile that is already in the selection", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 });
+    r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: PRIMARY, ctrlKey: true });
+    assert.deepEqual(r.calls, [["toggleSelect", 1, 1]]);
+  });
+
+  it("on an empty cell it does nothing at all, and is still swallowed", () => {
+    for (const modifier of TOGGLE_KEYS) {
+      const r = rig();
+      const a = r.at(10, 10, cell(0, 0));
+      const e = r.fire("pointerdown", { ...a, button: PRIMARY, ...modifier });
+      r.tick(r.B.HOLD_MS);
+      assert.deepEqual(r.calls, [], Object.keys(modifier)[0]);
+      assert.equal(e.prevented, true);
+    }
+  });
+
+  it("starts no drag, on a tile or on an empty cell", () => {
+    for (const hit of [tile(1, 1), cell(0, 0)]) {
+      const r = rig();
+      const from = r.at(20, 20, hit);
+      const c = r.at(50, 20, cell(2, 1));
+      r.fire("pointerdown", { ...from, button: PRIMARY, ctrlKey: true });
+      r.fire("pointermove", c);
+      assert.deepEqual(r.of("add"), []);
+    }
   });
 });
 

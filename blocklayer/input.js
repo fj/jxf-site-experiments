@@ -1,9 +1,10 @@
 /*
  * Blocklayer — the pointer, wheel and keyboard on the canvas, read as editing
  * gestures: click or drag over empty cells to add, click a tile to select it,
- * wheel over the selection to elevate it, hold the right button to remove,
- * press the right button off the selection to deselect, and keys that move the
- * view, move the level, step the foreground colour, or edit the selection.
+ * Ctrl or Cmd with a click to toggle a tile in the selection, wheel over the
+ * selection to elevate it, hold the right button to remove, press the right
+ * button off the selection to deselect, and keys that move the view, move the
+ * level, step the foreground colour, or edit the selection.
  * Nothing here knows the level; every gesture ends in one of the handlers.
  * keyFor() names the key bound to a handler call, for the toolbar's tooltips.
  */
@@ -192,6 +193,21 @@
       handlers.deselect();
     }
 
+    // Ctrl, or Cmd on a Mac, makes a press toggle the tile under it in the
+    // selection. Over an empty cell it does nothing at all, so a press that
+    // builds a selection can never lay a tile by accident.
+    function leftDown(e, hit) {
+      var tile = hit && hit.tile;
+      if (e.ctrlKey || e.metaKey) {
+        if (tile) handlers.toggleSelect(tile.x, tile.y);
+        return;
+      }
+      dragging = true;
+      lastCell = null;
+      if (hit && hit.cell) handlers.hover(addCell(e, hit.cell));
+      else if (tile) handlers.select(tile.x, tile.y);
+    }
+
     function onDown(e) {
       if (e.button !== PRIMARY_BUTTON && e.button !== SECONDARY_BUTTON) return;
       e.preventDefault();
@@ -201,10 +217,7 @@
       canvas.setPointerCapture(e.pointerId);
       var hit = pick(e);
       if (e.button === PRIMARY_BUTTON) {
-        dragging = true;
-        lastCell = null;
-        if (hit && hit.cell) handlers.hover(addCell(e, hit.cell));
-        else if (hit && hit.tile) handlers.select(hit.tile.x, hit.tile.y);
+        leftDown(e, hit);
         return;
       }
       var tile = hit && hit.tile;

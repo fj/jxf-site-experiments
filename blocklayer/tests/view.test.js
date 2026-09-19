@@ -438,6 +438,109 @@ describe("view: pick", () => {
   });
 });
 
+describe("view: within", () => {
+  // Four tiles in a square, in an order no view puts them in, and one past
+  // the square that its box never reaches at any rotation.
+  const SQUARE = [[1, 1], [0, 0], [1, 0], [0, 1]];
+  const OUTSIDE = [2, 2];
+  const PANS = [{ x: 0, y: 0 }, { x: 9, y: -5 }];
+  const CORNERS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  const REACH_X = 24;                  // px a probe box reaches across from its corner
+  const REACH_Y = 12;                  // ...and down, which is not the same
+  const ELEV = B.NEW_TILE_ELEV;
+
+  function patch(rot, pan, cells) {
+    const view = viewAt(rot, pan);
+    const level = L.create();
+    for (const [x, y] of cells) L.add(level, x, y, ELEV);
+    return { view, level };
+  }
+
+  // Where a tile's top face's centre lands, as render.js places it.
+  const topOf = (view, level, [x, y]) =>
+    V.project(view, x, y, L.top(L.get(level, x, y)));
+
+  // The box that just holds the top faces of the named cells.
+  function boxOver(view, level, cells) {
+    const tops = cells.map((cell) => topOf(view, level, cell));
+    const xs = tops.map((p) => p.sx);
+    const ys = tops.map((p) => p.sy);
+    return {
+      x0: Math.min(...xs), y0: Math.min(...ys),
+      x1: Math.max(...xs), y1: Math.max(...ys)
+    };
+  }
+
+  const cellsOf = (tiles) => tiles.map((t) => [t.x, t.y]);
+
+  it("gathers the tiles the box holds, in the level's own order, turned and panned", () => {
+    for (const rot of ROTS) {
+      for (const pan of PANS) {
+        const { view, level } = patch(rot, pan, SQUARE.concat([OUTSIDE]));
+        const got = V.within(view, level, boxOver(view, level, SQUARE));
+        assert.deepEqual(cellsOf(got), SQUARE, `rot ${rot} pan ${pan.x},${pan.y}`);
+      }
+    }
+  });
+
+  it("answers the tiles themselves, and nothing over an empty level", () => {
+    const { view, level } = patch(0, PANS[0], SQUARE);
+    const box = boxOver(view, level, SQUARE);
+    assert.deepEqual(V.within(view, level, box), L.all(level));
+    assert.deepEqual(V.within(view, L.create(), box), []);
+  });
+
+  it("holds a tile whose centre lies on a corner and drops it a pixel past, at every rotation", () => {
+    for (const rot of ROTS) {
+      const { view, level } = patch(rot, PANS[1], [[0, 0]]);
+      const p = topOf(view, level, [0, 0]);
+      for (const [dx, dy] of CORNERS) {
+        const far = { x1: p.sx + dx * REACH_X, y1: p.sy + dy * REACH_Y };
+        const on = { x0: p.sx, y0: p.sy, ...far };
+        const past = { x0: p.sx + dx, y0: p.sy + dy, ...far };
+        assert.equal(V.within(view, level, on).length, 1, `rot ${rot} on ${dx},${dy}`);
+        assert.equal(V.within(view, level, past).length, 0, `rot ${rot} past ${dx},${dy}`);
+      }
+    }
+  });
+
+  it("holds a tile just inside an edge and drops the one just outside it", () => {
+    const { view, level } = patch(0, PANS[0], [[0, 0], [1, 0]]);
+    const near = topOf(view, level, [0, 0]);
+    const far = topOf(view, level, [1, 0]);
+    const reach = (edge) => ({ x0: near.sx, y0: near.sy - REACH_Y, x1: edge, y1: far.sy });
+    assert.deepEqual(cellsOf(V.within(view, level, reach(far.sx))), [[0, 0], [1, 0]]);
+    assert.deepEqual(cellsOf(V.within(view, level, reach(far.sx - 1))), [[0, 0]]);
+  });
+
+  it("reads the box's corners in either order", () => {
+    const { view, level } = patch(0, PANS[0], SQUARE.concat([OUTSIDE]));
+    const box = boxOver(view, level, SQUARE);
+    const orders = [
+      box,
+      { x0: box.x1, y0: box.y1, x1: box.x0, y1: box.y0 },
+      { x0: box.x1, y0: box.y0, x1: box.x0, y1: box.y1 },
+      { x0: box.x0, y0: box.y1, x1: box.x1, y1: box.y0 }
+    ];
+    for (const corners of orders) {
+      assert.deepEqual(cellsOf(V.within(view, level, corners)), SQUARE, JSON.stringify(corners));
+    }
+  });
+
+  it("reads a slope by the top face a block over its elevation, as the renderer draws it", () => {
+    for (const shape of B.SHAPES) {
+      const { view, level } = patch(0, PANS[0], [[0, 0]]);
+      L.setShape(level, 0, 0, shape);
+      const tile = L.get(level, 0, 0);
+      const pinned = (p) => ({ x0: p.sx, y0: p.sy, x1: p.sx, y1: p.sy });
+      assert.deepEqual(V.within(view, level, pinned(topOf(view, level, [0, 0]))), [tile], shape);
+      const base = V.project(view, 0, 0, tile.elev);
+      const onBase = L.sloped(tile) ? [] : [tile];
+      assert.deepEqual(V.within(view, level, pinned(base)), onBase, shape);
+    }
+  });
+});
+
 describe("view: sameHit", () => {
   const onTile = (x, y, more = {}) => ({ tile: tile({ x, y, ...more }) });
   const onCell = (x, y) => ({ cell: { x, y } });

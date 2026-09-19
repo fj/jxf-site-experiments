@@ -23,7 +23,10 @@ const STILL_ROT = 0;                         // a still mark is the same at ever
 const GRID = 3;                              // the pan and mark arrows sit in a 3 by 3 rose
 const ELEV = 3;
 const CELL = { x: 1, y: 2 };
+const CELLS = [{ x: 1, y: 2 }, { x: 3, y: 4 }];   // a sweep's cells; the last is the anchor
+const ANCHOR = CELLS.length - 1;
 const BARE_CELL = { x: 9, y: 9 };            // a cell with no tile on it
+const BARE_CELLS = [BARE_CELL, { x: 8, y: 8 }];
 const FILE = { name: "level.blocklayer.json" };
 const FOREGROUND = "violet";                 // a foreground the default is not
 const TILE_COLOR = "red";                    // ...and a tile's colour that is neither
@@ -227,26 +230,36 @@ function state(over = {}) {
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
     color: B.DEFAULT_COLOR,
-    selected: null,
+    selection: [],
     ...over
   };
 }
 
-// The same, with one tile selected, after `edit` has changed it.
-function selecting(edit) {
+// The same, with a tile on each of the named cells selected, after `edit` has
+// changed it. `edit` is handed that cell's setters and its place in the
+// selection, whose last cell is the anchor.
+function selectingCells(cells, edit) {
   const level = B.level.create();
-  B.level.add(level, CELL.x, CELL.y, ELEV);
-  if (edit) {
+  cells.forEach((cell, i) => {
+    B.level.add(level, cell.x, cell.y, ELEV);
+    if (!edit) return;
     edit({
-      shape: (s) => B.level.setShape(level, CELL.x, CELL.y, s),
-      facing: (f) => B.level.setFacing(level, CELL.x, CELL.y, f),
-      color: (c) => B.level.setColor(level, CELL.x, CELL.y, c),
-      decor: (d) => B.level.setDecor(level, CELL.x, CELL.y, d),
-      mark: (m) => B.level.toggleMark(level, CELL.x, CELL.y, m)
-    });
-  }
-  return state({ level, selected: CELL });
+      shape: (s) => B.level.setShape(level, cell.x, cell.y, s),
+      facing: (f) => B.level.setFacing(level, cell.x, cell.y, f),
+      color: (c) => B.level.setColor(level, cell.x, cell.y, c),
+      decor: (d) => B.level.setDecor(level, cell.x, cell.y, d),
+      mark: (m) => B.level.toggleMark(level, cell.x, cell.y, m)
+    }, i);
+  });
+  return state({ level, selection: cells });
 }
+
+const selecting = (edit) => selectingCells([CELL], edit);
+
+// The colour buttons the toolbar shows as pressed.
+const pressedColors = (r) => B.PALETTE
+  .filter((entry) => pressedOf(r.find("color", entry.key)) === PRESSED)
+  .map((entry) => entry.key);
 
 describe("toolbar: the buttons", () => {
   it("hooks every button it offers with the act and the arg it acts on", () => {
@@ -328,14 +341,17 @@ describe("toolbar: sync", () => {
     assert.equal(shownOn(r.find("opaque", "")), masked(B.icons.sprite("opaque")));
   });
 
-  it("disables every tile-editing button, and no other, while no tile is selected", () => {
+  it("disables every tile-editing button, and no other, and presses none, with no tile selected", () => {
     const r = rig();
-    const empty = [state(), state({ selected: BARE_CELL })];
+    const empty = [state(), state({ selection: [BARE_CELL] }), state({ selection: BARE_CELLS })];
     for (const nothing of empty) {
       r.bar.sync(nothing);
       for (const spec of BUTTONS) {
         const edits = TILE_ACTS.indexOf(spec.act) >= 0;
-        assert.equal(r.find(spec.act, spec.arg).disabled, edits, `${spec.act} ${spec.arg}`);
+        const btn = r.find(spec.act, spec.arg);
+        const name = `${spec.act} ${spec.arg}`;
+        assert.equal(btn.disabled, edits, name);
+        if (edits && pressedOf(btn) !== null) assert.equal(pressedOf(btn), RELEASED, name);
       }
     }
   });
@@ -359,20 +375,16 @@ describe("toolbar: sync", () => {
 
   it("presses the selected tile's colour, and the foreground while none is selected", () => {
     const r = rig();
-    const pressedColors = () => B.PALETTE
-      .filter((entry) => pressedOf(r.find("color", entry.key)) === PRESSED)
-      .map((entry) => entry.key);
-
     r.bar.sync(state());
-    assert.deepEqual(pressedColors(), [B.DEFAULT_COLOR], "the foreground it starts at");
+    assert.deepEqual(pressedColors(r), [B.DEFAULT_COLOR], "the foreground it starts at");
     r.bar.sync(state({ color: FOREGROUND }));
-    assert.deepEqual(pressedColors(), [FOREGROUND]);
-    r.bar.sync(state({ color: FOREGROUND, selected: BARE_CELL }));
-    assert.deepEqual(pressedColors(), [FOREGROUND], "a cell with no tile on it is no tile");
+    assert.deepEqual(pressedColors(r), [FOREGROUND]);
+    r.bar.sync(state({ color: FOREGROUND, selection: [BARE_CELL] }));
+    assert.deepEqual(pressedColors(r), [FOREGROUND], "a cell with no tile on it is no tile");
 
     const painted = selecting((tile) => tile.color(TILE_COLOR));
     r.bar.sync({ ...painted, color: FOREGROUND });
-    assert.deepEqual(pressedColors(), [TILE_COLOR], "the tile's colour, not the foreground");
+    assert.deepEqual(pressedColors(r), [TILE_COLOR], "the tile's colour, not the foreground");
     for (const entry of B.PALETTE) {
       assert.equal(r.find("color", entry.key).disabled, false, entry.key);
     }
@@ -380,7 +392,7 @@ describe("toolbar: sync", () => {
     const unpainted = selecting();
     delete B.level.get(unpainted.level, CELL.x, CELL.y).color;
     r.bar.sync({ ...unpainted, color: FOREGROUND });
-    assert.deepEqual(pressedColors(), [FOREGROUND], "a tile from before the colours");
+    assert.deepEqual(pressedColors(r), [FOREGROUND], "a tile from before the colours");
   });
 
   it("enables the facing button only on a slope, and shows the tile's facing on it", () => {
@@ -397,6 +409,80 @@ describe("toolbar: sync", () => {
     r.bar.sync(state());
     assert.equal(facing.disabled, true);
     assert.equal(shownOn(facing), masked(B.icons.arrow(B.FACINGS[0])));
+  });
+});
+
+describe("toolbar: sync over a selection of many tiles", () => {
+  const MARK = "rope";
+  const DECOR = "rock";
+  const SHAPE = "ramp";
+
+  // Every selected tile carries the same shape, decor and mark; `only` names
+  // the one that carries them when the selection is to disagree.
+  const carrying = (only) => selectingCells(CELLS, (tile, i) => {
+    if (only !== undefined && i !== only) return;
+    tile.shape(SHAPE);
+    tile.decor(DECOR);
+    tile.mark(MARK);
+  });
+
+  const pressedOn = (r) => [
+    pressedOf(r.find("shape", SHAPE)),
+    pressedOf(r.find("decor", DECOR)),
+    pressedOf(r.find("mark", MARK))
+  ];
+
+  it("presses a toggle only when every selected tile carries its value", () => {
+    const r = rig();
+    r.bar.sync(carrying());
+    assert.deepEqual(pressedOn(r), [PRESSED, PRESSED, PRESSED], "a selection that agrees");
+    r.bar.sync(carrying(ANCHOR));
+    assert.deepEqual(pressedOn(r), [RELEASED, RELEASED, RELEASED], "one that does not");
+    assert.equal(pressedOf(r.find("shape", "block")), RELEASED, "nor the other tile's shape");
+  });
+
+  it("enables every tile-editing button while the selection holds a tile", () => {
+    const r = rig();
+    r.bar.sync(carrying(ANCHOR));
+    for (const spec of BUTTONS.filter((s) => TILE_ACTS.indexOf(s.act) >= 0)) {
+      assert.equal(r.find(spec.act, spec.arg).disabled, false, `${spec.act} ${spec.arg}`);
+    }
+  });
+
+  it("enables the facing button when any selected tile is a slope, and turns the anchor", () => {
+    const r = rig();
+    const facing = r.find("facing", "");
+    r.bar.sync(selectingCells(CELLS, (tile, i) => {
+      if (i !== ANCHOR) tile.shape(SHAPE);
+      tile.facing(i === ANCHOR ? "E" : "W");
+    }));
+    assert.equal(facing.disabled, false, "one slope in the selection is enough");
+    assert.equal(shownOn(facing), masked(B.icons.arrow("E")), "the anchor's facing");
+
+    r.bar.sync(selectingCells(CELLS, (tile) => tile.facing("S")));
+    assert.equal(facing.disabled, true, "no slope in the selection");
+    assert.equal(shownOn(facing), masked(B.icons.arrow("S")));
+  });
+
+  it("presses the colour every selected tile carries, and none when they disagree", () => {
+    const r = rig();
+    r.bar.sync(selectingCells(CELLS, (tile) => tile.color(TILE_COLOR)));
+    assert.deepEqual(pressedColors(r), [TILE_COLOR]);
+    r.bar.sync(selectingCells(CELLS, (tile, i) => {
+      tile.color(i === ANCHOR ? FOREGROUND : TILE_COLOR);
+    }));
+    assert.deepEqual(pressedColors(r), [], "not even the anchor's colour");
+    for (const entry of B.PALETTE) {
+      assert.equal(r.find("color", entry.key).disabled, false, entry.key);
+    }
+  });
+
+  it("reads a tile from before the colours as the foreground, wherever it sits", () => {
+    const r = rig();
+    const painted = selectingCells(CELLS, (tile) => tile.color(FOREGROUND));
+    delete B.level.get(painted.level, CELLS[ANCHOR].x, CELLS[ANCHOR].y).color;
+    r.bar.sync({ ...painted, color: FOREGROUND });
+    assert.deepEqual(pressedColors(r), [FOREGROUND], "it agrees with the tile before it");
   });
 });
 

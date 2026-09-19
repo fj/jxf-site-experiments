@@ -17,15 +17,30 @@ const TILE_ELEV = 2;            // blocks under a tile, so a top read wrong land
 const HOLD_PROGRESS = 0.4;      // part way through the hold that removes a tile
 const WEDGE_OF = { block: null, ramp: "ramp", stairs: "stairs" };
 const MARKS_PER_ROW = 3;        // marks render.js lays in a row before it starts another
+const SELECTED = [[0, 0], [1, 1], [2, 0]];   // cells a sweep took
+const UNSELECTED = [3, 3];                   // ...and one it left out
+// A sweep in base px around the frame's origin, wider than it is tall and off
+// centre, so a corner read the wrong way round lands elsewhere.
+const BOX = { x0: -30, y0: -11, x1: 41, y1: 26 };
+const SUB_PIXEL = 0.4;                       // a sweep corner between two pixels
+const NO_INK = "none";                       // the fill colour the scene starts at
+const BOX_LINE_PX = 1;                       // how wide render.js draws the box's line
+const BOX_DASH_PX = 3;                       // ...and how long each dash along it is
 
 // render.js over a recording pixel layer: every sprite module answers a
 // tagged stand-in, and each draw of one is logged with its name, where it
 // lands and how solid the scene was drawing at. What each sprite was asked for
 // is logged under the same name. A tiled fill is logged like a draw, with the
-// rect it covers, and clearing the scene empties both logs, as clearing a
-// canvas empties it.
+// rect it covers, a plain fill on the scene is logged as a "rect" with its
+// colour, and clearing the scene empties both logs, as clearing a canvas
+// empties it.
 function stage() {
   const B = load(["config.js", "level.js", "view.js", "render.js"]);
+  // The change that turns the selection into a list adds this to config.js.
+  // Once it lands these tests bind to the real one, and say so if it differs.
+  if (!B.inCells) {
+    B.inCells = (cells, x, y) => cells.some((cell) => cell.x === x && cell.y === y);
+  }
   const draws = [];
   const fills = [];
   const calls = new Map();
@@ -36,9 +51,16 @@ function stage() {
   const tag = (name, { size = 0, oy = 0 } = {}) =>
     ({ name, ox: 0, oy, canvas: { width: size, height: size } });
   const gridTile = tag("grid");
+  const saved = [];
   const scene = {
     globalAlpha: FULL_ALPHA,
     imageSmoothingEnabled: true,
+    fillStyle: NO_INK,
+    save() { saved.push(scene.fillStyle); },
+    restore() { scene.fillStyle = saved.pop(); },
+    fillRect(x, y, w, h) {
+      draws.push({ name: "rect", x, y, w, h, color: scene.fillStyle, alpha: scene.globalAlpha });
+    },
     clearRect() { draws.length = 0; fills.length = 0; calls.clear(); }
   };
   const blits = [];
@@ -90,7 +112,8 @@ function stage() {
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
     newElev: B.NEW_TILE_ELEV,
-    selected: null,
+    selection: [],
+    box: null,
     hover: null,
     hold: null
   };
@@ -100,6 +123,7 @@ function stage() {
     draws,
     fills,
     blits,
+    ink: () => scene.fillStyle,
     asked: (name) => calls.get(name) || [],
     add: (x, y, elev) => B.level.add(state.level, x, y, elev),
     draw: () => B.render.draw(canvas, state, SCALE),
@@ -141,6 +165,9 @@ const turnedTile = (s, x, y, shape) => {
 };
 
 const viewFacingOf = (s, tile) => s.B.view.viewFacing(s.state.view.rot, tile.facing);
+
+// Where each highlight ring landed, sorted, so the depth order does not matter.
+const ringedAt = (s) => drawsNamed(s, "outline").map((d) => [d.x, d.y]).sort();
 
 const decorOn = (s, x, y) => {
   const key = s.B.DECOR[0].key;
@@ -304,7 +331,7 @@ describe("render: the order a tile is drawn in", () => {
     const tile = turnedTile(s, 0, 0, "ramp");
     decorOn(s, 0, 0);
     marksOn(s, 0, 0, 1);
-    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.selection = [{ x: tile.x, y: tile.y }];
     s.state.hold = { x: tile.x, y: tile.y, progress: HOLD_PROGRESS };
     s.draw();
     assert.deepEqual(s.names(), [
@@ -338,7 +365,7 @@ describe("render: the see-through tiles", () => {
     decorOn(s, 0, 0);
     marksOn(s, 0, 0, 1);
     s.state.opaque = false;
-    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.selection = [{ x: tile.x, y: tile.y }];
     s.state.hold = { x: tile.x, y: tile.y, progress: HOLD_PROGRESS };
     s.draw();
     const over = s.draws.filter((d) => d.name !== "column");
@@ -421,7 +448,7 @@ describe("render: the highlight ring", () => {
     const s = stage();
     const tile = turnedTile(s, 0, 0, "ramp");
     s.add(1, 1, TILE_ELEV);
-    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.selection = [{ x: tile.x, y: tile.y }];
     s.draw();
     const { x, y } = drawNamed(s, "outline");
     assert.deepEqual([x, y], anchorOf(s, tile));
@@ -439,20 +466,162 @@ describe("render: the highlight ring", () => {
     assert.deepEqual(s.asked("outline"), [[tile.shape, viewFacingOf(s, tile), "hover"]]);
   });
 
+  it("rings every tile the selection holds, and no other", () => {
+    const s = stage();
+    const picked = SELECTED.map(([x, y]) => s.add(x, y, TILE_ELEV));
+    s.add(...UNSELECTED, TILE_ELEV);
+    s.state.selection = SELECTED.map(([x, y]) => ({ x: x, y: y }));
+    s.draw();
+    assert.deepEqual(ringedAt(s), picked.map((tile) => anchorOf(s, tile)).sort());
+    assert.deepEqual(s.asked("outline"),
+      picked.map((tile) => [tile.shape, viewFacingOf(s, tile), "select"]));
+  });
+
   it("rings the selected tile as selected while the pointer hovers it too", () => {
     const s = stage();
     const tile = s.add(0, 0, TILE_ELEV);
-    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.selection = [{ x: tile.x, y: tile.y }];
     s.state.hover = { tile: tile };
     s.draw();
     assert.deepEqual(s.asked("outline"), [[tile.shape, viewFacingOf(s, tile), "select"]]);
   });
 
-  it("rings no tile while none is selected and none hovered", () => {
+  // (0, 0) is drawn first, so the two rings come in this order.
+  it("rings a hovered tile the selection leaves out in the hover ring", () => {
+    const s = stage();
+    const picked = s.add(0, 0, TILE_ELEV);
+    const over = s.add(1, 1, TILE_ELEV);
+    s.state.selection = [{ x: picked.x, y: picked.y }];
+    s.state.hover = { tile: over };
+    s.draw();
+    assert.deepEqual(s.asked("outline"), [
+      [picked.shape, viewFacingOf(s, picked), "select"],
+      [over.shape, viewFacingOf(s, over), "hover"]
+    ]);
+  });
+
+  it("rings no tile while the selection is empty and none is hovered", () => {
     const s = stage();
     s.add(0, 0, TILE_ELEV);
     s.draw();
     assert.deepEqual(drawsNamed(s, "outline"), []);
+  });
+});
+
+describe("render: the box a sweep draws", () => {
+  const rectsOf = (s) => drawsNamed(s, "rect");
+
+  // Every pixel the rects cover, so the box is read as a picture and not as
+  // the calls that drew it.
+  const pixelsOf = (rects) => {
+    const lit = new Set();
+    for (const r of rects) {
+      for (let x = r.x; x < r.x + r.w; x++) {
+        for (let y = r.y; y < r.y + r.h; y++) lit.add(`${x},${y}`);
+      }
+    }
+    return lit;
+  };
+
+  const ringOf = (x0, y0, x1, y1) => {
+    const lit = new Set();
+    for (let x = x0; x <= x1; x++) { lit.add(`${x},${y0}`); lit.add(`${x},${y1}`); }
+    for (let y = y0; y <= y1; y++) { lit.add(`${x0},${y}`); lit.add(`${x1},${y}`); }
+    return lit;
+  };
+
+  const swept = (s) => {
+    const frame = s.frame();
+    return ringOf(frame.ox + BOX.x0, frame.oy + BOX.y0, frame.ox + BOX.x1, frame.oy + BOX.y1);
+  };
+
+  it("lines the swept rectangle, one pixel wide, around the frame's origin", () => {
+    const s = stage();
+    s.state.box = { ...BOX };
+    s.draw();
+    assert.deepEqual(pixelsOf(rectsOf(s)), swept(s));
+  });
+
+  it("lines the same rectangle whichever corners the sweep hands it", () => {
+    const corners = [
+      { x0: BOX.x1, y0: BOX.y1, x1: BOX.x0, y1: BOX.y0 },
+      { x0: BOX.x1, y0: BOX.y0, x1: BOX.x0, y1: BOX.y1 },
+      { x0: BOX.x0, y0: BOX.y1, x1: BOX.x1, y1: BOX.y0 }
+    ];
+    for (const box of corners) {
+      const s = stage();
+      s.state.box = box;
+      s.draw();
+      assert.deepEqual(pixelsOf(rectsOf(s)), swept(s), JSON.stringify(box));
+    }
+  });
+
+  // Every corner is pulled off the grid each way, so a rule that always rounds
+  // down or always rounds up moves one of them.
+  it("snaps a sweep between pixels onto the nearest whole pixel", () => {
+    for (const away of [SUB_PIXEL, -SUB_PIXEL]) {
+      const s = stage();
+      s.state.box = {
+        x0: BOX.x0 - away, y0: BOX.y0 - away,
+        x1: BOX.x1 + away, y1: BOX.y1 + away
+      };
+      s.draw();
+      for (const r of rectsOf(s)) {
+        assert.deepEqual([r.x, r.y], [Math.round(r.x), Math.round(r.y)], JSON.stringify(r));
+      }
+      assert.deepEqual(pixelsOf(rectsOf(s)), swept(s), `corners ${away} away`);
+    }
+  });
+
+  it("draws the box in the select colour, dashed with the outline colour", () => {
+    const s = stage();
+    s.state.box = { ...BOX };
+    s.draw();
+    const inks = rectsOf(s).map((r) => r.color);
+    assert.equal(inks[0], s.B.COLORS.select, "the first dash is the select colour");
+    assert.deepEqual(new Set(inks), new Set([s.B.COLORS.select, s.B.COLORS.outline]));
+  });
+
+  it("lays the two inks in dashes that take turns along a side", () => {
+    const s = stage();
+    s.state.box = { ...BOX };
+    s.draw();
+    const frame = s.frame();
+    const side = rectsOf(s).filter((r) => r.y === frame.oy + BOX.y0 && r.w > BOX_LINE_PX);
+    const inks = [s.B.COLORS.select, s.B.COLORS.outline];
+    side.forEach((r, i) => {
+      const last = i === side.length - 1;
+      const wide = last ? `at most ${BOX_DASH_PX} px across` : `${BOX_DASH_PX} px across`;
+      assert.ok(last ? r.w <= BOX_DASH_PX : r.w === BOX_DASH_PX, `dash ${i} is ${wide}`);
+      assert.equal(r.color, inks[i % inks.length], `dash ${i} takes its turn`);
+    });
+    assert.ok(side.length > inks.length, `${side.length} dashes along the top`);
+  });
+
+  it("leaves the scene's ink as it found it, so nothing later fills in the box's colour", () => {
+    const s = stage();
+    s.state.box = { ...BOX };
+    const before = s.ink();
+    s.draw();
+    assert.equal(s.ink(), before);
+  });
+
+  it("draws the box over the scene and under the compass and the badge", () => {
+    const s = stage();
+    s.add(0, 0, TILE_ELEV);
+    s.state.box = { ...BOX };
+    s.draw();
+    const names = s.names();
+    assert.ok(names.indexOf("rect") > names.indexOf("label"), "over the elevation labels");
+    assert.ok(names.lastIndexOf("rect") < names.indexOf("compass"), "under the compass");
+    assert.equal(names[names.length - 1], "label", "the badge is still drawn last");
+  });
+
+  it("draws no box while no sweep is running", () => {
+    const s = stage();
+    s.add(0, 0, TILE_ELEV);
+    s.draw();
+    assert.deepEqual(rectsOf(s), []);
   });
 });
 

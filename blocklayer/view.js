@@ -1,8 +1,9 @@
 /*
  * Blocklayer — the camera: where a world cell lands on the base canvas after
  * rotation and pan, the depth order tiles are drawn in, and the way back from
- * a pointer to the tile or the empty cell under it. Pure arithmetic; the only
- * thing read from a canvas is its size.
+ * a pointer to the tile or the empty cell under it, or from a swept box to the
+ * tiles it holds. Pure arithmetic; the only thing read from a canvas is its
+ * size.
  */
 (function () {
   "use strict";
@@ -122,6 +123,20 @@
     return B.sameCell(a.cell, b.cell.x, b.cell.y) && !a.edge === !b.edge;
   }
 
+  // The tiles a swept box holds: those whose top face's centre lies in it, in
+  // the level's own order. The box is in the space project() answers, and its
+  // corners come in either order.
+  function within(view, level, box) {
+    var left = Math.min(box.x0, box.x1);
+    var right = Math.max(box.x0, box.x1);
+    var top = Math.min(box.y0, box.y1);
+    var bottom = Math.max(box.y0, box.y1);
+    return B.level.all(level).filter(function (tile) {
+      var p = project(view, tile.x, tile.y, B.level.top(tile));
+      return p.sx >= left && p.sx <= right && p.sy >= top && p.sy <= bottom;
+    });
+  }
+
   function pan(view, facing, tiles) {
     var step = STEP[facing];
     if (!step) return view.pan;
@@ -153,6 +168,7 @@
     cellAt: cellAt,
     order: order,
     pick: pick,
+    within: within,
     sameHit: sameHit,
     viewFacing: viewFacing,
     frame: frame

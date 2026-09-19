@@ -10,7 +10,7 @@
 
   var B = window.BlockLayer = window.BlockLayer || {};
 
-  var FORMAT_VERSION = 2;                      // version 1 gave a tile no colour
+  var FORMAT_VERSION = 3;                      // 1 gave a tile no colour, 2 no size
   var DEFAULT_SHAPE = B.SHAPES[0];
   var DEFAULT_FACING = B.FACINGS[0];
   var SLOPED_SHAPES = ["ramp", "stairs"];      // their top is one block above elev
@@ -233,7 +233,11 @@
         marks: t.marks.slice()
       };
     });
-    return { version: FORMAT_VERSION, tiles: tiles };
+    return {
+      version: FORMAT_VERSION,
+      size: { w: level.size.w, h: level.size.h },
+      tiles: tiles
+    };
   }
 
   function isInteger(n) {
@@ -269,12 +273,43 @@
     return tile;
   }
 
+  function sideInRange(n) {
+    return isInteger(n) && n >= B.SIZE_MIN && n <= B.SIZE_MAX;
+  }
+
+  // A size from untrusted data, or null when it is missing or broken. A side
+  // out of the range is broken, as an elevation out of its own range is.
+  function readSize(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    if (!sideInRange(raw.w) || !sideInRange(raw.h)) return null;
+    return { w: raw.w, h: raw.h };
+  }
+
+  // The smallest board that holds every one of those tiles.
+  function fitSize(tiles) {
+    var w = 0;
+    var h = 0;
+    tiles.forEach(function (tile) {
+      w = Math.max(w, tile.x + 1);
+      h = Math.max(h, tile.y + 1);
+    });
+    return makeSize(w, h);
+  }
+
+  // A file that names no size, or a broken one, opens on the board its tiles
+  // fit, so a file of version 1 or 2 keeps its tiles where they were.
   function fromJSON(data) {
     if (!data || typeof data !== "object" || !Array.isArray(data.tiles)) return null;
-    var level = create();
+    var tiles = [];
     data.tiles.forEach(function (raw) {
       var tile = readTile(raw);
-      if (tile && !get(level, tile.x, tile.y)) level.tiles[key(tile.x, tile.y)] = tile;
+      if (tile) tiles.push(tile);
+    });
+    var size = readSize(data.size) || fitSize(tiles);
+    var level = create(size.w, size.h);
+    tiles.forEach(function (tile) {
+      if (!inside(level, tile.x, tile.y)) return;
+      if (!get(level, tile.x, tile.y)) level.tiles[key(tile.x, tile.y)] = tile;
     });
     return level;
   }

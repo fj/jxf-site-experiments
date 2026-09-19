@@ -576,24 +576,25 @@ describe("level: toggleMark", () => {
 });
 
 describe("level: toJSON", () => {
-  it("writes version 2 and the tiles sorted by y then x", () => {
-    const level = L.create();
+  it("writes version 3, the board's size, and the tiles sorted by y then x", () => {
+    const level = L.create(BOARD.w, BOARD.h);
     L.add(level, 2, 1);
     L.add(level, 0, 1);
-    L.add(level, 5, 0, 4, OTHER_COLOR);
-    L.setShape(level, 5, 0, "stairs");
-    L.setFacing(level, 5, 0, "S");
-    L.setDecor(level, 5, 0, "rock");
-    L.toggleMark(level, 5, 0, "teleport");
+    L.add(level, 2, 0, 4, OTHER_COLOR);
+    L.setShape(level, 2, 0, "stairs");
+    L.setFacing(level, 2, 0, "S");
+    L.setDecor(level, 2, 0, "rock");
+    L.toggleMark(level, 2, 0, "teleport");
     const plain = {
       elev: B.NEW_TILE_ELEV, color: B.DEFAULT_COLOR,
       shape: "block", facing: "N", decor: null, marks: []
     };
     assert.deepEqual(L.toJSON(level), {
-      version: 2,
+      version: 3,
+      size: BOARD,
       tiles: [
         {
-          x: 5, y: 0, elev: 4, color: OTHER_COLOR,
+          x: 2, y: 0, elev: 4, color: OTHER_COLOR,
           shape: "stairs", facing: "S", decor: "rock", marks: ["teleport"]
         },
         { x: 0, y: 1, ...plain },
@@ -602,8 +603,10 @@ describe("level: toJSON", () => {
     });
   });
 
-  it("writes an empty level as no tiles", () => {
-    assert.deepEqual(L.toJSON(L.create()), { version: 2, tiles: [] });
+  it("writes an empty level as its board and no tiles", () => {
+    assert.deepEqual(L.toJSON(L.create()), {
+      version: 3, size: B.SIZE_DEFAULT, tiles: []
+    });
   });
 
   it("is stable regardless of insertion order", () => {
@@ -615,14 +618,16 @@ describe("level: toJSON", () => {
   });
 
   it("returns fresh data that does not alias the level", () => {
-    const level = L.create();
+    const level = L.create(BOARD.w, BOARD.h);
     const tile = L.add(level, 0, 0);
     L.toggleMark(level, 0, 0, "rope");
     const data = L.toJSON(level);
     data.tiles[0].marks.push("jump");
     data.tiles[0].elev = 3;
+    data.size.w = BOARD.w + 1;
     assert.deepEqual(tile.marks, ["rope"]);
     assert.equal(tile.elev, B.NEW_TILE_ELEV);
+    assert.deepEqual(level.size, BOARD);
   });
 });
 
@@ -633,8 +638,70 @@ describe("level: fromJSON", () => {
     }
   });
 
-  it("reads an empty level as an empty level", () => {
-    assert.deepEqual(L.fromJSON({ version: 2, tiles: [] }), L.create());
+  it("reads an empty level as an empty level on the smallest board", () => {
+    assert.deepEqual(L.fromJSON({ version: 2, tiles: [] }),
+      L.create(B.SIZE_MIN, B.SIZE_MIN));
+  });
+
+  it("reads the board size the file names", () => {
+    assert.deepEqual(L.fromJSON({ version: 3, size: BOARD, tiles: [] }).size, BOARD);
+  });
+
+  it("takes the smallest board that holds the tiles when the file names no size", () => {
+    const level = L.fromJSON({ version: 2, tiles: [tile({ x: 1, y: 2 }), tile({ x: 3, y: 0 })] });
+    assert.deepEqual(level.size, { w: 4, h: 3 });
+    assert.ok(L.get(level, 1, 2), "the tile stays where it was");
+    assert.ok(L.get(level, 3, 0), "and so does the other");
+  });
+
+  it("takes that board for a size it cannot read", () => {
+    const tiles = [tile({ x: 1, y: 2 })];
+    const fitted = { w: 2, h: 3 };
+    const bad = [
+      null, "3", 12, [], {}, { w: 2 }, { h: 3 }, { w: "2", h: 3 }, { w: 2.5, h: 3 },
+      { w: B.SIZE_MIN - 1, h: 3 }, { w: 2, h: B.SIZE_MAX + 1 }, { w: NaN, h: 3 }
+    ];
+    for (const size of bad) {
+      assert.deepEqual(L.fromJSON({ version: 3, size, tiles }).size, fitted, inspect(size));
+    }
+  });
+
+  // The board starts at 0,0, so a file written before it existed can name a
+  // cell no board holds.
+  it("drops a tile at a negative cell instead of shifting the board to hold it", () => {
+    const level = L.fromJSON({
+      version: 2,
+      tiles: [tile({ x: -3, y: 0 }), tile({ x: 0, y: -4 }), tile({ x: 1, y: 2 })]
+    });
+    assert.deepEqual(level.size, { w: 2, h: 3 });
+    assert.equal(L.count(level), 1);
+    assert.deepEqual(L.get(level, 1, 2), tile({ x: 1, y: 2 }));
+  });
+
+  it("reads the smallest board a file can name", () => {
+    const level = L.fromJSON({
+      version: 3,
+      size: { w: B.SIZE_MIN, h: B.SIZE_MIN },
+      tiles: [tile({ x: 0, y: 0 }), tile({ x: 1, y: 0 })]
+    });
+    assert.deepEqual(level.size, { w: B.SIZE_MIN, h: B.SIZE_MIN });
+    assert.equal(L.count(level), 1);
+  });
+
+  it("clamps the fitted board to the largest one, dropping what will not fit", () => {
+    const level = L.fromJSON({ tiles: [tile({ x: 0, y: 0 }), tile({ x: B.SIZE_MAX, y: 0 })] });
+    assert.deepEqual(level.size, { w: B.SIZE_MAX, h: B.SIZE_MIN });
+    assert.equal(L.count(level), 1);
+  });
+
+  it("drops a tile that stands off the board the file names", () => {
+    const level = L.fromJSON({
+      version: 3,
+      size: { w: 2, h: 2 },
+      tiles: [tile({ x: 0, y: 0 }), tile({ x: 2, y: 0 }), tile({ x: 0, y: 2 }), tile({ x: -1, y: 0 })]
+    });
+    assert.equal(L.count(level), 1);
+    assert.deepEqual(L.get(level, 0, 0), tile({ x: 0, y: 0 }));
   });
 
   it("drops fields it does not know", () => {
@@ -714,8 +781,14 @@ describe("level: fromJSON", () => {
     assert.equal(L.get(level, 1, 2).elev, B.ELEV_MAX - 1);
   });
 
+  it("brings back a board with more room than its tiles need", () => {
+    const level = L.create(B.SIZE_MAX, B.SIZE_MAX);
+    L.add(level, 0, 0);
+    assert.deepEqual(L.fromJSON(JSON.parse(JSON.stringify(L.toJSON(level)))), level);
+  });
+
   it("round-trips through toJSON", () => {
-    const level = L.create();
+    const level = L.create(BOARD.w, BOARD.h);
     L.add(level, 2, 3, 2, OTHER_COLOR);
     L.setShape(level, 2, 3, "ramp");
     L.setFacing(level, 2, 3, "S");

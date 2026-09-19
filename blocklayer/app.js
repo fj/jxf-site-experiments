@@ -19,6 +19,7 @@
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
     newElev: B.NEW_TILE_ELEV,
+    color: B.DEFAULT_COLOR,
     selected: null,
     hover: null,
     hold: null
@@ -240,6 +241,16 @@
     setDecor: function (key) {
       editSelected(function (x, y) { B.level.setDecor(state.level, x, y, key); });
     },
+    // The foreground colour: what a new tile gets, and what the selected tile
+    // is painted. Like the zoom it is view state, so only the tiles save it.
+    setColor: function (key) {
+      state.color = key;
+      if (!state.selected) {
+        changed();
+        return;
+      }
+      editSelected(function (x, y) { B.level.setColor(state.level, x, y, key); });
+    },
     toggleMark: function (key) {
       editSelected(function (x, y) { B.level.toggleMark(state.level, x, y, key); });
     },
@@ -251,7 +262,7 @@
       sched();
     },
     add: function (x, y) {
-      B.level.add(state.level, x, y, state.newElev);
+      B.level.add(state.level, x, y, state.newElev, state.color);
       edited();
     },
     select: function (x, y) {

@@ -198,6 +198,24 @@ function boot(tiles = [], storage = null) {
       assert.ok(el, "no modal");
       return el;
     },
+    // The line under the canvas that a message lands on.
+    status() {
+      const el = descend(mount).find((one) => one.getAttribute("role") === "status");
+      assert.ok(el, "no status line");
+      return el;
+    },
+    // What the canvas stands in, which a file dragged over marks.
+    stage() {
+      const el = descend(mount).find((one) => one.className === `${B.PREFIX}stage`);
+      assert.ok(el, "no stage");
+      return el;
+    },
+    // The picker the open button opens.
+    picker() {
+      const el = descend(mount).find((one) => one.tag === "input" && one.type === "file");
+      assert.ok(el, "no picker");
+      return el;
+    },
     // The sentence the modal puts the count in.
     text() { return descend(this.modal()).find((el) => el.tag === "p").textContent; },
     find(act, arg) {
@@ -542,15 +560,17 @@ describe("app: a shrink that would lose tiles", () => {
 
 describe("app: a level opened from a file", () => {
   const OPENED = { w: 4, h: 3 };
-  const DROP = { dataTransfer: { files: [{}] }, preventDefault() {} };
+  const DROP = { dataTransfer: { files: [{}] } };
+  const NOT_A_LEVEL = "not a level file";
 
-  // The picker and the drop both read the file, then hand what file.js makes
-  // of it to the app; what it makes is the other change in flight's business.
-  const opening = () => {
-    const r = boot();
-    const other = r.B.level.create();
-    other.size = { ...OPENED };
-    r.B.file.parse = () => other;
+  // A file dropped on the canvas of an app with a tile selected, which file.js
+  // reads as a board of `holding`, or as no level at all. What it makes of the
+  // text is the file module's own business.
+  const opening = (holding = OPENED) => {
+    const r = boot(PAIR);
+    r.press(0, 0);
+    r.opened = holding && r.B.level.create(holding.w, holding.h);
+    r.B.file.parse = () => r.opened;
     r.canvas.fire("drop", DROP);
     return r;
   };
@@ -559,6 +579,59 @@ describe("app: a level opened from a file", () => {
     const r = opening();
     assert.deepEqual(r.shown(), [OPENED.w, OPENED.h]);
     assert.deepEqual(r.of("clampPan").pop(), [OPENED.w, OPENED.h]);
+  });
+
+  it("puts the level the file held in place of the one on the board", () => {
+    const r = opening();
+    assert.equal(r.frame().level, r.opened);
+    assert.deepEqual(r.selected(), [], "the old level's selection goes with it");
+    assert.equal(r.status().textContent, "", "a file that opens says nothing");
+  });
+
+  it("opens the file the reader chooses with the picker", () => {
+    const r = opening(null);
+    r.opened = r.B.level.create(OPENED.w, OPENED.h);
+    const picker = r.picker();
+    picker.files = [{}];
+    picker.fire("change");
+    assert.equal(r.frame().level, r.opened);
+  });
+
+  it("says so on the status line when the file is no level, and changes nothing", () => {
+    const r = opening(null);
+    assert.equal(r.status().textContent, NOT_A_LEVEL);
+    assert.equal(r.frame().level, r.level, "the level on the board is untouched");
+    assert.deepEqual(r.cells(), PAIR);
+    assert.deepEqual(r.selected(), [PAIR[0]], "and so is the selection");
+  });
+
+  it("takes the message off the status line after its time", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = opening(null);
+    t.mock.timers.tick(r.B.STATUS_MS - 1);
+    assert.equal(r.status().textContent, NOT_A_LEVEL, "still there a moment short of it");
+    t.mock.timers.tick(1);
+    assert.equal(r.status().textContent, "");
+  });
+});
+
+describe("app: a file dragged over the canvas", () => {
+  const DROPPING = "is-dropping";    // the stylesheet's hook for a file overhead
+  const marked = (r) => r.stage().classList.contains(DROPPING);
+
+  it("marks the stage while the file is over it, and takes the mark off after", () => {
+    const r = boot();
+    assert.equal(r.canvas.fire("dragover").prevented, true, "the page may take the drop");
+    assert.equal(marked(r), true);
+    r.canvas.fire("dragleave");
+    assert.equal(marked(r), false);
+  });
+
+  it("takes the mark off when the file is dropped", () => {
+    const r = boot();
+    r.canvas.fire("dragover");
+    r.canvas.fire("drop", { dataTransfer: null });
+    assert.equal(marked(r), false);
   });
 });
 

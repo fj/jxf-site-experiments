@@ -7,6 +7,9 @@
  * selection to deselect, and keys that move the view, move the level, step the
  * foreground colour, or edit the selection.
  * Nothing here knows the level; every gesture ends in one of the handlers.
+ * Every hover reports what is under the pointer, whether Alt is held and where
+ * the pointer is, and Alt coming or going reports the same again, so what
+ * reads the hover follows the key without a move.
  * keyFor() names the key bound to a handler call, for the toolbar's tooltips.
  */
 (function () {
@@ -128,6 +131,31 @@
     var lastCell = null;
     var hold = null;
     var sweep = null;       // where a shift drag began, in client space
+    var alt = false;
+    var last = null;        // the hit last reported, and where the pointer was
+
+    // What the pointer is over, whether Alt is held and where the pointer is:
+    // the tip follows all three. Every pointer event carries the key's state,
+    // so Alt held before the pointer arrives counts as held.
+    function hover(hit, e) {
+      alt = !!e.altKey;
+      last = { hit: hit, x: e.clientX, y: e.clientY };
+      handlers.hover(hit, alt, e.clientX, e.clientY);
+    }
+
+    // The pointer has left, so there is nothing under it and nowhere to say.
+    function hoverNothing() {
+      last = null;
+      handlers.hover(null);
+    }
+
+    // Alt comes and goes with the pointer still, and the hover goes again so
+    // the tip appears and disappears at once.
+    function trackAlt(e) {
+      if (!!e.altKey === alt) return;
+      alt = !!e.altKey;
+      if (last) handlers.hover(last.hit, alt, last.x, last.y);
+    }
 
     function inside(e) {
       var rect = canvas.getBoundingClientRect();
@@ -233,7 +261,7 @@
       }
       dragging = true;
       lastCell = null;
-      if (hit && hit.cell) handlers.hover(addCell(e, hit.cell));
+      if (hit && hit.cell) hover(addCell(e, hit.cell), e);
       else if (tile) handlers.select(tile.x, tile.y);
     }
 
@@ -262,7 +290,7 @@
       if (dragging && cell && !hit.edge && !B.sameCell(lastCell, cell.x, cell.y)) {
         hit = addCell(e, cell);
       }
-      handlers.hover(hit);
+      hover(hit, e);
       if (hold && !(tile && B.sameCell(hold, tile.x, tile.y))) cancelHold();
     }
 
@@ -282,7 +310,7 @@
 
     function onLeave() {
       cancelHold();
-      handlers.hover(null);
+      hoverNothing();
     }
 
     function onWheel(e) {
@@ -291,7 +319,7 @@
       if (!B.selection.holds(handlers.selection(), hit.tile.x, hit.tile.y)) return;
       e.preventDefault();
       handlers.raise(e.deltaY < 0 ? 1 : -1);
-      handlers.hover(pick(e));
+      hover(pick(e), e);
     }
 
     // A colour step resolves into the setColor call a swatch click makes: it
@@ -324,6 +352,7 @@
     }
 
     function onKey(e) {
+      trackAlt(e);
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       var view = VIEW_KEYS[e.key];
       if (view) call(view);
@@ -339,6 +368,7 @@
     canvas.addEventListener("pointerleave", onLeave);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("keydown", onKey);
+    canvas.addEventListener("keyup", trackAlt);
     canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
 

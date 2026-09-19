@@ -35,4 +35,5 @@ scripts:
   - input.js
   - toolbar.js
   - bounds.js
+  - tip.js
   - app.js

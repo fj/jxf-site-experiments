@@ -1,11 +1,11 @@
 /*
  * Blocklayer — the app entry. Builds the toolbar, the canvas, the hint row,
- * the size row and the status line into the mount, keeps the one state object
- * the renderer reads, and maps every toolbar action and pointer gesture onto a
- * call to the modules that hold the rules: each one redraws, refreshes the
- * toolbar, and — when the level changed — saves it on that redraw. The level
- * also goes out to a file and comes back from one, by the picker or dropped on
- * the canvas.
+ * the size row, the tip panel and the status line into the mount, keeps the
+ * one state object the renderer reads, and maps every toolbar action and
+ * pointer gesture onto a call to the modules that hold the rules: each one
+ * redraws, refreshes the toolbar, and — when the level changed — saves it on
+ * that redraw. The level also goes out to a file and comes back from one, by
+ * the picker or dropped on the canvas.
  * Wiring only; what a gesture means belongs to the module it calls.
  */
 (function () {
@@ -30,12 +30,14 @@
     box: null,
     hover: null,
     hold: null,
-    pending: null
+    pending: null,
+    tip: null
   };
 
   var canvas = null;
   var toolbar = null;
   var bounds = null;
+  var tip = null;
   var status = null;
 
   // ---- Persistence ---------------------------------------------------------
@@ -181,6 +183,7 @@
   function changed() {
     toolbar.sync(state);
     bounds.sync(state);
+    tip.sync(state);
     sched();
   }
 
@@ -311,7 +314,11 @@
     pick: pick,
     selection: function () { return state.selection; },
     color: function () { return state.color; },
-    hover: function (hit) {
+    // The panel follows the pointer, so it is refreshed on its own rather
+    // than through the whole interface.
+    hover: function (hit, alt, x, y) {
+      state.tip = B.tip.from(hit, alt, x, y);
+      tip.sync(state);
       if (B.view.sameHit(hit, state.hover)) return;
       state.hover = hit;
       sched();
@@ -405,6 +412,7 @@
     canvas.setAttribute("aria-label", "Level");
     board.appendChild(canvas);
     board.appendChild(bounds.modal);
+    board.appendChild(tip.el);
     return board;
   }
 
@@ -424,6 +432,7 @@
   // ---- Boot ----------------------------------------------------------------
   toolbar = B.toolbar.build(handlers);
   bounds = B.bounds.build(handlers);
+  tip = B.tip.build();
   var stage = buildSkeleton(root);
   B.input.attach(canvas, handlers);
   watchDrops(stage);

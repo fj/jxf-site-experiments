@@ -1,9 +1,10 @@
 // Styles for the Blocklayer experiment.
 //
 // A column of pixel-art buttons beside the level's canvas, a hint row and a
-// size row under the canvas, and a status line under those. The host owns the
-// mount's outer box; what's here is the layout inside it, the button, the
-// icon's colour per theme, the canvas and the hold-to-clear fill.
+// size row under the canvas, and a status line under those, with the resize
+// modal and the tip panel over the canvas. The host owns the mount's outer
+// box; what's here is the layout inside it, the button, the icon's colour per
+// theme, the canvas and the hold-to-clear fill.
 
 @import "../shared/theme";
 
@@ -36,6 +37,8 @@ $blk-modal-width: 22em;
 $blk-modal-btn-pad: 0.35em 0.9em;
 $blk-scrim-alpha: 0.5;
 $blk-scrim-dark: #05060a;     // the veil over a dark canvas, which the ink is too near
+$blk-tip-pad: 0.3em 0.5em;
+$blk-tip-width: 12em;
 
 .experiment-ext-blk-layout {
   display: grid;
@@ -247,6 +250,37 @@ $blk-scrim-dark: #05060a;     // the veil over a dark canvas, which the ink is t
     &:hover { border-color: $exp-link-dark; }
     &:focus-visible { outline-color: $exp-link-dark; }
   }
+}
+
+// What Alt over a tile says it is. It is placed from the client point the
+// pointer reports, so it is fixed to the viewport, and it never takes an
+// event the canvas under it wants.
+.experiment-ext-blk-tip {
+  position: fixed;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: $blk-tip-width;
+  padding: $blk-tip-pad;
+  border: $blk-border solid $exp-border;
+  border-radius: $blk-corner;
+  background: $exp-surface;
+  color: $blk-ink;
+  pointer-events: none;
+
+  &[hidden] { display: none; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+    color: $blk-ink-dark;
+  }
+}
+
+.experiment-ext-blk-tip-line {
+  @extend %blk-caption;
+
+  &[hidden] { display: none; }
 }
 
 // A level file dragged over the stage lights the canvas border, as focus does.

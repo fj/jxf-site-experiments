@@ -238,6 +238,14 @@ describe("toolbar: the buttons", () => {
     for (const btn of buttons(bar.el)) assert.equal(btn.className, `${B.PREFIX}btn`);
   });
 
+  it("lends the rest of the interface the very words its shape buttons show", () => {
+    const r = rig();
+    for (const shape of B.SHAPES) {
+      assert.equal(B.toolbar.shapeLabel(shape), r.find("shape", shape).title.split(" (")[0]);
+    }
+    assert.equal(B.toolbar.shapeLabel("dome"), "", "a shape no button shows has no word");
+  });
+
   it("offers one colour button per palette entry, in palette order", () => {
     assert.deepEqual(slotsOf(rig().bar.el, "color"), B.PALETTE.map((entry) => entry.key));
   });

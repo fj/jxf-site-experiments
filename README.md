@@ -238,6 +238,8 @@ right hand. The toolbar is icons only; the one place the interface shows
 numbers is the size row under the canvas, where the reader sets the board's
 width and height in tiles. A shrink that would drop tiles changes nothing
 until a modal over the canvas says how many would go and the reader agrees.
+`Alt` held over a tile opens a small panel beside the pointer that names the
+tile's elevation, colour, shape and decor object.
 
 The scene is drawn at the sprites' own scale on an offscreen canvas and blitted
 up by a whole number, so pixels stay square. Every sprite is built in code from
@@ -252,7 +254,8 @@ level a first visit starts with; the level the browser keeps — all unit-tested
 under `tests/`), `sprites-tiles.js`, `sprites-decor.js`, `sprites-marks.js`,
 `sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`, `bounds.js` (the
 size row the reader sets the board by, and the modal that guards a lossy
-shrink), and `app.js` last — the DOM, the listeners and the frame scheduler,
-and nothing else — with the kit's `shared/png.js` for the file download.
+shrink), `tip.js` (the panel Alt opens on a tile), and `app.js` last — the
+DOM, the listeners and the frame scheduler, and nothing else — with the kit's
+`shared/png.js` for the file download.
 The level autosaves to `localStorage`, and a `.blocklayer.json` dropped on the
 canvas opens.

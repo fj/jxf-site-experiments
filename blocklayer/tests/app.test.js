@@ -144,6 +144,7 @@ function boot(tiles = [], storage = null) {
 
   return {
     B,
+    window,
     level,
     calls,
     canvas,
@@ -718,6 +719,30 @@ describe("app: a level opened from a file", () => {
     assert.equal(r.status().textContent, NOT_A_LEVEL, "still there a moment short of it");
     t.mock.timers.tick(1);
     assert.equal(r.status().textContent, "");
+  });
+});
+
+describe("app: the level saved to a file", () => {
+  const JSON_MIME = "application/json";
+  const REFUSED = "the browser would not save it";
+
+  it("hands the level's own text to the kit's download, under the file's name", async () => {
+    const r = boot(PAIR);
+    const saves = [];
+    r.window.ExpPng = { save(blob, name) { saves.push({ blob, name }); } };
+    r.find("save", "").fire("click");
+    assert.equal(saves.length, 1);
+    assert.equal(saves[0].name, r.B.file.FILE_NAME);
+    assert.equal(saves[0].blob.type, JSON_MIME);
+    assert.equal(await saves[0].blob.text(), r.B.file.serialize(r.level));
+  });
+
+  it("says why on the status line when the download will not run", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = boot(PAIR);
+    r.window.ExpPng = { save() { throw new Error(REFUSED); } };
+    r.find("save", "").fire("click");
+    assert.equal(r.status().textContent, REFUSED);
   });
 });
 

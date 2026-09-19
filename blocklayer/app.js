@@ -1,10 +1,11 @@
 /*
  * Blocklayer — the app entry. Builds the toolbar, the canvas, the hint row
  * and the status line into the mount, keeps the one state object the renderer
- * reads, and maps every toolbar action and pointer gesture onto a level or
- * view mutation: each one redraws, refreshes the toolbar, and — when the
- * level changed — saves it on that redraw. The level also goes out to a file
- * and comes back from one, by the picker or dropped on the canvas.
+ * reads, and maps every toolbar action and pointer gesture onto a call to the
+ * modules that hold the rules: each one redraws, refreshes the toolbar, and —
+ * when the level changed — saves it on that redraw. The level also goes out to
+ * a file and comes back from one, by the picker or dropped on the canvas.
+ * Wiring only; what a gesture means belongs to the module it calls.
  */
 (function () {
   "use strict";
@@ -13,8 +14,10 @@
   var root = B && document.getElementById(B.MOUNT_ID);
   if (!B || !root) return;
 
+  var storage = B.store.from(window);
+
   var state = {
-    level: loadLevel(),
+    level: B.store.read(storage),
     view: B.view.create(),
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
@@ -31,35 +34,14 @@
   var status = null;
 
   // ---- Persistence ---------------------------------------------------------
-  // The try is for storage itself, which a browser may refuse to hand over.
-  function stored() {
-    try {
-      return B.file.parse(window.localStorage.getItem(B.STORAGE_KEY));
-    } catch (err) {
-      return null;
-    }
-  }
-
-  function loadLevel() {
-    return stored() || B.demo.level();
-  }
-
   var unsaved = false;
-
-  function save() {
-    try {
-      window.localStorage.setItem(B.STORAGE_KEY, B.file.serialize(state.level));
-    } catch (err) {
-      // Storage refused the level; it lives on in memory until the next edit.
-    }
-  }
 
   // Edits are saved once per frame, on the redraw every edit schedules; the
   // page going away flushes what no frame has reached yet.
   function flushSave() {
     if (!unsaved) return;
     unsaved = false;
-    save();
+    B.store.write(storage, state.level);
   }
 
   function watchLeaving() {

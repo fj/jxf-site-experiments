@@ -241,13 +241,14 @@ up by a whole number, so pixels stay square. Every sprite is built in code from
 the palette in `config.js` — nothing is a bitmap file. Modules on the
 `BlockLayer` namespace, in load order: `config.js`, `pixel.js` (anchored
 sprites, string-art, shading, memoizing), `level.js`, `file.js`, `view.js`,
-`selection.js` and `demo.js` (the pure models: tiles and their edits and
-validation; the `*.blocklayer.json` file a level is saved to and opened from;
-rotation, projection, picking, the frame and the way in from a pointer; which
-cells are chosen, which every module asks `selection.js`; the level a first
-visit starts with — all unit-tested under `tests/`), `sprites-tiles.js`,
-`sprites-decor.js`,
-`sprites-marks.js`, `sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`,
-and `app.js` last, with the kit's `shared/png.js` for the file download.
+`selection.js`, `demo.js` and `store.js` (the pure models: tiles and their
+edits and validation; the `*.blocklayer.json` file a level is saved to and
+opened from; rotation, projection, picking, the frame and the way in from a
+pointer; which cells are chosen, which every module asks `selection.js`; the
+level a first visit starts with; the level the browser keeps — all unit-tested
+under `tests/`), `sprites-tiles.js`, `sprites-decor.js`, `sprites-marks.js`,
+`sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`, and `app.js` last —
+the DOM, the listeners and the frame scheduler, and nothing else — with the
+kit's `shared/png.js` for the file download.
 The level autosaves to `localStorage`, and a `.blocklayer.json` dropped on the
 canvas opens.

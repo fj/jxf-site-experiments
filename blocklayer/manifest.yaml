@@ -26,6 +26,7 @@ scripts:
   - view.js
   - selection.js
   - demo.js
+  - store.js
   - sprites-tiles.js
   - sprites-decor.js
   - sprites-marks.js

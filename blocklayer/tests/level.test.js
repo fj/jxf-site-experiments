@@ -13,12 +13,19 @@ const DECOR_KEYS = B.DECOR.map((d) => d.key);
 const MARK_KEYS = B.MARKS.map((m) => m.key);
 const OTHER_COLOR = COLOR_KEYS.find((key) => key !== B.DEFAULT_COLOR);
 
+// A board that is not square, so a size read the wrong way round shows.
+const BOARD = { w: 3, h: 4 };
+const ON_BOARD = [[0, 0], [BOARD.w - 1, 0], [0, BOARD.h - 1], [BOARD.w - 1, BOARD.h - 1]];
+// The cell just past each edge, and the one past the far corner.
+const OFF_BOARD = [[-1, 0], [0, -1], [BOARD.w, 0], [0, BOARD.h], [BOARD.w, BOARD.h]];
+
 describe("level: tiles", () => {
-  it("starts empty", () => {
+  it("starts empty, on a board of the default size", () => {
     const level = L.create();
     assert.equal(L.count(level), 0);
     assert.deepEqual(L.all(level), []);
     assert.equal(L.get(level, 0, 0), null);
+    assert.deepEqual(level.size, B.SIZE_DEFAULT);
   });
 
   it("keys a cell as x,y", () => {
@@ -62,6 +69,22 @@ describe("level: tiles", () => {
     assert.equal(L.count(level), 1);
   });
 
+  it("refuses a cell off the board and adds nothing", () => {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (const [x, y] of OFF_BOARD) {
+      assert.equal(L.add(level, x, y), null, `${x},${y}`);
+    }
+    assert.equal(L.count(level), 0);
+  });
+
+  it("adds at every corner of the board", () => {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (const [x, y] of ON_BOARD) {
+      assert.equal(L.add(level, x, y).x, x, `${x},${y}`);
+    }
+    assert.equal(L.count(level), ON_BOARD.length);
+  });
+
   it("removes a tile and reports whether anything went", () => {
     const level = L.create();
     L.add(level, 0, 0);
@@ -71,20 +94,80 @@ describe("level: tiles", () => {
     assert.equal(L.count(level), 0);
   });
 
-  it("clears every tile", () => {
-    const level = L.create();
+  it("clears every tile and keeps the board", () => {
+    const level = L.create(BOARD.w, BOARD.h);
     L.add(level, 0, 0);
     L.add(level, 1, 1);
     L.clear(level);
     assert.equal(L.count(level), 0);
     assert.equal(L.get(level, 1, 1), null);
+    assert.deepEqual(level.size, BOARD);
   });
 
   it("lists all tiles", () => {
     const level = L.create();
     const a = L.add(level, 0, 0);
-    const b = L.add(level, -1, 5);
+    const b = L.add(level, 1, 5);
     assert.deepEqual(new Set(L.all(level)), new Set([a, b]));
+  });
+});
+
+describe("level: the board", () => {
+  it("runs from one tile square to sixty-four, and starts twelve by twelve", () => {
+    assert.deepEqual([B.SIZE_MIN, B.SIZE_MAX], [1, 64]);
+    assert.deepEqual(B.SIZE_DEFAULT, { w: 12, h: 12 });
+  });
+
+  it("takes the size it is given", () => {
+    assert.deepEqual(L.create(BOARD.w, BOARD.h).size, BOARD);
+  });
+
+  it("falls back to the default for a side it is given none", () => {
+    assert.deepEqual(L.create().size, B.SIZE_DEFAULT);
+    assert.deepEqual(L.create(BOARD.w).size, { w: BOARD.w, h: B.SIZE_DEFAULT.h });
+    assert.deepEqual(L.create(undefined, BOARD.h).size, { w: B.SIZE_DEFAULT.w, h: BOARD.h });
+  });
+
+  it("falls back for a side that is no number at all", () => {
+    for (const bad of [null, "3", NaN, Infinity, -Infinity, {}]) {
+      assert.deepEqual(L.create(bad, bad).size, B.SIZE_DEFAULT, inspect(bad));
+    }
+  });
+
+  it("clamps a size at both ends of the range", () => {
+    assert.deepEqual(L.create(0, -1).size, { w: B.SIZE_MIN, h: B.SIZE_MIN });
+    assert.deepEqual(L.create(B.SIZE_MAX + 1, B.SIZE_MAX * 2).size,
+      { w: B.SIZE_MAX, h: B.SIZE_MAX });
+  });
+
+  it("rounds a fractional size to whole tiles", () => {
+    assert.deepEqual(L.create(3.2, 4.7).size, { w: 3, h: 5 });
+    assert.deepEqual(L.create(B.SIZE_MIN - 0.4, B.SIZE_MAX + 0.4).size,
+      { w: B.SIZE_MIN, h: B.SIZE_MAX });
+  });
+});
+
+describe("level: inside", () => {
+  it("holds every cell of the board, from the first to the last", () => {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (let y = 0; y < BOARD.h; y++) {
+      for (let x = 0; x < BOARD.w; x++) assert.equal(L.inside(level, x, y), true, `${x},${y}`);
+    }
+  });
+
+  it("leaves out the cell just past each edge", () => {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (const [x, y] of OFF_BOARD) {
+      assert.equal(L.inside(level, x, y), false, `${x},${y}`);
+    }
+  });
+
+  it("holds the one cell of the smallest board and nothing around it", () => {
+    const level = L.create(B.SIZE_MIN, B.SIZE_MIN);
+    assert.equal(L.inside(level, 0, 0), true);
+    for (const [x, y] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      assert.equal(L.inside(level, x, y), false, `${x},${y}`);
+    }
   });
 });
 
@@ -451,8 +534,8 @@ describe("level: toJSON", () => {
   it("is stable regardless of insertion order", () => {
     const a = L.create();
     const b = L.create();
-    for (const [x, y] of [[3, 3], [-1, 0], [0, -1], [2, 3]]) L.add(a, x, y);
-    for (const [x, y] of [[2, 3], [0, -1], [3, 3], [-1, 0]]) L.add(b, x, y);
+    for (const [x, y] of [[3, 3], [1, 0], [0, 1], [2, 3]]) L.add(a, x, y);
+    for (const [x, y] of [[2, 3], [0, 1], [3, 3], [1, 0]]) L.add(b, x, y);
     assert.deepEqual(L.toJSON(a), L.toJSON(b));
   });
 
@@ -558,12 +641,12 @@ describe("level: fromJSON", () => {
 
   it("round-trips through toJSON", () => {
     const level = L.create();
-    L.add(level, -2, 3, 2, OTHER_COLOR);
-    L.setShape(level, -2, 3, "ramp");
-    L.setFacing(level, -2, 3, "S");
-    L.setDecor(level, -2, 3, "crystal-yellow");
-    L.toggleMark(level, -2, 3, "arrow-sw");
-    L.toggleMark(level, -2, 3, "teleport");
+    L.add(level, 2, 3, 2, OTHER_COLOR);
+    L.setShape(level, 2, 3, "ramp");
+    L.setFacing(level, 2, 3, "S");
+    L.setDecor(level, 2, 3, "crystal-yellow");
+    L.toggleMark(level, 2, 3, "arrow-sw");
+    L.toggleMark(level, 2, 3, "teleport");
     L.add(level, 4, 0, B.ELEV_MIN);
     assert.deepEqual(L.fromJSON(JSON.parse(JSON.stringify(L.toJSON(level)))), level);
   });

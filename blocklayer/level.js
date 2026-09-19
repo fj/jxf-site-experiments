@@ -1,9 +1,9 @@
 /*
- * Blocklayer — the level: tiles on an integer grid, each a column of blocks
- * with a colour, a shape, a facing, at most one decor object and a list of
- * marks. Every edit clamps or ignores what the rules forbid, and a level read
- * back from storage is validated one tile at a time. Pure data; nothing here
- * draws.
+ * Blocklayer — the level: a board of a stated size, holding a tile at some of
+ * its cells, each a column of blocks with a colour, a shape, a facing, at most
+ * one decor object and a list of marks. Every edit clamps or ignores what the
+ * rules forbid, and a level read back from storage is validated one tile at a
+ * time. Pure data; nothing here draws.
  */
 (function () {
   "use strict";
@@ -18,8 +18,25 @@
   var DECOR_KEYS = B.DECOR.map(function (d) { return d.key; });
   var MARK_KEYS = B.MARKS.map(function (m) { return m.key; });
 
-  function create() {
-    return { tiles: {} };
+  function clampSide(n, fallback) {
+    if (typeof n !== "number" || !isFinite(n)) n = fallback;
+    return B.clamp(Math.round(n), B.SIZE_MIN, B.SIZE_MAX);
+  }
+
+  function makeSize(w, h) {
+    return { w: clampSide(w, B.SIZE_DEFAULT.w), h: clampSide(h, B.SIZE_DEFAULT.h) };
+  }
+
+  function create(w, h) {
+    return { size: makeSize(w, h), tiles: {} };
+  }
+
+  function onBoard(size, x, y) {
+    return x >= 0 && y >= 0 && x < size.w && y < size.h;
+  }
+
+  function inside(level, x, y) {
+    return onBoard(level.size, x, y);
   }
 
   function key(x, y) {
@@ -58,6 +75,7 @@
   function add(level, x, y, elev, color) {
     var existing = get(level, x, y);
     if (existing) return existing;
+    if (!inside(level, x, y)) return null;
     if (elev === undefined) elev = B.NEW_TILE_ELEV;
     if (!knownColor(color)) color = B.DEFAULT_COLOR;
     var tile = makeTile(x, y, B.clamp(elev, B.ELEV_MIN, B.ELEV_MAX), color);
@@ -246,6 +264,7 @@
 
   B.level = {
     create: create,
+    inside: inside,
     key: key,
     get: get,
     all: all,

@@ -186,8 +186,8 @@ describe("view: pick", () => {
   //     X.X
   //     .X.
   it("answers the empty cell a ring of four neighbours surrounds, over all of its floor", () => {
-    const hole = { x: 1, y: -2 };
-    const ring = [[0, -2], [2, -2], [1, -1], [1, -3]];
+    const hole = { x: 1, y: 2 };
+    const ring = [[0, 2], [2, 2], [1, 1], [1, 3]];
     const reachX = B.TILE_W / 2;
     const reachY = B.TILE_H / 2;
     for (const rot of ROTS) {
@@ -231,13 +231,13 @@ describe("view: pick", () => {
 
   it("returns the tile that is alone under the point", () => {
     const { view, level } = scene();
-    const only = L.add(level, 2, -3, B.NEW_TILE_ELEV);
-    const p = V.project(view, 2, -3, B.NEW_TILE_ELEV);
+    const only = L.add(level, 2, 3, B.NEW_TILE_ELEV);
+    const p = V.project(view, 2, 3, B.NEW_TILE_ELEV);
     assert.deepEqual(V.pick(view, level, p.sx + 4, p.sy + 20), { tile: only });
   });
 
   it("picks a tile by its top face at every rotation, whatever its shape or height", () => {
-    const at = { x: 2, y: -1 };
+    const at = { x: 2, y: 1 };
     const TOP_FACE = [[0, 0], [0, -7], [0, 7], [15, 0], [-15, 0], [8, -3]];
     const MID_ELEV = 3;                  // clear of the floor; ELEV_MAX is the ceiling
     for (const rot of ROTS) {
@@ -344,15 +344,15 @@ describe("view: pick", () => {
 
   it("flags a point on the line between two empty cells as an edge", () => {
     const { view, level } = scene();
-    const lone = L.add(level, 2, -1, 0);
-    const p = V.project(view, 2, -1, B.FLOOR);
+    const lone = L.add(level, 2, 1, 0);
+    const p = V.project(view, 2, 1, B.FLOOR);
     const vertex = { sx: p.sx + B.TILE_W / 2, sy: p.sy };
     const onVertex = V.pick(view, level, vertex.sx, vertex.sy);
-    assert.deepEqual(onVertex, { cell: { x: 3, y: -1 }, edge: true });
-    assert.deepEqual(V.pick(view, level, vertex.sx + 1, vertex.sy), { cell: { x: 3, y: -2 } });
-    const q = V.project(view, 3, -2, B.FLOOR);
+    assert.deepEqual(onVertex, { cell: { x: 3, y: 1 }, edge: true });
+    assert.deepEqual(V.pick(view, level, vertex.sx + 1, vertex.sy), { cell: { x: 3, y: 0 } });
+    const q = V.project(view, 3, 0, B.FLOOR);
     const edge = { sx: q.sx + B.TILE_W / 4, sy: q.sy + B.TILE_H / 4 };
-    assert.deepEqual(V.pick(view, level, edge.sx, edge.sy), { cell: { x: 4, y: -2 }, edge: true });
+    assert.deepEqual(V.pick(view, level, edge.sx, edge.sy), { cell: { x: 4, y: 0 }, edge: true });
     assert.deepEqual(V.pick(view, level, p.sx - 1, p.sy), { tile: lone });
   });
 
@@ -385,7 +385,7 @@ describe("view: pick", () => {
     const PAST_DIAMOND = 4;              // px the sweep reaches beyond the floor diamond
     const reachX = B.TILE_W / 2 + PAST_DIAMOND;
     const reachY = B.TILE_H / 2 + PAST_DIAMOND;
-    const at = { x: 1, y: -2 };
+    const at = { x: 1, y: 2 };
     for (const rot of ROTS) {
       for (const shape of B.SHAPES) {
         const view = viewAt(rot, { x: 9, y: -5 });
@@ -551,7 +551,7 @@ describe("view: within a box of no size", () => {
     for (const rot of ROTS) {
       const view = viewAt(rot, { x: 9, y: -5 });
       const level = L.create();
-      const only = L.add(level, 1, -2, B.NEW_TILE_ELEV);
+      const only = L.add(level, 1, 2, B.NEW_TILE_ELEV);
       const p = V.project(view, only.x, only.y, L.top(only));
       for (const [dx, dy] of TOP_FACE) {
         const corner = { sx: p.sx + dx, sy: p.sy + dy };
@@ -785,7 +785,7 @@ describe("view: basePoint", () => {
     const canvas = bordered();
     const frame = V.frame(canvas, SCALE);
     const { view, level } = scene();
-    const tall = L.add(level, 1, -1, B.NEW_TILE_ELEV);
+    const tall = L.add(level, 1, 1, B.NEW_TILE_ELEV);
     const p = V.project(view, tall.x, tall.y, L.top(tall));
     // Back the other way: base px to the content box's own CSS px.
     const cx = (frame.ox + p.sx) * SCALE / RATIO;

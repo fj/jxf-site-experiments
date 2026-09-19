@@ -10,12 +10,14 @@ const F = B.file;
 const L = B.level;
 
 const TWO_SPACE_INDENT = 2;
+const COLOR_KEYS = B.PALETTE.map((c) => c.key);
+const OTHER_COLOR = COLOR_KEYS.find((key) => key !== B.DEFAULT_COLOR);
 
 // A few tiles that between them use every field a tile can carry.
 function sampleLevel() {
   const level = L.create();
   L.add(level, 0, 0, 0);
-  L.add(level, 1, 0, 2);
+  L.add(level, 1, 0, 2, OTHER_COLOR);
   L.setShape(level, 1, 0, "ramp");
   L.setFacing(level, 1, 0, "E");
   L.setDecor(level, 1, 0, "chest");
@@ -40,7 +42,7 @@ describe("file: serialize", () => {
   });
 
   it("writes an empty level", () => {
-    assert.equal(F.serialize(L.create()), '{\n  "version": 1,\n  "tiles": []\n}\n');
+    assert.equal(F.serialize(L.create()), '{\n  "version": 2,\n  "tiles": []\n}\n');
   });
 });
 
@@ -52,6 +54,13 @@ describe("file: parse", () => {
 
   it("round-trips an empty level", () => {
     assert.deepEqual(F.parse(F.serialize(L.create())), L.create());
+  });
+
+  it("brings every tile back in the colour it was saved in", () => {
+    const level = L.create();
+    COLOR_KEYS.forEach((color, x) => L.add(level, x, 0, B.NEW_TILE_ELEV, color));
+    const read = F.parse(F.serialize(level));
+    COLOR_KEYS.forEach((color, x) => assert.equal(L.get(read, x, 0).color, color, color));
   });
 
   it("returns null for text that is not JSON", () => {
@@ -73,9 +82,30 @@ describe("file: parse", () => {
     }
   });
 
-  it("keeps the good tiles of a file that also holds bad ones", () => {
+  it("opens a version 1 file, which names no colour, in the default colour", () => {
     const text = JSON.stringify({
       version: 1,
+      tiles: [{ x: 0, y: 0, elev: 2, shape: "ramp", facing: "S", decor: "rock", marks: ["jump"] }]
+    });
+    assert.deepEqual(L.get(F.parse(text), 0, 0), tile({
+      x: 0, y: 0, elev: 2, color: B.DEFAULT_COLOR,
+      shape: "ramp", facing: "S", decor: "rock", marks: ["jump"]
+    }));
+  });
+
+  it("drops a tile whose colour the palette does not hold", () => {
+    const text = JSON.stringify({
+      version: 2,
+      tiles: [tile({ x: 0 }), tile({ x: 1, color: "puce" })]
+    });
+    const level = F.parse(text);
+    assert.equal(L.count(level), 1);
+    assert.deepEqual(L.get(level, 0, 2), tile({ x: 0 }));
+  });
+
+  it("keeps the good tiles of a file that also holds bad ones", () => {
+    const text = JSON.stringify({
+      version: 2,
       tiles: [
         tile({ x: 0 }),
         tile({ x: 1, elev: B.ELEV_MAX + 1 }),

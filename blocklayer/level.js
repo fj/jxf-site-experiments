@@ -1,18 +1,20 @@
 /*
  * Blocklayer — the level: tiles on an integer grid, each a column of blocks
- * with a shape, a facing, at most one decor object and a list of marks. Every
- * edit clamps or ignores what the rules forbid, and a level read back from
- * storage is validated one tile at a time. Pure data; nothing here draws.
+ * with a colour, a shape, a facing, at most one decor object and a list of
+ * marks. Every edit clamps or ignores what the rules forbid, and a level read
+ * back from storage is validated one tile at a time. Pure data; nothing here
+ * draws.
  */
 (function () {
   "use strict";
 
   var B = window.BlockLayer = window.BlockLayer || {};
 
-  var FORMAT_VERSION = 1;
+  var FORMAT_VERSION = 2;                      // version 1 gave a tile no colour
   var DEFAULT_SHAPE = B.SHAPES[0];
   var DEFAULT_FACING = B.FACINGS[0];
   var SLOPED_SHAPES = ["ramp", "stairs"];      // their top is one block above elev
+  var COLOR_KEYS = B.PALETTE.map(function (c) { return c.key; });
   var DECOR_KEYS = B.DECOR.map(function (d) { return d.key; });
   var MARK_KEYS = B.MARKS.map(function (m) { return m.key; });
 
@@ -36,11 +38,12 @@
     return Object.keys(level.tiles).length;
   }
 
-  function makeTile(x, y, elev) {
+  function makeTile(x, y, elev, color) {
     return {
       x: x,
       y: y,
       elev: elev,
+      color: color,
       shape: DEFAULT_SHAPE,
       facing: DEFAULT_FACING,
       decor: null,
@@ -48,11 +51,16 @@
     };
   }
 
-  function add(level, x, y, elev) {
+  function knownColor(color) {
+    return COLOR_KEYS.indexOf(color) >= 0;
+  }
+
+  function add(level, x, y, elev, color) {
     var existing = get(level, x, y);
     if (existing) return existing;
     if (elev === undefined) elev = B.NEW_TILE_ELEV;
-    var tile = makeTile(x, y, B.clamp(elev, B.ELEV_MIN, B.ELEV_MAX));
+    if (!knownColor(color)) color = B.DEFAULT_COLOR;
+    var tile = makeTile(x, y, B.clamp(elev, B.ELEV_MIN, B.ELEV_MAX), color);
     level.tiles[key(x, y)] = tile;
     return tile;
   }
@@ -102,6 +110,13 @@
     }
     tiles.forEach(function (tile) { tile.elev += delta; });
     return true;
+  }
+
+  function setColor(level, x, y, color) {
+    var tile = get(level, x, y);
+    if (!tile) return null;
+    if (knownColor(color)) tile.color = color;
+    return tile.color;
   }
 
   function setShape(level, x, y, shape) {
@@ -157,6 +172,7 @@
         x: t.x,
         y: t.y,
         elev: t.elev,
+        color: t.color,
         shape: t.shape,
         facing: t.facing,
         decor: t.decor,
@@ -180,14 +196,17 @@
   }
 
   // A tile from untrusted data, or null when any field but the marks is bad.
+  // A file of version 1 names no colour, so a missing one reads as the default.
   function readTile(raw) {
     if (!raw || typeof raw !== "object") return null;
     if (!isInteger(raw.x) || !isInteger(raw.y) || !isInteger(raw.elev)) return null;
     if (raw.elev < B.ELEV_MIN || raw.elev > B.ELEV_MAX) return null;
     if (B.SHAPES.indexOf(raw.shape) < 0 || B.FACINGS.indexOf(raw.facing) < 0) return null;
+    var color = raw.color === undefined ? B.DEFAULT_COLOR : raw.color;
+    if (!knownColor(color)) return null;
     var decor = raw.decor === undefined ? null : raw.decor;
     if (decor !== null && DECOR_KEYS.indexOf(decor) < 0) return null;
-    var tile = makeTile(raw.x, raw.y, raw.elev);
+    var tile = makeTile(raw.x, raw.y, raw.elev, color);
     tile.shape = raw.shape;
     tile.elev = Math.min(raw.elev, maxElev(tile));
     tile.facing = raw.facing;
@@ -220,6 +239,7 @@
     maxElev: maxElev,
     raise: raise,
     raiseAll: raiseAll,
+    setColor: setColor,
     setShape: setShape,
     setFacing: setFacing,
     cycleFacing: cycleFacing,

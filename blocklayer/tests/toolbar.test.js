@@ -34,7 +34,7 @@ const TILE_COLOR = "red";                    // ...and a tile's colour that is n
 const B = load([
   "config.js", "pixel.js", "level.js",
   "sprites-tiles.js", "sprites-decor.js", "sprites-marks.js", "sprites-icons.js",
-  "input.js", "toolbar.js"
+  "input.js", "parts.js", "toolbar.js"
 ], { document: fakeDocument() });
 
 const HOLD_VAR = "--" + B.PREFIX + "hold";
@@ -241,9 +241,9 @@ describe("toolbar: the buttons", () => {
   it("lends the rest of the interface the very words its shape buttons show", () => {
     const r = rig();
     for (const shape of B.SHAPES) {
-      assert.equal(B.toolbar.shapeLabel(shape), r.find("shape", shape).title.split(" (")[0]);
+      assert.equal(B.parts.shapeLabel(shape), r.find("shape", shape).title.split(" (")[0]);
     }
-    assert.equal(B.toolbar.shapeLabel("dome"), "", "a shape no button shows has no word");
+    assert.equal(B.parts.shapeLabel("dome"), "", "a shape no button shows has no word");
   });
 
   it("offers one colour button per palette entry, in palette order", () => {

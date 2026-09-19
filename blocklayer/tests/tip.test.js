@@ -10,9 +10,7 @@ const ELSEWHERE = { x: 300, y: 40 };
 const CTL_ATTR = "data-ctl";
 
 const B = load([
-  "config.js", "pixel.js", "level.js",
-  "sprites-tiles.js", "sprites-decor.js", "sprites-marks.js", "sprites-icons.js",
-  "input.js", "toolbar.js", "tip.js"
+  "config.js", "parts.js", "tip.js"
 ], { document: fakeDocument() });
 
 const ALT = true;
@@ -100,7 +98,7 @@ describe("tip: what the panel says", () => {
     }
     for (const shape of B.SHAPES) {
       r.show(hit({ shape }), ALT);
-      assert.deepEqual(r.said()[2], B.toolbar.shapeLabel(shape), shape);
+      assert.deepEqual(r.said()[2], B.parts.shapeLabel(shape), shape);
     }
   });
 

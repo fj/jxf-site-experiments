@@ -33,6 +33,7 @@ scripts:
   - sprites-icons.js
   - render.js
   - input.js
+  - parts.js
   - toolbar.js
   - bounds.js
   - tip.js

@@ -1,8 +1,9 @@
 /*
- * Blocklayer — the level the browser keeps: the one a visit starts from, and
- * the one written back after an edit. A browser may refuse storage outright or
- * throw on any call to it, and what it holds may be no level at all; any of
- * those answers the demo level and none of them throws.
+ * Blocklayer — the level the browser keeps: the one read back on a return
+ * visit, and the one written after an edit. A browser may refuse storage
+ * outright or throw on any call to it, and what it holds may be no level at
+ * all; any of those answers nothing and none of them throws. What a visit with
+ * no level of its own starts on is the app's choice, not the storage's.
  */
 (function () {
   "use strict";
@@ -19,18 +20,14 @@
     }
   }
 
-  // The level the storage holds, or nothing when it holds none.
-  function stored(storage) {
+  // The level the storage holds, however empty, or nothing when it holds none.
+  function read(storage) {
+    if (!storage) return null;
     try {
       return B.file.parse(storage.getItem(B.STORAGE_KEY));
     } catch (err) {
       return null;
     }
-  }
-
-  // The level to start from: the stored one, however empty, else the demo.
-  function read(storage) {
-    return (storage && stored(storage)) || B.demo.level();
   }
 
   // The level is stored as the text a file holds.

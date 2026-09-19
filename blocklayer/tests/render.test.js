@@ -41,7 +41,14 @@ function stage() {
     imageSmoothingEnabled: true,
     clearRect() { draws.length = 0; fills.length = 0; calls.clear(); }
   };
-  const out = { imageSmoothingEnabled: true, clearRect() {}, drawImage() {} };
+  const blits = [];
+  const out = {
+    imageSmoothingEnabled: true,
+    clearRect(x, y, w, h) { blits.push({ cleared: [x, y, w, h] }); },
+    drawImage(image, x, y, w, h) {
+      blits.push({ image, x, y, w, h, smoothing: out.imageSmoothingEnabled });
+    }
+  };
   const logDraw = (sprite, x, y) => {
     draws.push({ name: sprite.name, x, y, alpha: scene.globalAlpha });
   };
@@ -92,6 +99,7 @@ function stage() {
     state,
     draws,
     fills,
+    blits,
     asked: (name) => calls.get(name) || [],
     add: (x, y, elev) => B.level.add(state.level, x, y, elev),
     draw: () => B.render.draw(canvas, state, SCALE),
@@ -532,5 +540,32 @@ describe("render: the marks a tile carries", () => {
     s.state.layers.marks = false;
     s.draw();
     assert.deepEqual(drawsNamed(s, "mark"), []);
+  });
+});
+
+describe("render: the blit to the visible canvas", () => {
+  const blitOf = (s) => s.blits.find((b) => b.image);
+
+  it("stretches the base scene over the canvas by the scale it is given", () => {
+    const s = stage();
+    s.draw();
+    const frame = s.frame();
+    const blit = blitOf(s);
+    assert.deepEqual([blit.x, blit.y], [0, 0]);
+    assert.deepEqual([blit.w, blit.h], [frame.w * SCALE, frame.h * SCALE]);
+  });
+
+  it("turns smoothing off first, so a pixel stays a square", () => {
+    const s = stage();
+    s.draw();
+    assert.equal(blitOf(s).smoothing, false);
+  });
+
+  it("clears the canvas before it blits, so nothing shows through", () => {
+    const s = stage();
+    s.draw();
+    const [cleared, blit] = s.blits;
+    assert.deepEqual(cleared.cleared, [0, 0, WIDTH, HEIGHT]);
+    assert.ok(blit.image, "the scene follows the clear");
   });
 });

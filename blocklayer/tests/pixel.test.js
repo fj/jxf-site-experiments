@@ -96,6 +96,29 @@ describe("pixel: hflip, vflip and transpose", () => {
   });
 });
 
+describe("pixel: draw", () => {
+  const SPRITE = { canvas: { width: 32, height: 16 }, ox: 4, oy: 2 };
+
+  function recorder() {
+    const calls = [];
+    return { ctx: { drawImage: (image, x, y) => calls.push([image, x, y]) }, calls };
+  }
+
+  it("puts the sprite's anchor on the point", () => {
+    const r = recorder();
+    P.draw(r.ctx, SPRITE, 10, 6);
+    assert.deepEqual(r.calls, [[SPRITE.canvas, 6, 4]]);
+  });
+
+  // A tile's projected centre is often a half pixel; the art may not be.
+  it("rounds a fractional point to a whole pixel, half a pixel upward", () => {
+    const r = recorder();
+    P.draw(r.ctx, SPRITE, 10.4, -3.2);
+    P.draw(r.ctx, SPRITE, 10.5, 2.5);
+    assert.deepEqual(r.calls, [[SPRITE.canvas, 6, -5], [SPRITE.canvas, 7, 1]]);
+  });
+});
+
 describe("pixel: drawTiled", () => {
   const RECT = { w: 40, h: 30 };
   const SPRITE = { canvas: { width: 32, height: 16 }, ox: 4, oy: 2 };

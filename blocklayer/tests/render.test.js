@@ -17,6 +17,8 @@ const TILE_ELEV = 2;            // blocks under a tile, so a top read wrong land
 const HOLD_PROGRESS = 0.4;      // part way through the hold that removes a tile
 const WEDGE_OF = { block: null, ramp: "ramp", stairs: "stairs" };
 const MARKS_PER_ROW = 3;        // marks render.js lays in a row before it starts another
+const SELECTED = [[0, 0], [1, 1], [2, 0]];   // cells a sweep took
+const UNSELECTED = [3, 3];                   // ...and one it left out
 
 // render.js over a recording pixel layer: every sprite module answers a
 // tagged stand-in, and each draw of one is logged with its name, where it
@@ -26,6 +28,8 @@ const MARKS_PER_ROW = 3;        // marks render.js lays in a row before it start
 // canvas empties it.
 function stage() {
   const B = load(["config.js", "level.js", "view.js", "render.js"]);
+  // The change that turns the selection into a list adds this to config.js.
+  B.inCells = (cells, x, y) => cells.some((cell) => cell.x === x && cell.y === y);
   const draws = [];
   const fills = [];
   const calls = new Map();
@@ -90,7 +94,7 @@ function stage() {
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
     newElev: B.NEW_TILE_ELEV,
-    selected: null,
+    selection: [],
     hover: null,
     hold: null
   };
@@ -141,6 +145,9 @@ const turnedTile = (s, x, y, shape) => {
 };
 
 const viewFacingOf = (s, tile) => s.B.view.viewFacing(s.state.view.rot, tile.facing);
+
+// Where each highlight ring landed, sorted, so the depth order does not matter.
+const ringedAt = (s) => drawsNamed(s, "outline").map((d) => [d.x, d.y]).sort();
 
 const decorOn = (s, x, y) => {
   const key = s.B.DECOR[0].key;
@@ -304,7 +311,7 @@ describe("render: the order a tile is drawn in", () => {
     const tile = turnedTile(s, 0, 0, "ramp");
     decorOn(s, 0, 0);
     marksOn(s, 0, 0, 1);
-    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.selection = [{ x: tile.x, y: tile.y }];
     s.state.hold = { x: tile.x, y: tile.y, progress: HOLD_PROGRESS };
     s.draw();
     assert.deepEqual(s.names(), [
@@ -338,7 +345,7 @@ describe("render: the see-through tiles", () => {
     decorOn(s, 0, 0);
     marksOn(s, 0, 0, 1);
     s.state.opaque = false;
-    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.selection = [{ x: tile.x, y: tile.y }];
     s.state.hold = { x: tile.x, y: tile.y, progress: HOLD_PROGRESS };
     s.draw();
     const over = s.draws.filter((d) => d.name !== "column");
@@ -421,7 +428,7 @@ describe("render: the highlight ring", () => {
     const s = stage();
     const tile = turnedTile(s, 0, 0, "ramp");
     s.add(1, 1, TILE_ELEV);
-    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.selection = [{ x: tile.x, y: tile.y }];
     s.draw();
     const { x, y } = drawNamed(s, "outline");
     assert.deepEqual([x, y], anchorOf(s, tile));
@@ -439,16 +446,41 @@ describe("render: the highlight ring", () => {
     assert.deepEqual(s.asked("outline"), [[tile.shape, viewFacingOf(s, tile), "hover"]]);
   });
 
+  it("rings every tile the selection holds, and no other", () => {
+    const s = stage();
+    const picked = SELECTED.map(([x, y]) => s.add(x, y, TILE_ELEV));
+    s.add(...UNSELECTED, TILE_ELEV);
+    s.state.selection = SELECTED.map(([x, y]) => ({ x: x, y: y }));
+    s.draw();
+    assert.deepEqual(ringedAt(s), picked.map((tile) => anchorOf(s, tile)).sort());
+    assert.deepEqual(s.asked("outline"),
+      picked.map((tile) => [tile.shape, viewFacingOf(s, tile), "select"]));
+  });
+
   it("rings the selected tile as selected while the pointer hovers it too", () => {
     const s = stage();
     const tile = s.add(0, 0, TILE_ELEV);
-    s.state.selected = { x: tile.x, y: tile.y };
+    s.state.selection = [{ x: tile.x, y: tile.y }];
     s.state.hover = { tile: tile };
     s.draw();
     assert.deepEqual(s.asked("outline"), [[tile.shape, viewFacingOf(s, tile), "select"]]);
   });
 
-  it("rings no tile while none is selected and none hovered", () => {
+  // (0, 0) is drawn first, so the two rings come in this order.
+  it("rings a hovered tile the selection leaves out in the hover ring", () => {
+    const s = stage();
+    const picked = s.add(0, 0, TILE_ELEV);
+    const over = s.add(1, 1, TILE_ELEV);
+    s.state.selection = [{ x: picked.x, y: picked.y }];
+    s.state.hover = { tile: over };
+    s.draw();
+    assert.deepEqual(s.asked("outline"), [
+      [picked.shape, viewFacingOf(s, picked), "select"],
+      [over.shape, viewFacingOf(s, over), "hover"]
+    ]);
+  });
+
+  it("rings no tile while the selection is empty and none is hovered", () => {
     const s = stage();
     s.add(0, 0, TILE_ELEV);
     s.draw();

@@ -1,9 +1,9 @@
 // Styles for the Blocklayer experiment.
 //
-// A column of pixel-art buttons beside the level's canvas, and a hint row and
-// a status line under the canvas. The host owns the mount's outer box; what's
-// here is the layout inside it, the button, the icon's colour per theme, the
-// canvas and the hold-to-clear fill.
+// A column of pixel-art buttons beside the level's canvas, a hint row and a
+// size row under the canvas, and a status line under those. The host owns the
+// mount's outer box; what's here is the layout inside it, the button, the
+// icon's colour per theme, the canvas and the hold-to-clear fill.
 
 @import "../shared/theme";
 
@@ -27,6 +27,9 @@ $blk-ink-dark: #e8e8f0;       // ...and on a dark one
 $blk-hint-gap: 1.2em;
 $blk-hint-item-gap: 0.35em;
 $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothing
+$blk-size-gap: 0.35em;
+$blk-size-field: 4em;         // wide enough for the largest board, and no wider
+$blk-size-pad: 0.2em 0.3em;
 
 .experiment-ext-blk-layout {
   display: grid;
@@ -177,11 +180,50 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   @include exp-dark { border-color: $exp-link-dark; }
 }
 
-// The hint and the status line: small mono text under the canvas.
+// The hint row, the size row and the status line: small mono text under the
+// canvas.
 %blk-caption {
-  margin-top: $blk-text-gap;
   font-family: $exp-mono-font-family;
   font-size: 0.8em;
+}
+
+// The hints on one side of the row, the board's size on the other.
+.experiment-ext-blk-captions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $blk-hint-item-gap $blk-hint-gap;
+  margin-top: $blk-text-gap;
+}
+
+.experiment-ext-blk-size {
+  @extend %blk-caption;
+  display: flex;
+  align-items: center;
+  gap: $blk-size-gap;
+  color: $exp-muted;
+
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+.experiment-ext-blk-size-input {
+  width: $blk-size-field;
+  padding: $blk-size-pad;
+  font: inherit;
+  color: inherit;
+  border: $blk-border solid $exp-border;
+  border-radius: $blk-corner;
+  background: $exp-surface;
+
+  &:focus-visible { outline: $blk-border solid $exp-link; outline-offset: 1px; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
 }
 
 .experiment-ext-blk-hint {
@@ -210,6 +252,7 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
 // Where the app says, briefly, why an opened file was refused.
 .experiment-ext-blk-status {
   @extend %blk-caption;
+  margin-top: $blk-text-gap;
   min-height: $blk-status-height;
   color: $exp-error;
 

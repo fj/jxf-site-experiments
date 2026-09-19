@@ -69,6 +69,9 @@ function fakeDocument() {
         el.fire("focus");
       };
       return el;
+    },
+    createTextNode(text) {
+      return { tag: "#text", textContent: text, children: [], getAttribute: () => null };
     }
   };
   return doc;

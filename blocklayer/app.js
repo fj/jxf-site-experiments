@@ -220,16 +220,6 @@
     changed();
   }
 
-  // The tiles a sweep caught: those under the rectangle, or the one under the
-  // point when the rectangle has no size.
-  function swept(box) {
-    if (box.x0 !== box.x1 || box.y0 !== box.y1) {
-      return B.view.within(state.view, state.level, box);
-    }
-    var hit = B.view.pick(state.view, state.level, box.x0, box.y0);
-    return hit && hit.tile ? [hit.tile] : [];
-  }
-
   // The tiles join the selection; the cells already in it keep their place.
   function addCells(tiles) {
     var next = state.selection.slice();
@@ -322,7 +312,7 @@
     // A sweep's two client corners: every tile inside joins the selection.
     selectBox: function (x0, y0, x1, y1) {
       var box = baseBox(x0, y0, x1, y1);
-      if (box) addCells(swept(box));
+      if (box) addCells(B.view.within(state.view, state.level, box));
     },
     // The rectangle the sweep is drawing, for the renderer; box(null) ends it.
     box: function (x0, y0, x1, y1) {

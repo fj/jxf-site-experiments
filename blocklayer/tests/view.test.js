@@ -528,16 +528,72 @@ describe("view: within", () => {
   });
 
   it("reads a slope by the top face a block over its elevation, as the renderer draws it", () => {
+    const PROBE = 1;                   // px each way, so the box has a size
+    const around = (p) =>
+      ({ x0: p.sx - PROBE, y0: p.sy - PROBE, x1: p.sx + PROBE, y1: p.sy + PROBE });
     for (const shape of B.SHAPES) {
       const { view, level } = patch(0, PANS[0], [[0, 0]]);
       L.setShape(level, 0, 0, shape);
       const tile = L.get(level, 0, 0);
-      const pinned = (p) => ({ x0: p.sx, y0: p.sy, x1: p.sx, y1: p.sy });
-      assert.deepEqual(V.within(view, level, pinned(topOf(view, level, [0, 0]))), [tile], shape);
+      assert.deepEqual(V.within(view, level, around(topOf(view, level, [0, 0]))), [tile], shape);
       const base = V.project(view, 0, 0, tile.elev);
       const onBase = L.sloped(tile) ? [] : [tile];
-      assert.deepEqual(V.within(view, level, pinned(base)), onBase, shape);
+      assert.deepEqual(V.within(view, level, around(base)), onBase, shape);
     }
+  });
+});
+
+describe("view: within a box of no size", () => {
+  const pinned = (p) => ({ x0: p.sx, y0: p.sy, x1: p.sx, y1: p.sy });
+
+  it("takes the tile under the corner, anywhere on its top face, as a click does", () => {
+    const TOP_FACE = [[0, 0], [0, -7], [0, 7], [15, 0], [-15, 0], [8, -3]];
+    for (const rot of ROTS) {
+      const view = viewAt(rot, { x: 9, y: -5 });
+      const level = L.create();
+      const only = L.add(level, 1, -2, B.NEW_TILE_ELEV);
+      const p = V.project(view, only.x, only.y, L.top(only));
+      for (const [dx, dy] of TOP_FACE) {
+        const corner = { sx: p.sx + dx, sy: p.sy + dy };
+        const name = `rot ${rot} ${dx},${dy}`;
+        assert.deepEqual(V.within(view, level, pinned(corner)), [only], name);
+        assert.deepEqual(V.pick(view, level, corner.sx, corner.sy), { tile: only }, `${name} click`);
+      }
+    }
+  });
+
+  it("takes a tile the click reaches by a side face, which no box of top faces holds", () => {
+    const view = V.create();
+    const level = L.create();
+    const TALL = 5;
+    const tall = L.add(level, 0, 0, TALL);
+    const top = V.project(view, 0, 0, TALL);
+    const side = { sx: top.sx, sy: top.sy + TALL * B.BLOCK_H };
+    assert.deepEqual(V.within(view, level, pinned(side)), [tall]);
+    const REACH = 2;                   // px each way: a box with a size, over the same point
+    assert.deepEqual(V.within(view, level, {
+      x0: side.sx - REACH, y0: side.sy - REACH, x1: side.sx + REACH, y1: side.sy + REACH
+    }), []);
+  });
+
+  it("takes nothing over an empty cell", () => {
+    const { view, level } = scene();
+    L.add(level, 3, 3, B.NEW_TILE_ELEV);
+    const p = V.project(view, 0, 0, B.FLOOR);
+    assert.deepEqual(V.within(view, level, pinned(p)), []);
+    assert.deepEqual(V.within(V.create(), L.create(), pinned(p)), []);
+  });
+
+  it("is a box, not a click, when only one side has no length", () => {
+    const view = V.create();
+    const level = L.create();
+    const near = L.add(level, 0, 0, B.NEW_TILE_ELEV);
+    const far = L.add(level, 1, 1, B.NEW_TILE_ELEV);
+    const a = V.project(view, near.x, near.y, L.top(near));
+    const b = V.project(view, far.x, far.y, L.top(far));
+    assert.equal(a.sx, b.sx, "the two tops share a column on screen");
+    assert.deepEqual(V.within(view, level, { x0: a.sx, y0: a.sy, x1: b.sx, y1: b.sy }),
+      [near, far]);
   });
 });
 

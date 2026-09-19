@@ -106,4 +106,9 @@
 
   // Whether `a` (a tile, a cell, or nothing) sits at the cell (x, y).
   B.sameCell = function (a, x, y) { return !!a && a.x === x && a.y === y; };
+
+  // Whether a list of tiles or cells holds the cell (x, y).
+  B.inCells = function (cells, x, y) {
+    return cells.some(function (cell) { return B.sameCell(cell, x, y); });
+  };
 })();

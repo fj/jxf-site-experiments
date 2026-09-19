@@ -100,16 +100,35 @@
     return elev >= B.ELEV_MIN && elev <= maxElev(tile);
   }
 
-  // Every tile takes the step or none does, so the level keeps its shape.
-  // Answers whether it moved.
-  function raiseAll(level, delta) {
-    var tiles = all(level);
+  // The tiles standing at those cells, each one once. A cell with no tile, and
+  // a cell named a second time, is passed over.
+  function tilesAt(level, cells) {
+    var seen = {};
+    var tiles = [];
+    cells.forEach(function (cell) {
+      var k = key(cell.x, cell.y);
+      if (seen[k]) return;
+      seen[k] = true;
+      var tile = get(level, cell.x, cell.y);
+      if (tile) tiles.push(tile);
+    });
+    return tiles;
+  }
+
+  // Every one of those tiles takes the step or none does, so the group keeps
+  // its shape. Answers whether it moved.
+  function raiseCells(level, cells, delta) {
+    var tiles = tilesAt(level, cells);
     if (!tiles.length) return false;
     for (var i = 0; i < tiles.length; i++) {
       if (!canRaise(tiles[i], delta)) return false;
     }
     tiles.forEach(function (tile) { tile.elev += delta; });
     return true;
+  }
+
+  function raiseAll(level, delta) {
+    return raiseCells(level, all(level), delta);
   }
 
   function setColor(level, x, y, color) {
@@ -238,6 +257,7 @@
     top: top,
     maxElev: maxElev,
     raise: raise,
+    raiseCells: raiseCells,
     raiseAll: raiseAll,
     setColor: setColor,
     setShape: setShape,

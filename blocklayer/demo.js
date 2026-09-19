@@ -38,7 +38,7 @@
   ];
   // The board takes a margin of empty tiles past the layout, so the first
   // screenshot shows its edges.
-  var BOARD_MARGIN = 2;
+  var BOARD_MARGIN = 3;          // empty tiles past the level, so the edges show
   var BOARD = {
     w: PLATEAU_SIZE + BOARD_MARGIN,
     h: PLATEAU_SIZE + TERRACES.length + BOARD_MARGIN

@@ -618,6 +618,7 @@ describe("render: the colour a tile is drawn in", () => {
   it("draws each column in the tile's own colour, not in one its height names", () => {
     const s = stage();
     const colors = s.B.PALETTE.map((c) => c.key);
+    s.state.level.size = { w: colors.length, h: 1 };   // a board wide enough for the palette
     colors.forEach((color, x) => s.B.level.add(s.state.level, x, 0, TILE_ELEV, color));
     s.draw();
     assert.deepEqual(s.asked("column"), colors.map((color) => [color, TILE_ELEV]));

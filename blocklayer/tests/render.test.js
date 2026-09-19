@@ -23,6 +23,7 @@ const UNSELECTED = [3, 3];                   // ...and one it left out
 // centre, so a corner read the wrong way round lands elsewhere.
 const BOX = { x0: -30, y0: -11, x1: 41, y1: 26 };
 const SUB_PIXEL = 0.4;                       // a sweep corner between two pixels
+const NO_INK = "none";                       // the fill colour the scene starts at
 
 // render.js over a recording pixel layer: every sprite module answers a
 // tagged stand-in, and each draw of one is logged with its name, where it
@@ -45,10 +46,13 @@ function stage() {
   const tag = (name, { size = 0, oy = 0 } = {}) =>
     ({ name, ox: 0, oy, canvas: { width: size, height: size } });
   const gridTile = tag("grid");
+  const saved = [];
   const scene = {
     globalAlpha: FULL_ALPHA,
     imageSmoothingEnabled: true,
-    fillStyle: null,
+    fillStyle: NO_INK,
+    save() { saved.push(scene.fillStyle); },
+    restore() { scene.fillStyle = saved.pop(); },
     fillRect(x, y, w, h) {
       draws.push({ name: "rect", x, y, w, h, color: scene.fillStyle, alpha: scene.globalAlpha });
     },
@@ -114,6 +118,7 @@ function stage() {
     draws,
     fills,
     blits,
+    ink: () => scene.fillStyle,
     asked: (name) => calls.get(name) || [],
     add: (x, y, elev) => B.level.add(state.level, x, y, elev),
     draw: () => B.render.draw(canvas, state, SCALE),
@@ -563,6 +568,14 @@ describe("render: the box a sweep draws", () => {
     const inks = rectsOf(s).map((r) => r.color);
     assert.equal(inks[0], s.B.COLORS.select, "the first dash is the select colour");
     assert.deepEqual(new Set(inks), new Set([s.B.COLORS.select, s.B.COLORS.outline]));
+  });
+
+  it("leaves the scene's ink as it found it, so nothing later fills in the box's colour", () => {
+    const s = stage();
+    s.state.box = { ...BOX };
+    const before = s.ink();
+    s.draw();
+    assert.equal(s.ink(), before);
   });
 
   it("draws the box over the scene and under the compass and the badge", () => {

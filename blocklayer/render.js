@@ -130,7 +130,8 @@
   }
 
   // The rectangle a sweep is drawing, on whole pixels. Its corners come in
-  // either order, and lie around the frame's origin as a projection does.
+  // either order, and lie around the frame's origin as a projection does. The
+  // ink it fills with is its own, so the sides are drawn inside a save.
   function drawBox(ctx, frame, box) {
     var left = Math.round(frame.ox + Math.min(box.x0, box.x1));
     var right = Math.round(frame.ox + Math.max(box.x0, box.x1));
@@ -138,10 +139,12 @@
     var bottom = Math.round(frame.oy + Math.max(box.y0, box.y1));
     var w = right - left + BOX_LINE;
     var h = bottom - top + BOX_LINE;
+    ctx.save();
     drawSide(ctx, left, top, true, w);
     drawSide(ctx, left, bottom, true, w);
     drawSide(ctx, left, top, false, h);
     drawSide(ctx, right, top, false, h);
+    ctx.restore();
   }
 
   // The corner: the compass, and under it the height a new tile gets, which

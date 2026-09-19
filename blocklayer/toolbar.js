@@ -1,7 +1,8 @@
 /*
  * Blocklayer — the toolbar: a column of pixel-art buttons that pan, turn and
  * zoom the view, show or hide its layers, and edit the selected tile's shape,
- * facing, decor and marks, and save, open or clear the level. The direction
+ * facing, colour, decor and marks, and save, open or clear the level. The
+ * colour buttons pick the foreground when no tile is selected. The direction
  * buttons are a compass rose that does not turn with the view. The DOM is
  * built once; sync() sets every pressed and disabled state from the app's
  * state, and the two icons that follow it (solid, facing), leaving an icon
@@ -208,6 +209,23 @@
     return el;
   }
 
+  // The palette, in order. A colour button is never disabled: with no tile
+  // selected it picks the colour a new tile gets.
+  function colorGroup(refs, handlers) {
+    var el = group("color");
+    var keyFor = B.input.keyFor;
+    var stepKeys = keyFor("cycleColor", 1) + EITHER_KEY + keyFor("cycleColor", -1);
+    B.PALETTE.forEach(function (entry) {
+      var btn = toggle("color", entry.key, titled(entry.label, stepKeys), function () {
+        handlers.setColor(entry.key);
+      });
+      image(btn, B.tiles.swatch(entry.key));
+      refs.colors[entry.key] = btn;
+      el.appendChild(btn);
+    });
+    return el;
+  }
+
   function decorGroup(refs, handlers) {
     var el = group("decor");
     B.DECOR.forEach(function (d) {
@@ -310,11 +328,12 @@
     var el = element("div", "toolbar");
     el.style.setProperty(HOLD_VAR, B.HOLD_MS + "ms");
 
-    var refs = { layers: {}, shapes: {}, decor: {}, marks: {} };
+    var refs = { layers: {}, shapes: {}, colors: {}, decor: {}, marks: {} };
     el.appendChild(panGroup(handlers));
     el.appendChild(viewGroup(handlers));
     el.appendChild(layersGroup(refs, handlers));
     el.appendChild(shapeGroup(refs, handlers));
+    el.appendChild(colorGroup(refs, handlers));
     el.appendChild(decorGroup(refs, handlers));
     el.appendChild(marksGroup(refs, handlers));
     var picker = filePicker(function (file) { handlers.open(file); });
@@ -343,9 +362,18 @@
       });
     }
 
+    function syncColors(shown) {
+      B.PALETTE.forEach(function (entry) {
+        press(refs.colors[entry.key], entry.key === shown);
+      });
+    }
+
     function sync(state) {
+      var tile = selectedTile(state);
       syncLayers(state);
-      syncTile(selectedTile(state));
+      syncTile(tile);
+      // The selected tile's colour, or else the foreground.
+      syncColors((tile && tile.color) || state.color);
     }
 
     return { el: el, sync: sync };

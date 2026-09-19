@@ -195,7 +195,9 @@
       handlers.deselect();
     }
 
-    // The box the sweep covers so far, from the press to the pointer.
+    // The box the sweep covers so far, from the press to the pointer. Both
+    // box() and selectBox() take the two corners in client space, as the
+    // pointer gives them, and in that order.
     function trackSweep(e) {
       handlers.box(sweep.x, sweep.y, e.clientX, e.clientY);
     }

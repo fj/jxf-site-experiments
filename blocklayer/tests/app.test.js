@@ -11,6 +11,7 @@ const START = { w: 8, h: 8 };
 const MOUNT_TAG = "div";
 const CANVAS_W = 480;
 const CANVAS_H = 320;
+const DPR = 1;                     // the device pixel ratio the fake page reports
 const PRIMARY = 0;
 const ALT_DOWN = { key: "Alt", altKey: true };
 const ALT_UP = { key: "Alt", altKey: false };
@@ -29,9 +30,10 @@ const MODULES = [
 // storage holds is written before the app is booted on it.
 const FILE = load(["config.js", "level.js", "file.js"]);
 
-// app.js schedules its redraws on the bare global, and a frame that never
-// runs keeps the renderer out of a test of the wiring.
-globalThis.requestAnimationFrame = () => 1;
+// app.js schedules its redraws on the bare global, and a test runs them by
+// hand, so a frame happens only where the test says it does.
+let scheduled = [];
+globalThis.requestAnimationFrame = (fn) => scheduled.push(fn);
 globalThis.cancelAnimationFrame = () => {};
 
 // A storage that holds one string, as localStorage does.
@@ -92,7 +94,7 @@ function boot(tiles = [], storage = null) {
   const onPage = new Map();
   const window = {
     document,
-    devicePixelRatio: 1,
+    devicePixelRatio: DPR,
     addEventListener(type, fn) { onPage.set(type, (onPage.get(type) || []).concat(fn)); }
   };
   if (storage) window.localStorage = storage;
@@ -102,6 +104,12 @@ function boot(tiles = [], storage = null) {
   const B = load(MODULES, window);
   const calls = [];
   watchContract(B, calls);
+
+  // What the renderer was handed, frame by frame. What it makes of the state
+  // is render.js's own business; the wiring has only to reach it.
+  const drawn = [];
+  B.render.draw = (on, state, scale) => drawn.push({ canvas: on, state, scale });
+  scheduled = [];
 
   const level = B.level.create();
   level.size = { ...START };
@@ -124,6 +132,17 @@ function boot(tiles = [], storage = null) {
     level,
     calls,
     canvas,
+    drawn,
+    // Every frame the app has asked for runs, as the browser would run them,
+    // and the state the renderer was handed last comes back.
+    frame() {
+      const due = scheduled;
+      scheduled = [];
+      due.forEach((fn) => fn());
+      return drawn.length ? drawn[drawn.length - 1].state : null;
+    },
+    // How many frames the app is waiting on.
+    waiting() { return scheduled.length; },
     // Where on the page the top face of the tile at (x, y) is drawn, or the
     // floor of that cell while no tile stands there.
     over(x, y) {
@@ -133,6 +152,11 @@ function boot(tiles = [], storage = null) {
       return { clientX: (at.sx + origin.ox) * scale, clientY: (at.sy + origin.oy) * scale };
     },
     of(name) { return calls.filter((c) => c[0] === name).map((c) => c.slice(1)); },
+    // The reader presses on the cell at (x, y): a tile goes there, or the one
+    // already standing there is selected.
+    press(x, y, props = {}) {
+      canvas.fire("pointerdown", { ...this.over(x, y), button: PRIMARY, ...props });
+    },
     firePage(type, props = {}) {
       const e = { key: "", altKey: false, ...props };
       for (const fn of onPage.get(type) || []) fn(e);
@@ -186,6 +210,30 @@ describe("app: the level a visit starts on", () => {
     for (const [what, storage] of Object.entries(starts)) {
       assert.deepEqual(boot([], storage).shown(), [START.w, START.h], what);
     }
+  });
+});
+
+describe("app: the frames it draws on", () => {
+  it("draws on the frame the boot asks for, on the canvas the reader sees", () => {
+    const r = boot();
+    assert.equal(r.waiting(), 1, "the boot asks for a frame of its own");
+    r.frame();
+    assert.equal(r.drawn.length, 1);
+    assert.equal(r.drawn[0].canvas, r.canvas);
+    assert.equal(r.drawn[0].scale, r.B.ZOOM_DEFAULT * DPR, "at the view's own scale");
+  });
+
+  it("asks for a frame on an edit, and draws a burst of edits on the one", () => {
+    const r = boot([[0, 0]]);
+    r.press(0, 0);
+    r.frame();
+    assert.equal(r.waiting(), 0, "nothing waits once the frame has run");
+    r.find("shape", "ramp").fire("click");
+    assert.equal(r.waiting(), 1, "the edit asked for a frame");
+    r.find("color", "red").fire("click");
+    assert.equal(r.waiting(), 1, "and the next edit rides the frame already asked for");
+    assert.equal(r.frame().level, r.level, "the renderer reads the app's own level");
+    assert.equal(r.drawn.length, 2);
   });
 });
 

@@ -1,7 +1,8 @@
 /*
  * Blocklayer — the camera: where a world cell lands on the base canvas after
- * rotation and pan, the depth order tiles are drawn in, and the way back from
- * a pointer to the tile or the empty cell under it, or from a swept box to the
+ * rotation and pan, the depth order tiles are drawn in, where the board's
+ * edges lie and how far the pan may carry them, and the way back from a
+ * pointer to the tile or the empty cell under it, or from a swept box to the
  * tiles it holds. Pure arithmetic; all that is read from a canvas is its size
  * and where it sits on the page.
  */
@@ -153,6 +154,49 @@
     return view.pan;
   }
 
+  // The board's floor plane on screen: `poly`, its four corners in the order
+  // they ring it, which the renderer strokes and clips the grid with, and
+  // `box`, the rectangle that holds them, which bounds the pan. A cell's
+  // diamond reaches half a cell past its centre, so the corners are the outer
+  // corners of the corner cells.
+  function board(view, size) {
+    var x0 = -HALF;
+    var y0 = -HALF;
+    var x1 = size.w - HALF;
+    var y1 = size.h - HALF;
+    var poly = [
+      project(view, x0, y0, B.FLOOR),
+      project(view, x1, y0, B.FLOOR),
+      project(view, x1, y1, B.FLOOR),
+      project(view, x0, y1, B.FLOOR)
+    ];
+    var xs = poly.map(function (p) { return p.sx; });
+    var ys = poly.map(function (p) { return p.sy; });
+    return {
+      poly: poly,
+      box: {
+        left: Math.min.apply(null, xs),
+        top: Math.min.apply(null, ys),
+        right: Math.max.apply(null, xs),
+        bottom: Math.max.apply(null, ys)
+      }
+    };
+  }
+
+  // The pan, pulled back until the board is near enough to see: the middle of
+  // the view stays inside the board's box grown by half the frame each way.
+  // That middle is the origin of the space project answers in, so the clamp
+  // gives the nearest point of the grown box to it, and the pan moves the
+  // board by as much.
+  function clampPan(view, size, frame) {
+    var bounds = board(view, size).box;
+    var reachX = frame.w * HALF;      // half the frame: how far the board may hang off
+    var reachY = frame.h * HALF;
+    view.pan.x -= B.clamp(0, bounds.left - reachX, bounds.right + reachX);
+    view.pan.y -= B.clamp(0, bounds.top - reachY, bounds.bottom + reachY);
+    return view.pan;
+  }
+
   function viewFacing(rot, facing) {
     return B.VIEW_FACINGS[B.facingDir(rot, facing) / DIRS_PER_VIEW_FACING];
   }
@@ -187,6 +231,8 @@
     toView: toView,
     fromView: fromView,
     project: project,
+    board: board,
+    clampPan: clampPan,
     cellAt: cellAt,
     order: order,
     pick: pick,

@@ -107,6 +107,194 @@ describe("view: project", () => {
   });
 });
 
+describe("view: board", () => {
+  const SIZE = { w: 4, h: 3 };          // wider than it is deep, so a swap shows
+  const ONE = { w: 1, h: 1 };
+  const HALF_CELL = 0.5;                // how far a cell's diamond reaches past its centre
+  const PAN = { x: 9, y: -5 };
+
+  // The outer corners of the corner cells, in world coordinates, the way round
+  // they ring the board.
+  const cornersOf = (size) => [
+    [-HALF_CELL, -HALF_CELL],
+    [size.w - HALF_CELL, -HALF_CELL],
+    [size.w - HALF_CELL, size.h - HALF_CELL],
+    [-HALF_CELL, size.h - HALF_CELL]
+  ];
+
+  const projected = (view, size) =>
+    cornersOf(size).map(([x, y]) => V.project(view, x, y, B.FLOOR));
+
+  it("puts the four corners where project puts them, at every rotation and a pan", () => {
+    for (const rot of ROTS) {
+      for (const pan of [{ x: 0, y: 0 }, PAN]) {
+        const view = viewAt(rot, pan);
+        assert.deepEqual(V.board(view, SIZE).poly, projected(view, SIZE),
+          `rot ${rot} pan ${pan.x},${pan.y}`);
+      }
+    }
+  });
+
+  it("reaches half a cell past the corner cells, so a one-by-one board is one diamond", () => {
+    const view = viewAt(0, PAN);
+    const centre = V.project(view, 0, 0, B.FLOOR);
+    const diamond = [
+      { sx: centre.sx, sy: centre.sy - B.TILE_H / 2 },
+      { sx: centre.sx + B.TILE_W / 2, sy: centre.sy },
+      { sx: centre.sx, sy: centre.sy + B.TILE_H / 2 },
+      { sx: centre.sx - B.TILE_W / 2, sy: centre.sy }
+    ];
+    const byX = (a, b) => a.sx - b.sx || a.sy - b.sy;
+    assert.deepEqual(V.board(view, ONE).poly.slice().sort(byX), diamond.slice().sort(byX));
+  });
+
+  it("bounds the polygon it answers, at every rotation", () => {
+    for (const rot of ROTS) {
+      const { poly, box } = V.board(viewAt(rot, PAN), SIZE);
+      const xs = poly.map((p) => p.sx);
+      const ys = poly.map((p) => p.sy);
+      assert.deepEqual(box, {
+        left: Math.min(...xs), top: Math.min(...ys),
+        right: Math.max(...xs), bottom: Math.max(...ys)
+      }, `rot ${rot}`);
+    }
+  });
+
+  // Both diagonals of the board reach the bounding box, so it is as wide as
+  // the two sides together however the view is turned.
+  it("spans both sides of the board, whichever way the view is turned", () => {
+    const cells = SIZE.w + SIZE.h;
+    for (const rot of ROTS) {
+      const { box } = V.board(viewAt(rot, PAN), SIZE);
+      assert.equal(box.right - box.left, cells * B.TILE_W / 2, `rot ${rot} across`);
+      assert.equal(box.bottom - box.top, cells * B.TILE_H / 2, `rot ${rot} down`);
+    }
+  });
+
+  it("moves with the pan, and grows by a tile for each cell added", () => {
+    const at = (size, pan) => V.board(viewAt(0, pan), size).box;
+    const plain = at(SIZE, { x: 0, y: 0 });
+    const panned = at(SIZE, PAN);
+    assert.deepEqual([panned.left - plain.left, panned.top - plain.top], [PAN.x, PAN.y]);
+    const wider = at({ w: SIZE.w + 1, h: SIZE.h }, { x: 0, y: 0 });
+    assert.equal(wider.right - plain.right, B.TILE_W / 2);
+    assert.equal(wider.bottom - plain.bottom, B.TILE_H / 2);
+  });
+});
+
+describe("view: clampPan", () => {
+  const SIZE = { w: 5, h: 3 };
+  const CANVAS = { width: 1000, height: 600 };
+  const ZOOMS = [2, 4];                 // the scales the frame is read at
+  const FAR = 10000;                    // px of pan, far past any bound
+  const HALF_FRAME = 0.5;
+
+  const frames = () => ZOOMS.map((scale) => V.frame(CANVAS, scale));
+
+  // Where the middle of the view sits in the space project answers.
+  const middleOf = (view) => ({ x: -view.pan.x, y: -view.pan.y });
+
+  // The board's box with no pan: what the middle of the view is held inside,
+  // once it is grown by half the frame each way.
+  const grown = (rot, frame) => {
+    const box = V.board(viewAt(rot), SIZE).box;
+    const reachX = frame.w * HALF_FRAME;
+    const reachY = frame.h * HALF_FRAME;
+    return {
+      left: box.left - reachX, right: box.right + reachX,
+      top: box.top - reachY, bottom: box.bottom + reachY
+    };
+  };
+
+  const clamped = (rot, pan, frame) => {
+    const view = viewAt(rot, pan);
+    V.clampPan(view, SIZE, frame);
+    return view;
+  };
+
+  it("leaves a pan that keeps the board in view, at every rotation and zoom", () => {
+    for (const rot of ROTS) {
+      for (const frame of frames()) {
+        const bounds = grown(rot, frame);
+        const inside = [
+          { x: 0, y: 0 },
+          { x: -bounds.left - 1, y: -bounds.top - 1 },
+          { x: -bounds.right + 1, y: -bounds.bottom + 1 }
+        ];
+        for (const pan of inside) {
+          const name = `rot ${rot} frame ${frame.w} pan ${pan.x},${pan.y}`;
+          assert.deepEqual(clamped(rot, pan, frame).pan, pan, name);
+        }
+      }
+    }
+  });
+
+  it("pulls the pan back at each of the four edges, at every rotation and zoom", () => {
+    const pans = [{ x: FAR, y: 0 }, { x: -FAR, y: 0 }, { x: 0, y: FAR }, { x: 0, y: -FAR }];
+    for (const rot of ROTS) {
+      for (const frame of frames()) {
+        const bounds = grown(rot, frame);
+        for (const pan of pans) {
+          const name = `rot ${rot} frame ${frame.w} pan ${pan.x},${pan.y}`;
+          const middle = middleOf(clamped(rot, pan, frame));
+          assert.equal(middle.x, B.clamp(-pan.x, bounds.left, bounds.right), `${name} across`);
+          assert.equal(middle.y, B.clamp(-pan.y, bounds.top, bounds.bottom), `${name} down`);
+        }
+      }
+    }
+  });
+
+  it("holds the middle of the view in the grown box, wherever the pan came from", () => {
+    const REACH = 400;                  // px of pan each way, past the board at any turn
+    const STEP = 80;
+    for (const rot of ROTS) {
+      const frame = frames()[0];
+      const bounds = grown(rot, frame);
+      for (let x = -REACH; x <= REACH; x += STEP) {
+        for (let y = -REACH; y <= REACH; y += STEP) {
+          const middle = middleOf(clamped(rot, { x, y }, frame));
+          const name = `rot ${rot} pan ${x},${y}`;
+          assert.ok(middle.x >= bounds.left && middle.x <= bounds.right, `${name} across`);
+          assert.ok(middle.y >= bounds.top && middle.y <= bounds.bottom, `${name} down`);
+        }
+      }
+    }
+  });
+
+  // What the rule is for: whatever the pan, the board's box still meets the
+  // rectangle the frame shows around its middle. The box, not the polygon: at
+  // a corner of it the board itself can lie just off the frame.
+  it("keeps the board's box reaching into the frame at every rotation and zoom", () => {
+    for (const rot of ROTS) {
+      for (const frame of frames()) {
+        for (const pan of [{ x: FAR, y: FAR }, { x: -FAR, y: -FAR }, { x: FAR, y: -FAR }]) {
+          const view = clamped(rot, pan, frame);
+          const box = V.board(view, SIZE).box;
+          const name = `rot ${rot} frame ${frame.w} pan ${pan.x},${pan.y}`;
+          assert.ok(box.right >= -frame.w * HALF_FRAME, `${name}: reaches the left edge`);
+          assert.ok(box.left <= frame.w * HALF_FRAME, `${name}: reaches the right edge`);
+          assert.ok(box.bottom >= -frame.h * HALF_FRAME, `${name}: reaches the top edge`);
+          assert.ok(box.top <= frame.h * HALF_FRAME, `${name}: reaches the bottom edge`);
+        }
+      }
+    }
+  });
+
+  it("moves only the axis that ran out, and answers the view's own pan", () => {
+    const frame = frames()[0];
+    const view = viewAt(0, { x: FAR, y: 0 });
+    const got = V.clampPan(view, SIZE, frame);
+    assert.equal(got, view.pan, "the view's own pan");
+    assert.notEqual(view.pan.x, FAR, "across, which ran out");
+    assert.equal(view.pan.y, 0, "down, which did not");
+  });
+
+  it("lets a wider frame carry the board further off the edge", () => {
+    const [wide, narrow] = frames().map((frame) => clamped(0, { x: FAR, y: 0 }, frame).pan.x);
+    assert.ok(wide > narrow, `${wide} px of pan at the wide frame, ${narrow} at the narrow one`);
+  });
+});
+
 describe("view: cellAt", () => {
   it("finds the cell under a projected centre for many cells, rotations and heights", () => {
     for (const rot of ROTS) {

@@ -20,7 +20,7 @@
     opaque: true,
     newElev: B.NEW_TILE_ELEV,
     color: B.DEFAULT_COLOR,
-    selected: null,
+    selection: [],
     hover: null,
     hold: null
   };
@@ -98,7 +98,7 @@
       return;
     }
     state.level = level;
-    state.selected = null;
+    setSelection([]);
     state.hover = null;
     edited();
   }
@@ -188,10 +188,30 @@
   }
 
   // ---- Mutations -----------------------------------------------------------
-  // A mutation that answers false changed nothing, so there is nothing to save.
-  function editSelected(mutate) {
-    if (!state.selected) return;
-    if (mutate(state.selected.x, state.selected.y) !== false) edited();
+  // Every selected tile takes the mutation, and the lot is saved once. A
+  // mutation that answers false left its tile alone.
+  function editSelection(mutate) {
+    var any = false;
+    state.selection.forEach(function (cell) {
+      if (mutate(cell.x, cell.y) !== false) any = true;
+    });
+    if (any) edited();
+  }
+
+  function without(cells, x, y) {
+    return cells.filter(function (cell) { return !B.sameCell(cell, x, y); });
+  }
+
+  // The one writer of the selection. It is replaced, never changed in place,
+  // so a list handed out stays whole while the level is edited under it.
+  function setSelection(cells) {
+    state.selection = cells;
+  }
+
+  // ...and the toolbar and the canvas follow it at once.
+  function selectCells(cells) {
+    setSelection(cells);
+    changed();
   }
 
   // The height the next tile gets, which the elevation keys move when there is
@@ -205,13 +225,13 @@
 
   function remove(x, y) {
     if (!B.level.remove(state.level, x, y)) return;
-    if (B.sameCell(state.selected, x, y)) state.selected = null;
+    setSelection(without(state.selection, x, y));
     edited();
   }
 
   function clear() {
     B.level.clear(state.level);
-    state.selected = null;
+    setSelection([]);
     edited();
   }
 
@@ -230,32 +250,32 @@
       changed();
     },
     setShape: function (shape) {
-      editSelected(function (x, y) { B.level.setShape(state.level, x, y, shape); });
+      editSelection(function (x, y) { B.level.setShape(state.level, x, y, shape); });
     },
     cycleFacing: function (step) {
-      editSelected(function (x, y) {
+      editSelection(function (x, y) {
         if (!B.level.sloped(B.level.get(state.level, x, y))) return false;
         B.level.cycleFacing(state.level, x, y, step);
       });
     },
     setDecor: function (key) {
-      editSelected(function (x, y) { B.level.setDecor(state.level, x, y, key); });
+      editSelection(function (x, y) { B.level.setDecor(state.level, x, y, key); });
     },
-    // The foreground colour: what a new tile gets, and what the selected tile
-    // is painted. Like the zoom it is view state, so only the tiles save it.
+    // The foreground colour: what a new tile gets, and what the selection is
+    // painted. Like the zoom it is view state, so only the tiles save it.
     setColor: function (key) {
       state.color = key;
-      if (!state.selected) {
+      if (!state.selection.length) {
         changed();
         return;
       }
-      editSelected(function (x, y) { B.level.setColor(state.level, x, y, key); });
+      editSelection(function (x, y) { B.level.setColor(state.level, x, y, key); });
     },
     toggleMark: function (key) {
-      editSelected(function (x, y) { B.level.toggleMark(state.level, x, y, key); });
+      editSelection(function (x, y) { B.level.toggleMark(state.level, x, y, key); });
     },
     pick: pick,
-    selected: function () { return state.selected; },
+    selection: function () { return state.selection; },
     color: function () { return state.color; },
     hover: function (hit) {
       if (B.view.sameHit(hit, state.hover)) return;
@@ -267,23 +287,24 @@
       edited();
     },
     select: function (x, y) {
-      state.selected = { x: x, y: y };
-      changed();
+      selectCells([{ x: x, y: y }]);
+    },
+    // The cell joins the selection as the newest of it, or leaves it.
+    toggleSelect: function (x, y) {
+      if (B.inCells(state.selection, x, y)) selectCells(without(state.selection, x, y));
+      else selectCells(state.selection.concat([{ x: x, y: y }]));
     },
     deselect: function () {
-      state.selected = null;
-      changed();
+      selectCells([]);
     },
+    // The selection moves as one, so it keeps its shape: one tile with no room
+    // holds the rest back.
     raise: function (delta) {
-      if (!state.selected) {
+      if (!state.selection.length) {
         setNewElev(delta);
         return;
       }
-      editSelected(function (x, y) {
-        var tile = B.level.get(state.level, x, y);
-        var before = tile ? tile.elev : null;
-        return B.level.raise(state.level, x, y, delta) !== before;
-      });
+      if (B.level.raiseCells(state.level, state.selection, delta)) edited();
     },
     raiseAll: function (delta) {
       if (B.level.raiseAll(state.level, delta)) edited();

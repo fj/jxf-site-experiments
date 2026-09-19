@@ -4,6 +4,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
 const { canvasDocument } = require("./sprite");
+const palette = require("./palette");
 
 const PRIMARY_BUTTON = 0;
 const SECONDARY_BUTTON = 2;
@@ -25,6 +26,8 @@ const ELEV = 3;
 const CELL = { x: 1, y: 2 };
 const BARE_CELL = { x: 9, y: 9 };            // a cell with no tile on it
 const FILE = { name: "level.blocklayer.json" };
+const FOREGROUND = "violet";                 // a foreground the default is not
+const TILE_COLOR = "red";                    // ...and a tile's colour that is neither
 
 // An element with what the toolbar touches and no more: attributes, classes,
 // style properties, children and listeners. fire() delivers an event to them.
@@ -82,6 +85,9 @@ const B = load([
   "input.js", "toolbar.js"
 ], { document: fakeDocument() });
 
+// The tile colours the toolbar picks, until the change that brings them lands.
+palette.swatches(palette.tileColors(palette.colors(B)));
+
 const HOLD_VAR = "--" + B.PREFIX + "hold";
 const HALF_HOLD_MS = B.HOLD_MS / 2;
 
@@ -109,7 +115,7 @@ const FILE_BUTTONS = [
   ["clear", "Clear", "clear", null]
 ];
 const LAYER_NAMES = LAYER_BUTTONS.map(([name]) => name);
-const GROUPS = ["pan", "view", "layers", "shape", "decor", "marks", "file"];
+const GROUPS = ["pan", "view", "layers", "shape", "color", "decor", "marks", "file"];
 const PAN_GRID = ["", "N", "", "W", "", "E", "", "S", ""];
 const ARROW_GRID = [
   "arrow-nw", "arrow-n", "arrow-ne",
@@ -146,6 +152,10 @@ const BUTTONS = [
     act: "facing", arg: "", label: "Facing", shows: masked(B.icons.arrow(B.FACINGS[0])),
     fires: ["cycleFacing"], calls: [["cycleFacing", -1], ["cycleFacing", 1]]
   }),
+  ...B.PALETTE.map((entry) => of({
+    act: "color", arg: entry.key, label: entry.label,
+    shows: pictured(B.tiles.swatch(entry.key)), fires: ["setColor", entry.key]
+  })),
   ...B.DECOR.map((d) => of({
     act: "decor", arg: d.key, label: d.label,
     shows: pictured(B.decor.icon(d.key)), fires: ["setDecor", d.key]
@@ -162,7 +172,7 @@ const BUTTONS = [
 
 const HANDLERS = [
   "pan", "rotate", "zoom", "toggleLayer", "toggleOpaque",
-  "setShape", "cycleFacing", "setDecor", "toggleMark",
+  "setShape", "cycleFacing", "setColor", "setDecor", "toggleMark",
   "save", "open", "clear"
 ];
 
@@ -219,6 +229,7 @@ function state(over = {}) {
     level: B.level.create(),
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
+    color: B.DEFAULT_COLOR,
     selected: null,
     ...over
   };
@@ -232,6 +243,7 @@ function selecting(edit) {
     edit({
       shape: (s) => B.level.setShape(level, CELL.x, CELL.y, s),
       facing: (f) => B.level.setFacing(level, CELL.x, CELL.y, f),
+      color: (c) => B.level.setColor(level, CELL.x, CELL.y, c),
       decor: (d) => B.level.setDecor(level, CELL.x, CELL.y, d),
       mark: (m) => B.level.toggleMark(level, CELL.x, CELL.y, m)
     });
@@ -270,6 +282,10 @@ describe("toolbar: the buttons", () => {
     assert.deepEqual(marks.slice(0, GRID * GRID), ARROW_GRID);
     assert.deepEqual(marks.slice(GRID * GRID), B.MARKS.filter((m) => !m.dir).map((m) => m.key));
     for (const btn of buttons(bar.el)) assert.equal(btn.className, `${B.PREFIX}btn`);
+  });
+
+  it("offers one colour button per palette entry, in palette order", () => {
+    assert.deepEqual(slotsOf(rig().bar.el, "color"), B.PALETTE.map((entry) => entry.key));
   });
 
   it("calls the handler a button stands for when it is clicked", () => {
@@ -342,6 +358,32 @@ describe("toolbar: sync", () => {
       assert.equal(btn.disabled, false, `${spec.act} ${spec.arg}`);
       assert.equal(pressedOf(btn), on ? PRESSED : RELEASED, `${spec.act} ${spec.arg}`);
     }
+  });
+
+  it("presses the selected tile's colour, and the foreground while none is selected", () => {
+    const r = rig();
+    const pressedColors = () => B.PALETTE
+      .filter((entry) => pressedOf(r.find("color", entry.key)) === PRESSED)
+      .map((entry) => entry.key);
+
+    r.bar.sync(state());
+    assert.deepEqual(pressedColors(), [B.DEFAULT_COLOR], "the foreground it starts at");
+    r.bar.sync(state({ color: FOREGROUND }));
+    assert.deepEqual(pressedColors(), [FOREGROUND]);
+    r.bar.sync(state({ color: FOREGROUND, selected: BARE_CELL }));
+    assert.deepEqual(pressedColors(), [FOREGROUND], "a cell with no tile on it is no tile");
+
+    const painted = selecting((tile) => tile.color(TILE_COLOR));
+    r.bar.sync({ ...painted, color: FOREGROUND });
+    assert.deepEqual(pressedColors(), [TILE_COLOR], "the tile's colour, not the foreground");
+    for (const entry of B.PALETTE) {
+      assert.equal(r.find("color", entry.key).disabled, false, entry.key);
+    }
+
+    const unpainted = selecting();
+    delete B.level.get(unpainted.level, CELL.x, CELL.y).color;
+    r.bar.sync({ ...unpainted, color: FOREGROUND });
+    assert.deepEqual(pressedColors(), [FOREGROUND], "a tile from before the colours");
   });
 
   it("enables the facing button only on a slope, and shows the tile's facing on it", () => {

@@ -214,7 +214,8 @@
   function colorGroup(refs, handlers) {
     var el = group("color");
     var keyFor = B.input.keyFor;
-    var stepKeys = keyFor("cycleColor", 1) + EITHER_KEY + keyFor("cycleColor", -1);
+    var step = B.input.CYCLE_COLOR;
+    var stepKeys = keyFor(step, 1) + EITHER_KEY + keyFor(step, -1);
     B.PALETTE.forEach(function (entry) {
       var btn = toggle("color", entry.key, titled(entry.label, stepKeys), function () {
         handlers.setColor(entry.key);

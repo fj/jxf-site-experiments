@@ -685,8 +685,9 @@ describe("input: keyFor", () => {
   });
 
   it("names the colour step on and the colour step back", () => {
-    assert.equal(keyFor("cycleColor", 1), "C");
-    assert.equal(keyFor("cycleColor", -1), "Shift+C");
+    const step = rig().B.input.CYCLE_COLOR;
+    assert.equal(keyFor(step, 1), "C");
+    assert.equal(keyFor(step, -1), "Shift+C");
   });
 
   it("names a key for every mark, the eight arrows as a rose around the jump", () => {

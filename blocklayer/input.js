@@ -293,5 +293,5 @@
     canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
 
-  B.input = { attach: attach, keyFor: keyFor };
+  B.input = { attach: attach, keyFor: keyFor, CYCLE_COLOR: CYCLE_COLOR };
 })();

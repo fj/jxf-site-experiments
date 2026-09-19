@@ -97,6 +97,8 @@ function rig() {
     add: (x, y) => { record("add")(x, y); added.add(key(x, y)); },
     select: record("select"),
     toggleSelect: record("toggleSelect"),
+    box: record("box"),
+    selectBox: record("selectBox"),
     raise: record("raise"),
     raiseAll: record("raiseAll"),
     hold: record("hold"),
@@ -301,6 +303,84 @@ describe("input: Ctrl or Cmd to toggle a tile in the selection", () => {
       r.fire("pointermove", c);
       assert.deepEqual(r.of("add"), []);
     }
+  });
+});
+
+const OFF_CANVAS = { clientX: WIDTH + 5, clientY: 10 };
+
+describe("input: Shift to sweep a box of tiles into the selection", () => {
+  it("reports the box from the press to the pointer, then selects it at the release", () => {
+    const r = rig();
+    r.select({ x: 9, y: 9 });
+    const from = r.at(10, 10, cell(0, 0));
+    const over = r.at(40, 30, cell(1, 0));
+    const to = r.at(70, 50, cell(2, 0));
+    r.fire("pointerdown", { ...from, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", over);
+    r.fire("pointermove", to);
+    assert.deepEqual(r.of("box"), [[10, 10, 40, 30], [10, 10, 70, 50]]);
+    // The button may outlast the key that started the sweep.
+    r.fire("pointerup", { ...to, button: PRIMARY });
+    assert.deepEqual(r.of("box").pop(), [null]);
+    assert.deepEqual(r.of("selectBox"), [[10, 10, 70, 50]]);
+    assert.deepEqual(r.of("select"), []);
+    assert.deepEqual(r.of("deselect"), []);
+  });
+
+  it("a shift click that never moves sweeps a box of no size and reports none", () => {
+    const r = rig();
+    const a = r.at(20, 20, tile(1, 1));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointerup", { ...a, button: PRIMARY });
+    assert.deepEqual(r.of("selectBox"), [[20, 20, 20, 20]]);
+    assert.deepEqual(r.of("box"), [[null]]);
+    assert.deepEqual(r.of("select"), []);
+    assert.deepEqual(r.of("add"), []);
+  });
+
+  it("adds no tiles, even when the sweep crosses empty cells", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const b = r.at(40, 10, cell(1, 0));
+    const c = r.at(70, 10, cell(2, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", b);
+    r.fire("pointermove", c);
+    r.fire("pointerup", { ...c, button: PRIMARY });
+    assert.deepEqual(r.of("add"), []);
+    assert.deepEqual(r.of("selectBox"), [[10, 10, 70, 10]]);
+  });
+
+  it("a cancelled sweep clears the box and selects nothing, then or on the release", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const b = r.at(40, 30, cell(1, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", b);
+    r.fire("pointercancel", b);
+    assert.deepEqual(r.of("box").pop(), [null]);
+    r.fire("pointerup", { ...b, button: PRIMARY });
+    assert.deepEqual(r.of("selectBox"), []);
+  });
+
+  it("a sweep that ends off the canvas clears the box and selects nothing", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", OFF_CANVAS);
+    r.fire("pointerup", { ...OFF_CANVAS, button: PRIMARY });
+    assert.deepEqual(r.of("box"), [[10, 10, OFF_CANVAS.clientX, OFF_CANVAS.clientY], [null]]);
+    assert.deepEqual(r.of("selectBox"), []);
+  });
+
+  it("the pointer moving with no sweep under way reports no box", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY });
+    r.fire("pointermove", r.at(40, 10, cell(1, 0)));
+    r.fire("pointerup", { ...a, button: PRIMARY });
+    assert.deepEqual(r.of("box"), []);
+    assert.deepEqual(r.of("selectBox"), []);
   });
 });
 

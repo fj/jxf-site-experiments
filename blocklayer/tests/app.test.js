@@ -103,11 +103,11 @@ function watchContract(B, calls) {
 
 // The app booted into a mount of its own, on the storage the test hands it —
 // none at all by default — and, with no level there, on a demo of `tiles` at
-// the starting size.
-function boot(tiles = [], storage = null) {
+// the starting size. `dpr` is the pixel ratio the page reports.
+function boot(tiles = [], storage = null, dpr = DPR) {
   const document = fakeDocument();
   const mount = document.createElement(MOUNT_TAG);
-  const window = { document, devicePixelRatio: DPR };
+  const window = { document, devicePixelRatio: dpr };
   if (storage) window.localStorage = storage;
   // The page's own listeners: input.js watches Alt on the window, so the
   // canvas need never hold focus for the tip to come and go, and app.js
@@ -140,7 +140,7 @@ function boot(tiles = [], storage = null) {
     clientWidth: CANVAS_W, clientHeight: CANVAS_H, width: CANVAS_W, height: CANVAS_H
   });
   const view = B.view.create();
-  const scale = view.zoom;
+  const scale = view.zoom * dpr;
 
   return {
     B,
@@ -337,6 +337,24 @@ describe("app: the frames it draws on", () => {
     assert.equal(r.waiting(), 1, "and the next edit rides the frame already asked for");
     assert.equal(r.frame().level, r.level, "the renderer reads the app's own level");
     assert.equal(r.drawn.length, 2);
+  });
+});
+
+describe("app: the canvas the board is drawn on", () => {
+  const DENSE = 2;                 // device pixels per CSS pixel on a sharp screen
+
+  it("draws at the page's own pixel ratio, so the picture stays sharp", () => {
+    const r = boot([], null, DENSE);
+    r.frame();
+    assert.equal(r.drawn[0].scale, r.B.ZOOM_DEFAULT * DENSE);
+  });
+
+  it("fits the canvas bitmap to its box, in the page's own pixels", () => {
+    const r = boot([], null, DENSE);
+    r.frame();
+    r.firePage("resize");
+    assert.deepEqual([r.canvas.width, r.canvas.height], [CANVAS_W * DENSE, CANVAS_H * DENSE]);
+    assert.equal(r.waiting(), 1, "and asks for the frame that fills it");
   });
 });
 

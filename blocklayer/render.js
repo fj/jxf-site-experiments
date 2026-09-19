@@ -1,11 +1,12 @@
 /*
  * Blocklayer — drawing the scene. Everything is drawn once, at base scale, on
- * an offscreen canvas: the floor grid, then the columns back to front with
- * what stands on them and the ghost among them at its depth, then the labels,
- * the box a sweep is drawing, the compass and the badge that names the height
- * a new tile gets. That bitmap is blitted to the visible canvas at `scale`
- * (the view's zoom times the device pixel ratio) with smoothing off, so every
- * pixel stays a crisp square.
+ * an offscreen canvas: the floor grid, cut to the board, and the board's
+ * outline, then the columns back to front with what stands on them and the
+ * ghost among them at its depth, then the labels, the box a sweep is drawing,
+ * the compass and the badge that names the height a new tile gets. That
+ * bitmap is blitted to the visible canvas at `scale` (the view's zoom times
+ * the device pixel ratio) with smoothing off, so every pixel stays a crisp
+ * square.
  */
 (function () {
   "use strict";
@@ -21,11 +22,15 @@
   var BADGE_MARGIN = 4;         // base px between the compass and the badge under it
   var BADGE_SIGN = "+";         // so the badge reads as a height, not as a count
   var TRANSPARENT_ALPHA = 0.45; // how solid a see-through tile is drawn
-  var BOX_LINE = 1;             // base px the sweep box's line is wide
-  var BOX_DASH = 3;             // base px of each dash along it
-  // The dashes take these in turn, so the box reads on a light canvas and on a
-  // dark one.
-  var BOX_INKS = [B.COLORS.select, B.COLORS.outline];
+  var LINE_PX = 1;              // base px a dashed line is wide
+  var DASH_PX = 3;              // base px of each dash along it
+  var DASH_INKS = [B.COLORS.select, B.COLORS.outline];
+
+  // Dash i of any dashed line takes the next ink, so the line reads on a light
+  // canvas and on a dark one. The sweep box and the board's outline share it.
+  function inkDash(ctx, i) {
+    ctx.fillStyle = DASH_INKS[i % DASH_INKS.length];
+  }
 
   var base = null;
 
@@ -36,12 +41,56 @@
     return base;
   }
 
-  // The floor lattice under the whole canvas, with a lattice point where cell
-  // (0, 0) stands on the floor, so the grid moves with the level.
-  function drawGrid(ctx, state, frame) {
+  // Where the board's corners land on the base canvas, on whole pixels, in
+  // the order they ring it.
+  function boardCorners(state, frame) {
+    return B.view.board(state.view, state.level.size).poly.map(function (p) {
+      return { x: Math.round(frame.ox + p.sx), y: Math.round(frame.oy + p.sy) };
+    });
+  }
+
+  function clipTo(ctx, corners) {
+    ctx.beginPath();
+    corners.forEach(function (p, i) {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.clip();
+  }
+
+  // The floor lattice, with a lattice point where cell (0, 0) stands on the
+  // floor, so the grid moves with the level, and cut to the board, so the grid
+  // ends where the level does.
+  function drawGrid(ctx, state, frame, corners) {
     var floor = B.view.project(state.view, 0, 0, B.FLOOR);
+    ctx.save();
+    clipTo(ctx, corners);
     B.pixel.drawTiled(ctx, B.tiles.grid(),
       frame.ox + floor.sx, frame.oy + floor.sy, frame.w, frame.h);
+    ctx.restore();
+  }
+
+  // One edge of the board, pixel by pixel, the ink changing every dash. The
+  // steps follow the longer side, so the edge stairs evenly down the diagonal.
+  function drawEdge(ctx, from, to) {
+    var dx = to.x - from.x;
+    var dy = to.y - from.y;
+    var steps = Math.max(Math.abs(dx), Math.abs(dy));
+    for (var i = 0; i <= steps; i++) {
+      inkDash(ctx, Math.floor(i / DASH_PX));
+      ctx.fillRect(Math.round(from.x + dx * i / steps),
+        Math.round(from.y + dy * i / steps), LINE_PX, LINE_PX);
+    }
+  }
+
+  // The board's outline, so the reader sees where the level ends. The ink it
+  // fills with is its own, so the edges are drawn inside a save.
+  function drawEdges(ctx, corners) {
+    ctx.save();
+    corners.forEach(function (from, i) {
+      drawEdge(ctx, from, corners[(i + 1) % corners.length]);
+    });
+    ctx.restore();
   }
 
   function hoveredTile(state) {
@@ -112,20 +161,22 @@
   }
 
   // The column a click would add, placed like the tile it would become so it
-  // takes its turn in depth order and a column in front of it covers it.
+  // takes its turn in depth order and a column in front of it covers it. A
+  // cell off the board takes no tile, so it shows no ghost.
   function ghostEntry(state) {
     var cell = state.hover && state.hover.cell;
-    return cell ? { x: cell.x, y: cell.y, elev: state.newElev } : null;
+    if (!cell || !B.level.inside(state.level, cell.x, cell.y)) return null;
+    return { x: cell.x, y: cell.y, elev: state.newElev };
   }
 
   // One side of the sweep box: dashes from (x, y), across or down, each in the
   // next ink.
   function drawSide(ctx, x, y, across, length) {
-    for (var at = 0, i = 0; at < length; at += BOX_DASH, i++) {
-      var dash = Math.min(BOX_DASH, length - at);
-      ctx.fillStyle = BOX_INKS[i % BOX_INKS.length];
-      if (across) ctx.fillRect(x + at, y, dash, BOX_LINE);
-      else ctx.fillRect(x, y + at, BOX_LINE, dash);
+    for (var at = 0, i = 0; at < length; at += DASH_PX, i++) {
+      var dash = Math.min(DASH_PX, length - at);
+      inkDash(ctx, i);
+      if (across) ctx.fillRect(x + at, y, dash, LINE_PX);
+      else ctx.fillRect(x, y + at, LINE_PX, dash);
     }
   }
 
@@ -137,8 +188,8 @@
     var right = Math.round(frame.ox + Math.max(box.x0, box.x1));
     var top = Math.round(frame.oy + Math.min(box.y0, box.y1));
     var bottom = Math.round(frame.oy + Math.max(box.y0, box.y1));
-    var w = right - left + BOX_LINE;
-    var h = bottom - top + BOX_LINE;
+    var w = right - left + LINE_PX;
+    var h = bottom - top + LINE_PX;
     ctx.save();
     drawSide(ctx, left, top, true, w);
     drawSide(ctx, left, bottom, true, w);
@@ -163,7 +214,9 @@
     var scene = baseCanvas(frame);
     var ctx = B.pixel.context(scene);
     ctx.clearRect(0, 0, frame.w, frame.h);
-    drawGrid(ctx, state, frame);
+    var corners = boardCorners(state, frame);
+    drawGrid(ctx, state, frame, corners);
+    drawEdges(ctx, corners);
 
     var ghost = ghostEntry(state);
     var columns = B.level.all(state.level).concat(ghost ? [ghost] : []);

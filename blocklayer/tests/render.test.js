@@ -24,18 +24,24 @@ const UNSELECTED = [3, 3];                   // ...and one it left out
 const BOX = { x0: -30, y0: -11, x1: 41, y1: 26 };
 const SUB_PIXEL = 0.4;                       // a sweep corner between two pixels
 const NO_INK = "none";                       // the fill colour the scene starts at
-const BOX_LINE_PX = 1;                       // how wide render.js draws the box's line
-const BOX_DASH_PX = 3;                       // ...and how long each dash along it is
+const LINE_PX = 1;                           // how wide render.js draws a dashed line
+const DASH_PX = 3;                           // ...and how long each dash along it is
+// The board every stage is laid over: deeper than it is wide, so a size read
+// the wrong way round shows.
+const BOARD = { w: 3, h: 5 };
 
 // render.js over a recording pixel layer: every sprite module answers a
 // tagged stand-in, and each draw of one is logged with its name, where it
 // lands and how solid the scene was drawing at. What each sprite was asked for
 // is logged under the same name. A tiled fill is logged like a draw, with the
-// rect it covers, a plain fill on the scene is logged as a "rect" with its
-// colour, and clearing the scene empties both logs, as clearing a canvas
-// empties it.
+// rect it covers and the path clipping it, a plain fill on the scene is logged
+// as a "rect" with its colour, and clearing the scene empties both logs, as
+// clearing a canvas empties it.
 function stage() {
   const B = load(["config.js", "level.js", "view.js", "selection.js", "render.js"]);
+  // The board lands in level.js with its own `inside`; until then, this one.
+  B.level.inside = (level, x, y) =>
+    x >= 0 && y >= 0 && x < level.size.w && y < level.size.h;
   const draws = [];
   const fills = [];
   const calls = new Map();
@@ -47,14 +53,30 @@ function stage() {
     ({ name, ox: 0, oy, canvas: { width: size, height: size } });
   const gridTile = tag("grid");
   const saved = [];
+  let clip = null;          // the path the scene is drawing inside, if any
+  let path = [];
+  let run = 0;              // every save starts one: the fills of a single line
   const scene = {
     globalAlpha: FULL_ALPHA,
     imageSmoothingEnabled: true,
     fillStyle: NO_INK,
-    save() { saved.push(scene.fillStyle); },
-    restore() { scene.fillStyle = saved.pop(); },
+    save() {
+      saved.push({ ink: scene.fillStyle, clip });
+      run++;
+    },
+    restore() {
+      const was = saved.pop();
+      scene.fillStyle = was.ink;
+      clip = was.clip;
+    },
+    beginPath() { path = []; },
+    moveTo(x, y) { path.push({ x, y }); },
+    lineTo(x, y) { path.push({ x, y }); },
+    clip() { clip = path; },
     fillRect(x, y, w, h) {
-      draws.push({ name: "rect", x, y, w, h, color: scene.fillStyle, alpha: scene.globalAlpha });
+      draws.push({
+        name: "rect", x, y, w, h, run, clip, color: scene.fillStyle, alpha: scene.globalAlpha
+      });
     },
     clearRect() { draws.length = 0; fills.length = 0; calls.clear(); }
   };
@@ -75,7 +97,7 @@ function stage() {
     draw: (c, sprite, x, y) => { logDraw(sprite, x, y); },
     drawTiled: (c, sprite, x, y, w, h) => {
       logDraw(sprite, x, y);
-      fills.push({ sprite, x, y, w, h });
+      fills.push({ sprite, x, y, w, h, clip });
     }
   };
   B.tiles = {
@@ -101,8 +123,10 @@ function stage() {
   B.decor = { sprite: (key) => { record("decor", key); return tag("decor", { oy: DECOR_OY }); } };
   B.marks = { sprite: (key, rot) => { record("mark", key, rot); return tag("mark"); } };
   const canvas = { width: WIDTH, height: HEIGHT, getContext: () => out };
+  const level = B.level.create();
+  level.size = { ...BOARD };
   const state = {
-    level: B.level.create(),
+    level,
     view: B.view.create(),
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
@@ -119,6 +143,7 @@ function stage() {
     fills,
     blits,
     ink: () => scene.fillStyle,
+    clipped: () => clip,
     asked: (name) => calls.get(name) || [],
     add: (x, y, elev) => B.level.add(state.level, x, y, elev),
     draw: () => B.render.draw(canvas, state, SCALE),
@@ -140,6 +165,35 @@ const drawNamed = (s, name) => {
   assert.equal(found.length, 1, `${found.length} ${name} draws`);
   return found[0];
 };
+
+// Where the board's corners land on the base canvas, in the order they ring
+// it, as render.js places them.
+const boardAt = (s) => {
+  const frame = s.frame();
+  return s.B.view.board(s.state.view, s.state.level.size).poly
+    .map((p) => ({ x: Math.round(frame.ox + p.sx), y: Math.round(frame.oy + p.sy) }));
+};
+
+// Each dashed line fills inside a save of its own, so its rects share a run:
+// the board's outline goes down first, a sweep's box later. A third run would
+// leave the two of them nameless, so it fails here rather than quietly.
+const rectRuns = (s) => {
+  const runs = new Map();
+  drawsNamed(s, "rect").forEach((rect) => {
+    if (!runs.has(rect.run)) runs.set(rect.run, []);
+    runs.get(rect.run).push(rect);
+  });
+  const found = [...runs.values()];
+  assert.ok(found.length <= 2, `${found.length} runs of fills: which is the board's?`);
+  return found;
+};
+
+const edgeRects = (s) => rectRuns(s)[0] || [];
+const boxRects = (s) => rectRuns(s)[1] || [];
+
+// The sprites drawn, in order. The outline and the box fill rects of their
+// own rather than draw a sprite.
+const spritesOf = (s) => s.names().filter((name) => name !== "rect");
 
 // Where a tile's anchor, the centre of its top diamond, lands on the base
 // canvas.
@@ -214,7 +268,7 @@ describe("render: the ghost", () => {
     s.add(2, 2);
     s.state.hover = { cell: { x: 1, y: 1 } };
     s.draw();
-    assert.deepEqual(s.names(), [
+    assert.deepEqual(spritesOf(s), [
       "grid", "column", "ghost", "column", "label", "label", "compass", "label"
     ]);
   });
@@ -242,6 +296,34 @@ describe("render: the ghost", () => {
     }
   });
 
+  it("is not drawn over a cell off the board, past any edge of it", () => {
+    const off = [
+      { x: -1, y: 0 }, { x: 0, y: -1 },
+      { x: BOARD.w, y: 0 }, { x: 0, y: BOARD.h },
+      { x: BOARD.w, y: BOARD.h }
+    ];
+    for (const cell of off) {
+      const s = stage();
+      s.state.hover = { cell };
+      s.draw();
+      assert.ok(!s.names().includes("ghost"), JSON.stringify(cell));
+      assert.deepEqual(s.asked("ghost"), [], JSON.stringify(cell));
+    }
+  });
+
+  it("is drawn over every cell of the board, corner cells and all", () => {
+    const on = [
+      { x: 0, y: 0 }, { x: BOARD.w - 1, y: 0 },
+      { x: 0, y: BOARD.h - 1 }, { x: BOARD.w - 1, y: BOARD.h - 1 }
+    ];
+    for (const cell of on) {
+      const s = stage();
+      s.state.hover = { cell };
+      s.draw();
+      assert.equal(drawsNamed(s, "ghost").length, 1, JSON.stringify(cell));
+    }
+  });
+
   it("leaves the level as it was", () => {
     const s = stage();
     s.add(0, 0);
@@ -257,17 +339,46 @@ describe("render: the floor grid", () => {
     s.add(0, 0);
     s.state.hover = { cell: { x: 1, y: 1 } };
     s.draw();
-    assert.deepEqual(s.names(),
+    assert.deepEqual(spritesOf(s),
       ["grid", "column", "ghost", "label", "compass", "label"]);
     assert.equal(s.fills.length, 1);
     assert.equal(s.fills[0].sprite, s.B.tiles.grid());
   });
 
-  it("covers the whole base canvas", () => {
+  it("reaches every corner of the base canvas, so the clip alone bounds it", () => {
     const s = stage();
     s.draw();
     const frame = s.frame();
     assert.deepEqual([s.fills[0].w, s.fills[0].h], [frame.w, frame.h]);
+  });
+
+  it("is cut to the board, so the grid ends where the level does", () => {
+    for (const pan of PANS) {
+      for (const rot of ROTS) {
+        const s = stage();
+        s.state.view.pan = { ...pan };
+        s.B.view.rotate(s.state.view, rot);
+        s.draw();
+        assert.deepEqual(s.fills[0].clip, boardAt(s), `rot ${rot} pan ${pan.x}, ${pan.y}`);
+      }
+    }
+  });
+
+  it("lets the clip go once it is laid, so nothing after it is cut to the board", () => {
+    const s = stage();
+    s.add(0, 0);
+    s.state.box = { ...BOX };
+    s.draw();
+    for (const r of drawsNamed(s, "rect")) assert.equal(r.clip, null, JSON.stringify(r));
+    assert.equal(s.clipped(), null, "the scene is left unclipped");
+  });
+
+  it("is cut to the board it is given, not to a board of its own", () => {
+    const s = stage();
+    s.state.level.size = { w: BOARD.w + 2, h: BOARD.h };
+    s.draw();
+    assert.deepEqual(s.fills[0].clip, boardAt(s));
+    assert.notDeepEqual(s.fills[0].clip, boardAt(stage()));
   });
 
   // Any lattice point aligns the pattern, so the test asks for a cell centre
@@ -284,6 +395,113 @@ describe("render: the floor grid", () => {
       const stands = s.B.view.project(s.state.view, cell.x, cell.y, s.B.FLOOR);
       assert.deepEqual([stands.sx, stands.sy], [start.sx, start.sy], `pan ${pan.x}, ${pan.y}`);
     }
+  });
+});
+
+describe("render: the board's outline", () => {
+  const OFF_LINE = 1;                 // px a rounded pixel may lie off the true edge
+
+  const litAt = (s) => edgeRects(s).map((r) => ({ x: r.x, y: r.y }));
+
+  const edgesOf = (corners) =>
+    corners.map((from, i) => [from, corners[(i + 1) % corners.length]]);
+
+  // Whether a pixel lies on the edge from a to b, give or take the rounding.
+  const onEdge = ({ x, y }, [a, b]) => {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const along = ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy);
+    if (along < 0 || along > 1) return false;
+    return Math.abs(a.x + dx * along - x) <= OFF_LINE &&
+      Math.abs(a.y + dy * along - y) <= OFF_LINE;
+  };
+
+  // Every step down the edge's longer side, which its pixels leave no gap in.
+  const stepsOf = ([a, b]) => {
+    const across = Math.abs(b.x - a.x) >= Math.abs(b.y - a.y);
+    const from = across ? a.x : a.y;
+    const to = across ? b.x : b.y;
+    const step = to < from ? -1 : 1;
+    const steps = [];
+    for (let at = from; at !== to + step; at += step) steps.push(at);
+    return { across, steps };
+  };
+
+  it("rings the board, corner to corner and unbroken, at every rotation and pan", () => {
+    for (const rot of ROTS) {
+      for (const pan of PANS) {
+        const s = stage();
+        s.state.view.pan = { ...pan };
+        s.B.view.rotate(s.state.view, rot);
+        s.draw();
+        const name = `rot ${rot} pan ${pan.x}, ${pan.y}`;
+        const corners = boardAt(s);
+        const lit = litAt(s);
+        const at = new Set(lit.map((p) => `${p.x},${p.y}`));
+        for (const c of corners) {
+          assert.ok(at.has(`${c.x},${c.y}`), `${name}: nothing at the corner ${c.x},${c.y}`);
+        }
+        const edges = edgesOf(corners);
+        for (const p of lit) {
+          assert.ok(edges.some((edge) => onEdge(p, edge)), `${name}: ${p.x},${p.y} lies off it`);
+        }
+        for (const edge of edges) {
+          const { across, steps } = stepsOf(edge);
+          const covered = new Set(lit.filter((p) => onEdge(p, edge))
+            .map((p) => (across ? p.x : p.y)));
+          for (const step of steps) assert.ok(covered.has(step), `${name}: a gap at ${step}`);
+        }
+      }
+    }
+  });
+
+  it("dashes the outline in two inks, so it reads on a light canvas and on a dark one", () => {
+    const s = stage();
+    s.draw();
+    const inks = edgeRects(s).map((r) => r.color);
+    assert.deepEqual(new Set(inks), new Set([s.B.COLORS.select, s.B.COLORS.outline]));
+    assert.deepEqual(inks.slice(0, DASH_PX), new Array(DASH_PX).fill(inks[0]));
+    assert.notEqual(inks[DASH_PX], inks[0], "the next dash takes the other ink");
+  });
+
+  it("draws every pixel of it one pixel square", () => {
+    const s = stage();
+    s.draw();
+    for (const r of edgeRects(s)) {
+      assert.deepEqual([r.w, r.h], [LINE_PX, LINE_PX], JSON.stringify(r));
+    }
+  });
+
+  it("lines the board over the grid and under the columns", () => {
+    const s = stage();
+    s.add(0, 0);
+    s.draw();
+    const names = s.names();
+    const edges = edgeRects(s);
+    assert.equal(names[0], "grid", "the grid goes down first");
+    assert.ok(edges.length > 0, "the outline follows it");
+    assert.ok(s.draws.indexOf(edges[edges.length - 1]) < names.indexOf("column"),
+      "and the columns stand over it");
+  });
+
+  it("leaves the scene's ink as it found it, so nothing later fills in the outline's colour", () => {
+    const s = stage();
+    const before = s.ink();
+    s.draw();
+    assert.equal(s.ink(), before);
+  });
+
+  it("lines the board the level carries, so a size read the wrong way round shows", () => {
+    const swapped = stage();
+    swapped.state.level.size = { w: BOARD.h, h: BOARD.w };
+    swapped.draw();
+    const plain = stage();
+    plain.draw();
+    const marks = (s) => [...new Set(litAt(s).map((p) => `${p.x},${p.y}`))].sort();
+    for (const c of boardAt(swapped)) {
+      assert.ok(marks(swapped).includes(`${c.x},${c.y}`), `the corner ${c.x},${c.y}`);
+    }
+    assert.notDeepEqual(marks(swapped), marks(plain));
   });
 });
 
@@ -329,7 +547,7 @@ describe("render: the order a tile is drawn in", () => {
     s.state.selection = [{ x: tile.x, y: tile.y }];
     s.state.hold = { x: tile.x, y: tile.y, progress: HOLD_PROGRESS };
     s.draw();
-    assert.deepEqual(s.names(), [
+    assert.deepEqual(spritesOf(s), [
       "grid", "column", "ramp", "hold", "outline", "decor", "mark", "label", "compass", "label"
     ]);
   });
@@ -363,7 +581,7 @@ describe("render: the see-through tiles", () => {
     s.state.selection = [{ x: tile.x, y: tile.y }];
     s.state.hold = { x: tile.x, y: tile.y, progress: HOLD_PROGRESS };
     s.draw();
-    const over = s.draws.filter((d) => d.name !== "column");
+    const over = s.draws.filter((d) => d.name !== "column" && d.name !== "rect");
     assert.deepEqual(new Set(over.map((d) => d.name)),
       new Set(["grid", "hold", "outline", "decor", "mark", "label", "compass"]));
     for (const { name, alpha } of over) assert.equal(alpha, FULL_ALPHA, name);
@@ -504,7 +722,7 @@ describe("render: the highlight ring", () => {
 });
 
 describe("render: the box a sweep draws", () => {
-  const rectsOf = (s) => drawsNamed(s, "rect");
+  const rectsOf = boxRects;
 
   // Every pixel the rects cover, so the box is read as a picture and not as
   // the calls that drew it.
@@ -582,12 +800,12 @@ describe("render: the box a sweep draws", () => {
     s.state.box = { ...BOX };
     s.draw();
     const frame = s.frame();
-    const side = rectsOf(s).filter((r) => r.y === frame.oy + BOX.y0 && r.w > BOX_LINE_PX);
+    const side = rectsOf(s).filter((r) => r.y === frame.oy + BOX.y0 && r.w > LINE_PX);
     const inks = [s.B.COLORS.select, s.B.COLORS.outline];
     side.forEach((r, i) => {
       const last = i === side.length - 1;
-      const wide = last ? `at most ${BOX_DASH_PX} px across` : `${BOX_DASH_PX} px across`;
-      assert.ok(last ? r.w <= BOX_DASH_PX : r.w === BOX_DASH_PX, `dash ${i} is ${wide}`);
+      const wide = last ? `at most ${DASH_PX} px across` : `${DASH_PX} px across`;
+      assert.ok(last ? r.w <= DASH_PX : r.w === DASH_PX, `dash ${i} is ${wide}`);
       assert.equal(r.color, inks[i % inks.length], `dash ${i} takes its turn`);
     });
     assert.ok(side.length > inks.length, `${side.length} dashes along the top`);
@@ -607,8 +825,10 @@ describe("render: the box a sweep draws", () => {
     s.state.box = { ...BOX };
     s.draw();
     const names = s.names();
-    assert.ok(names.indexOf("rect") > names.indexOf("label"), "over the elevation labels");
-    assert.ok(names.lastIndexOf("rect") < names.indexOf("compass"), "under the compass");
+    const box = rectsOf(s);
+    const at = (rect) => s.draws.indexOf(rect);
+    assert.ok(at(box[0]) > names.indexOf("label"), "over the elevation labels");
+    assert.ok(at(box[box.length - 1]) < names.indexOf("compass"), "under the compass");
     assert.equal(names[names.length - 1], "label", "the badge is still drawn last");
   });
 

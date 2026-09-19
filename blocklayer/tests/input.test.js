@@ -304,6 +304,18 @@ describe("input: Ctrl or Cmd to toggle a tile in the selection", () => {
       assert.deepEqual(r.of("add"), []);
     }
   });
+
+  it("wins over Shift: the press toggles the tile and sweeps no box", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    const to = r.at(50, 50, cell(2, 2));
+    r.fire("pointerdown", { ...t, button: PRIMARY, ctrlKey: true, shiftKey: true });
+    r.fire("pointermove", to);
+    r.fire("pointerup", { ...to, button: PRIMARY });
+    assert.deepEqual(r.of("toggleSelect"), [[1, 1]]);
+    assert.deepEqual(r.of("box"), []);
+    assert.deepEqual(r.of("selectBox"), []);
+  });
 });
 
 const OFF_CANVAS = { clientX: WIDTH + 5, clientY: 10 };
@@ -325,6 +337,41 @@ describe("input: Shift to sweep a box of tiles into the selection", () => {
     assert.deepEqual(r.of("selectBox"), [[10, 10, 70, 50]]);
     assert.deepEqual(r.of("select"), []);
     assert.deepEqual(r.of("deselect"), []);
+  });
+
+  // The corners go to the handlers as they were swept, from the press: which
+  // one is the lower and which the higher is the handler's to sort out.
+  it("a sweep up and to the left keeps the press corner first", () => {
+    const r = rig();
+    const from = r.at(70, 50, cell(2, 0));
+    const to = r.at(10, 10, cell(0, 0));
+    r.fire("pointerdown", { ...from, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", to);
+    r.fire("pointerup", { ...to, button: PRIMARY });
+    assert.deepEqual(r.of("box"), [[70, 50, 10, 10], [null]]);
+    assert.deepEqual(r.of("selectBox"), [[70, 50, 10, 10]]);
+  });
+
+  it("the press is swallowed and captures the pointer, as any other is", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const e = r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true, pointerId: 7 });
+    assert.equal(e.prevented, true);
+    assert.equal(r.canvas.captured, 7);
+  });
+
+  // The capture keeps the pointer events coming, so the sweep goes on over
+  // the edge of the canvas, as a drag that adds tiles does.
+  it("survives a trip off the canvas and back", () => {
+    const r = rig();
+    const a = r.at(10, 10, cell(0, 0));
+    const b = r.at(40, 30, cell(1, 0));
+    r.fire("pointerdown", { ...a, button: PRIMARY, shiftKey: true });
+    r.fire("pointermove", OFF_CANVAS);
+    r.fire("pointerleave", OFF_CANVAS);
+    r.fire("pointermove", b);
+    r.fire("pointerup", { ...b, button: PRIMARY });
+    assert.deepEqual(r.of("selectBox"), [[10, 10, 40, 30]]);
   });
 
   it("a shift click that never moves sweeps a box of no size and reports none", () => {
@@ -741,6 +788,13 @@ describe("input: keys on the selected tile", () => {
   it("x removes the selected tile", () => {
     const r = pressOnSelected([["x"]]);
     assert.deepEqual(r.calls, [["remove", 1, 1]]);
+  });
+
+  it("x removes every tile in the selection, oldest first", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 });
+    assert.equal(r.fire("keydown", { key: "x" }).prevented, true);
+    assert.deepEqual(r.of("remove"), [[1, 1], [2, 2], [3, 3]]);
   });
 
   it("with nothing selected, every tile key does nothing and is not swallowed", () => {

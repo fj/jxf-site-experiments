@@ -75,11 +75,13 @@ function fakeCanvas() {
 function rig() {
   const clock = fakeWindow();
   const B = load(["config.js", "input.js"], clock.window);
+  // config.js grows inCells in the change that makes the selection a list.
+  B.inCells = B.inCells || ((cells, x, y) => cells.some((c) => c.x === x && c.y === y));
   const canvas = fakeCanvas();
   const hits = new Map();
   const added = new Set();
   const calls = [];
-  let selected = null;
+  let selection = [];
   let color = B.DEFAULT_COLOR;
   const record = (name) => (...args) => { calls.push([name, ...args]); };
   const key = (x, y) => `${x},${y}`;
@@ -90,14 +92,20 @@ function rig() {
   };
   const handlers = {
     pick,
-    selected: () => selected,
+    selection: () => selection,
     hover: record("hover"),
     add: (x, y) => { record("add")(x, y); added.add(key(x, y)); },
     select: record("select"),
     raise: record("raise"),
     raiseAll: record("raiseAll"),
     hold: record("hold"),
-    remove: record("remove"),
+    // app.js takes a tile it removes out of the selection, in place, as a
+    // model that hands the same list to every caller would.
+    remove: (x, y) => {
+      record("remove")(x, y);
+      const at = selection.findIndex((c) => c.x === x && c.y === y);
+      if (at !== -1) selection.splice(at, 1);
+    },
     pan: record("pan"),
     rotate: record("rotate"),
     zoom: record("zoom"),
@@ -121,7 +129,7 @@ function rig() {
       hits.set(`${x},${y}`, hit);
       return { clientX: x, clientY: y };
     },
-    select(cell) { selected = cell; },
+    select(...cells) { selection = cells; },
     of(name) { return calls.filter((c) => c[0] === name).map((c) => c.slice(1)); },
     fire(type, props) { return canvas.fire(type, props); }
   };
@@ -396,6 +404,17 @@ describe("input: the right button and the selection", () => {
     assert.deepEqual(r.of("deselect"), []);
   });
 
+  it("a right press keeps a selection of several on a tile in it, and drops it on one outside", () => {
+    for (const [hit, deselects] of [[tile(2, 2), []], [tile(3, 3), [[]]]]) {
+      const where = `${hit.tile.x},${hit.tile.y}`;
+      const r = rig();
+      r.select({ x: 1, y: 1 }, { x: 2, y: 2 });
+      r.fire("pointerdown", { ...r.at(50, 50, hit), button: SECONDARY });
+      assert.deepEqual(r.of("deselect"), deselects, where);
+      assert.deepEqual(r.of("hold"), [[hit.tile.x, hit.tile.y, 0]], where);
+    }
+  });
+
   it("with nothing selected, a right press deselects nothing, on a tile or off one", () => {
     const r = rig();
     r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: SECONDARY });
@@ -425,6 +444,14 @@ describe("input: the wheel", () => {
     assert.equal(up.prevented, true);
     assert.equal(down.prevented, true);
     assert.deepEqual(r.of("hover"), [[tile(1, 1)], [tile(1, 1)]]);
+  });
+
+  it("raises a tile that is one of several selected", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 });
+    const t = r.at(50, 50, tile(2, 2));
+    assert.equal(r.fire("wheel", { ...t, deltaY: -100 }).prevented, true);
+    assert.deepEqual(r.of("raise"), [[1]]);
   });
 
   it("does nothing over an unselected tile, an empty cell, or with no vertical delta", () => {
@@ -467,10 +494,20 @@ describe("input: the keyboard", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
     r.fire("keydown", { key: "Delete" });
+    r.select({ x: 1, y: 1 });
     r.fire("keydown", { key: "Backspace" });
-    r.select(null);
+    r.select();
     assert.equal(r.fire("keydown", { key: "Delete" }).prevented, true);
     assert.deepEqual(r.of("remove"), [[1, 1], [1, 1]]);
+  });
+
+  // Each removal takes its cell out of the selection, so the last cell is
+  // reached only by a key that reads the whole selection first.
+  it("Delete removes every tile in the selection, oldest first", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 });
+    assert.equal(r.fire("keydown", { key: "Delete" }).prevented, true);
+    assert.deepEqual(r.of("remove"), [[1, 1], [2, 2], [3, 3]]);
   });
 
   it("Escape deselects", () => {

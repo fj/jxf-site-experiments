@@ -148,6 +148,81 @@ describe("level: raise", () => {
   });
 });
 
+describe("level: raiseCells", () => {
+  const ROW = 4;                   // tiles in the row each of these tests builds
+  const COLUMNS = Array.from({ length: ROW }, (_, x) => x);
+  const cells = (...pairs) => pairs.map(([x, y]) => ({ x, y }));
+
+  // A row of blocks, each one step higher than the last.
+  const stack = () => {
+    const level = L.create();
+    for (const x of COLUMNS) L.add(level, x, 0, x);
+    return level;
+  };
+
+  const elevs = (level) => COLUMNS.map((x) => L.get(level, x, 0).elev);
+
+  it("moves only the tiles at the cells it is given", () => {
+    const level = stack();
+    assert.equal(L.raiseCells(level, cells([1, 0], [2, 0]), 1), true);
+    assert.deepEqual(elevs(level), [0, 2, 3, 3]);
+    assert.equal(L.raiseCells(level, cells([1, 0], [2, 0]), -1), true);
+    assert.deepEqual(elevs(level), [0, 1, 2, 3]);
+  });
+
+  it("moves none of them when one has no room, and leaves the rest of the level alone", () => {
+    const level = stack();
+    L.raise(level, 3, 0, B.ELEV_MAX);
+    assert.deepEqual(elevs(level), [0, 1, 2, B.ELEV_MAX]);
+    assert.equal(L.raiseCells(level, cells([2, 0], [3, 0]), 1), false);
+    assert.deepEqual(elevs(level), [0, 1, 2, B.ELEV_MAX]);
+  });
+
+  it("refuses at the bottom of the range too", () => {
+    const level = stack();
+    assert.equal(L.raiseCells(level, cells([0, 0], [1, 0]), -1), false);
+    assert.deepEqual(elevs(level), [0, 1, 2, 3]);
+  });
+
+  it("refuses when a ramp or stairs is at its own ceiling, though a block could rise", () => {
+    for (const shape of ["ramp", "stairs"]) {
+      const level = L.create();
+      L.add(level, 0, 0, B.ELEV_MAX - 1);
+      L.add(level, 1, 0, B.ELEV_MAX - 1);
+      L.setShape(level, 1, 0, shape);
+      const both = cells([0, 0], [1, 0]);
+      assert.equal(L.raiseCells(level, both, 1), false, shape);
+      assert.equal(L.raiseCells(level, cells([0, 0]), 1), true, shape);
+      assert.equal(L.get(level, 0, 0).elev, B.ELEV_MAX, shape);
+      assert.equal(L.get(level, 1, 0).elev, B.ELEV_MAX - 1, shape);
+    }
+  });
+
+  it("takes an empty list as nothing to do", () => {
+    const level = stack();
+    assert.equal(L.raiseCells(level, [], 1), false);
+    assert.deepEqual(elevs(level), [0, 1, 2, 3]);
+  });
+
+  it("moves a tile once however often its cell is named", () => {
+    const level = stack();
+    const twice = cells([1, 0], [1, 0]);
+    assert.equal(L.raiseCells(level, twice, 1), true);
+    assert.deepEqual(elevs(level), [0, 2, 2, 3]);
+    L.raise(level, 1, 0, B.ELEV_MAX);
+    assert.equal(L.raiseCells(level, twice, 1), false);
+    assert.equal(L.get(level, 1, 0).elev, B.ELEV_MAX);
+  });
+
+  it("passes over a cell that holds no tile", () => {
+    const level = stack();
+    assert.equal(L.raiseCells(level, cells([0, 0], [9, 9]), 1), true);
+    assert.deepEqual(elevs(level), [1, 1, 2, 3]);
+    assert.equal(L.raiseCells(level, cells([9, 9]), 1), false);
+    assert.equal(L.get(level, 9, 9), null);
+  });
+});
+
 describe("level: raiseAll", () => {
   it("moves every tile by the delta and reports that it moved", () => {
     const level = L.create();

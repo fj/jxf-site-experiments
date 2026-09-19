@@ -8,8 +8,10 @@ const { load, tile } = require("./load");
 const B = load(["config.js", "level.js"]);
 const L = B.level;
 
+const COLOR_KEYS = B.PALETTE.map((c) => c.key);
 const DECOR_KEYS = B.DECOR.map((d) => d.key);
 const MARK_KEYS = B.MARKS.map((m) => m.key);
+const OTHER_COLOR = COLOR_KEYS.find((key) => key !== B.DEFAULT_COLOR);
 
 describe("level: tiles", () => {
   it("starts empty", () => {
@@ -23,14 +25,22 @@ describe("level: tiles", () => {
     assert.equal(L.key(3, -4), "3,-4");
   });
 
-  it("adds a block at the new-tile elevation facing north", () => {
+  it("adds a block at the new-tile elevation, facing north, in the default colour", () => {
     const level = L.create();
     const tile = L.add(level, 2, 3);
     assert.deepEqual(tile, {
-      x: 2, y: 3, elev: B.NEW_TILE_ELEV, shape: "block", facing: "N", decor: null, marks: []
+      x: 2, y: 3, elev: B.NEW_TILE_ELEV, color: B.DEFAULT_COLOR,
+      shape: "block", facing: "N", decor: null, marks: []
     });
     assert.equal(L.get(level, 2, 3), tile);
     assert.equal(L.count(level), 1);
+  });
+
+  it("adds a tile in the colour it is given, and the default for any other", () => {
+    const level = L.create();
+    assert.equal(L.add(level, 0, 0, 1, OTHER_COLOR).color, OTHER_COLOR);
+    assert.equal(L.add(level, 1, 0, 1, "puce").color, B.DEFAULT_COLOR);
+    assert.equal(L.add(level, 2, 0, 1).color, B.DEFAULT_COLOR);
   });
 
   it("clamps the elevation of an added tile", () => {
@@ -44,9 +54,10 @@ describe("level: tiles", () => {
     const level = L.create();
     const first = L.add(level, 0, 0, 2);
     L.toggleMark(level, 0, 0, "rope");
-    const again = L.add(level, 0, 0, B.ELEV_MAX);
+    const again = L.add(level, 0, 0, B.ELEV_MAX, OTHER_COLOR);
     assert.equal(again, first);
     assert.equal(again.elev, 2);
+    assert.equal(again.color, B.DEFAULT_COLOR);
     assert.deepEqual(again.marks, ["rope"]);
     assert.equal(L.count(level), 1);
   });
@@ -182,6 +193,34 @@ describe("level: raiseAll", () => {
   });
 });
 
+describe("level: setColor", () => {
+  it("paints a tile a colour the palette holds and returns it", () => {
+    const level = L.create();
+    const tile = L.add(level, 0, 0);
+    assert.equal(L.setColor(level, 0, 0, OTHER_COLOR), OTHER_COLOR);
+    assert.equal(tile.color, OTHER_COLOR);
+  });
+
+  it("ignores a colour the palette does not hold", () => {
+    const level = L.create();
+    L.add(level, 0, 0);
+    L.setColor(level, 0, 0, OTHER_COLOR);
+    for (const bad of ["puce", "#ff0000", "", 3, null, undefined]) {
+      assert.equal(L.setColor(level, 0, 0, bad), OTHER_COLOR, inspect(bad));
+    }
+  });
+
+  it("accepts every colour in the palette", () => {
+    const level = L.create();
+    L.add(level, 0, 0);
+    for (const k of COLOR_KEYS) assert.equal(L.setColor(level, 0, 0, k), k);
+  });
+
+  it("returns null when there is no tile", () => {
+    assert.equal(L.setColor(L.create(), 5, 5, OTHER_COLOR), null);
+  });
+});
+
 describe("level: setShape", () => {
   it("changes the shape and returns the tile", () => {
     const level = L.create();
@@ -304,27 +343,34 @@ describe("level: toggleMark", () => {
 });
 
 describe("level: toJSON", () => {
-  it("writes version 1 and the tiles sorted by y then x", () => {
+  it("writes version 2 and the tiles sorted by y then x", () => {
     const level = L.create();
     L.add(level, 2, 1);
     L.add(level, 0, 1);
-    L.add(level, 5, 0, 4);
+    L.add(level, 5, 0, 4, OTHER_COLOR);
     L.setShape(level, 5, 0, "stairs");
     L.setFacing(level, 5, 0, "S");
     L.setDecor(level, 5, 0, "rock");
     L.toggleMark(level, 5, 0, "teleport");
+    const plain = {
+      elev: B.NEW_TILE_ELEV, color: B.DEFAULT_COLOR,
+      shape: "block", facing: "N", decor: null, marks: []
+    };
     assert.deepEqual(L.toJSON(level), {
-      version: 1,
+      version: 2,
       tiles: [
-        { x: 5, y: 0, elev: 4, shape: "stairs", facing: "S", decor: "rock", marks: ["teleport"] },
-        { x: 0, y: 1, elev: B.NEW_TILE_ELEV, shape: "block", facing: "N", decor: null, marks: [] },
-        { x: 2, y: 1, elev: B.NEW_TILE_ELEV, shape: "block", facing: "N", decor: null, marks: [] }
+        {
+          x: 5, y: 0, elev: 4, color: OTHER_COLOR,
+          shape: "stairs", facing: "S", decor: "rock", marks: ["teleport"]
+        },
+        { x: 0, y: 1, ...plain },
+        { x: 2, y: 1, ...plain }
       ]
     });
   });
 
   it("writes an empty level as no tiles", () => {
-    assert.deepEqual(L.toJSON(L.create()), { version: 1, tiles: [] });
+    assert.deepEqual(L.toJSON(L.create()), { version: 2, tiles: [] });
   });
 
   it("is stable regardless of insertion order", () => {
@@ -355,7 +401,7 @@ describe("level: fromJSON", () => {
   });
 
   it("reads an empty level as an empty level", () => {
-    assert.deepEqual(L.fromJSON({ version: 1, tiles: [] }), L.create());
+    assert.deepEqual(L.fromJSON({ version: 2, tiles: [] }), L.create());
   });
 
   it("drops fields it does not know", () => {
@@ -365,17 +411,28 @@ describe("level: fromJSON", () => {
 
   it("reads a good tile in full", () => {
     const raw = tile({
-      elev: 5, shape: "stairs", facing: "W", decor: "chest", marks: ["jump"]
+      elev: 5, color: OTHER_COLOR, shape: "stairs", facing: "W", decor: "chest", marks: ["jump"]
     });
-    const level = L.fromJSON({ version: 1, tiles: [raw] });
+    const level = L.fromJSON({ version: 2, tiles: [raw] });
     assert.deepEqual(L.get(level, 1, 2), raw);
     assert.notEqual(L.get(level, 1, 2), raw);
     assert.notEqual(L.get(level, 1, 2).marks, raw.marks);
   });
 
-  it("fills in a missing decor and missing marks", () => {
-    const level = L.fromJSON({ tiles: [{ x: 0, y: 0, elev: 0, shape: "block", facing: "N" }] });
-    assert.deepEqual(L.get(level, 0, 0), tile({ x: 0, y: 0 }));
+  it("accepts every colour in the palette", () => {
+    for (const color of COLOR_KEYS) {
+      const level = L.fromJSON({ version: 2, tiles: [tile({ color })] });
+      assert.equal(L.get(level, 1, 2).color, color);
+    }
+  });
+
+  // Version 1 named no colour on a tile, so such a file still opens.
+  it("fills in a missing colour with the default, and a missing decor and marks", () => {
+    const level = L.fromJSON({
+      version: 1,
+      tiles: [{ x: 0, y: 0, elev: 0, shape: "block", facing: "N" }]
+    });
+    assert.deepEqual(L.get(level, 0, 0), tile({ x: 0, y: 0, color: B.DEFAULT_COLOR }));
   });
 
   it("drops each kind of bad tile and keeps the good ones around it", () => {
@@ -384,6 +441,7 @@ describe("level: fromJSON", () => {
       tile({ x: 1.5 }), tile({ y: "2" }), tile({ x: NaN }), tile({ y: Infinity }),
       tile({ elev: B.ELEV_MAX + 1 }), tile({ elev: B.ELEV_MIN - 1 }),
       tile({ elev: 0.5 }), tile({ elev: "0" }), tile({ elev: undefined }),
+      tile({ color: "puce" }), tile({ color: "#7ed957" }), tile({ color: null }),
       tile({ shape: "dome" }), tile({ shape: undefined }),
       tile({ facing: "up" }), tile({ facing: undefined }),
       tile({ decor: "dragon" }), tile({ decor: 3 })
@@ -425,7 +483,7 @@ describe("level: fromJSON", () => {
 
   it("round-trips through toJSON", () => {
     const level = L.create();
-    L.add(level, -2, 3, 2);
+    L.add(level, -2, 3, 2, OTHER_COLOR);
     L.setShape(level, -2, 3, "ramp");
     L.setFacing(level, -2, 3, "S");
     L.setDecor(level, -2, 3, "crystal-yellow");

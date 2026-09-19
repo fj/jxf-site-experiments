@@ -56,9 +56,15 @@ function stage() {
   };
   B.tiles = {
     grid: () => gridTile,
-    column: () => tag("column"),
-    ramp: (elev, viewFacing) => { record("ramp", elev, viewFacing); return tag("ramp"); },
-    stairs: (elev, viewFacing) => { record("stairs", elev, viewFacing); return tag("stairs"); },
+    column: (color, elev) => { record("column", color, elev); return tag("column"); },
+    ramp: (color, elev, viewFacing) => {
+      record("ramp", color, elev, viewFacing);
+      return tag("ramp");
+    },
+    stairs: (color, elev, viewFacing) => {
+      record("stairs", color, elev, viewFacing);
+      return tag("stairs");
+    },
     ghost: (elev) => { record("ghost", elev); return tag("ghost"); },
     outline: (shape, viewFacing, kind) => {
       record("outline", shape, viewFacing, kind);
@@ -355,8 +361,30 @@ describe("render: the wedge a sloped tile stands on", () => {
     const s = stage();
     const tile = turnedTile(s, 0, 0, "ramp");
     s.draw();
-    assert.deepEqual(s.asked("ramp"), [[tile.elev, viewFacingOf(s, tile)]]);
+    assert.deepEqual(s.asked("ramp"), [[tile.color, tile.elev, viewFacingOf(s, tile)]]);
     assert.notEqual(viewFacingOf(s, tile), s.B.view.viewFacing(0, tile.facing));
+  });
+});
+
+describe("render: the colour a tile is drawn in", () => {
+  it("draws each column in the tile's own colour, not in one its height names", () => {
+    const s = stage();
+    const colors = s.B.PALETTE.map((c) => c.key);
+    colors.forEach((color, x) => s.B.level.add(s.state.level, x, 0, TILE_ELEV, color));
+    s.draw();
+    assert.deepEqual(s.asked("column"), colors.map((color) => [color, TILE_ELEV]));
+  });
+
+  it("draws the wedge of a sloped tile in the same colour as the column under it", () => {
+    for (const shape of ["ramp", "stairs"]) {
+      const s = stage();
+      const color = s.B.PALETTE.map((c) => c.key).find((key) => key !== s.B.DEFAULT_COLOR);
+      const tile = turnedTile(s, 0, 0, shape);
+      s.B.level.setColor(s.state.level, tile.x, tile.y, color);
+      s.draw();
+      assert.deepEqual(s.asked("column"), [[color, tile.elev]], shape);
+      assert.deepEqual(s.asked(shape), [[color, tile.elev, viewFacingOf(s, tile)]], shape);
+    }
   });
 });
 

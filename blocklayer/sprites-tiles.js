@@ -1,6 +1,7 @@
 /*
  * Blocklayer — the tile sprites: the flat top, the column of blocks under it,
- * the wedges of ramps and stairs, and the marks the editor lays over a tile.
+ * the wedges of ramps and stairs, the swatch a colour button shows, and the
+ * marks the editor lays over a tile.
  * Faces are flat polygons in the tile's own (u, v, z) frame, rasterised one
  * pixel column at a time; a pass over the finished pixels then draws the dark
  * outline wherever a face meets another face or the background.
@@ -59,18 +60,19 @@
     "+": ["...", ".#.", "###", ".#.", "..."]
   };
 
-  function topColor(elev) {
-    var color = B.ELEVATION_COLORS[String(elev)];
-    if (!color) throw new Error("no colour for elevation " + elev);
-    return color;
+  function topColor(color) {
+    for (var i = 0; i < B.PALETTE.length; i++) {
+      if (B.PALETTE[i].key === color) return B.PALETTE[i].hex;
+    }
+    throw new Error("no colour named " + color);
   }
 
-  function faceColor(elev, kind) {
-    var color = topColor(elev);
-    if (kind === "left") return P.shade(color, B.FACE_SHADES.left);
-    if (kind === "right") return P.shade(color, B.FACE_SHADES.right);
-    if (kind === "slope") return P.shade(color, SLOPE_SHADE);
-    return color;
+  function faceColor(color, kind) {
+    var hex = topColor(color);
+    if (kind === "left") return P.shade(hex, B.FACE_SHADES.left);
+    if (kind === "right") return P.shade(hex, B.FACE_SHADES.right);
+    if (kind === "slope") return P.shade(hex, SLOPE_SHADE);
+    return hex;
   }
 
   // ---- Rasterising ---------------------------------------------------------
@@ -303,13 +305,13 @@
     return wedgeShape(viewFacing, faces, slopeSeen(viewFacing) ? [SLOPE] : polygons(faces));
   }
 
-  function drawFaces(ctx, ax, ay, elev, faces) {
-    faces.forEach(function (f) { fillFace(ctx, ax, ay, f.pts, faceColor(elev, f.kind)); });
+  function drawFaces(ctx, ax, ay, color, faces) {
+    faces.forEach(function (f) { fillFace(ctx, ax, ay, f.pts, faceColor(color, f.kind)); });
   }
 
-  function wedge(elev, shape) {
+  function wedge(color, shape) {
     var c = P.canvas(W, WEDGE_H);
-    drawFaces(P.context(c), HALF_W, WEDGE_ANCHOR_Y, elev, shape.faces);
+    drawFaces(P.context(c), HALF_W, WEDGE_ANCHOR_Y, color, shape.faces);
     outlinePass(c);
     return P.sprite(c, HALF_W, WEDGE_ANCHOR_Y);
   }
@@ -335,9 +337,9 @@
   }
 
   // Between two stacked blocks, a darker seam.
-  function drawSeams(ctx, elev, blocks) {
-    var left = P.shade(faceColor(elev, "left"), SEAM_SHADE);
-    var right = P.shade(faceColor(elev, "right"), SEAM_SHADE);
+  function drawSeams(ctx, color, blocks) {
+    var left = P.shade(faceColor(color, "left"), SEAM_SHADE);
+    var right = P.shade(faceColor(color, "right"), SEAM_SHADE);
     for (var k = 1; k < blocks; k++) drawSeam(ctx, BLOCK * k, left, right);
   }
 
@@ -356,14 +358,20 @@
     return c;
   }
 
-  function column(elev) {
+  function column(color, elev) {
     var blocks = elev - B.FLOOR;
-    var left = faceColor(elev, "left");
-    var right = faceColor(elev, "right");
-    var c = columnShape(blocks, left, right, topColor(elev));
+    var left = faceColor(color, "left");
+    var right = faceColor(color, "right");
+    var c = columnShape(blocks, left, right, topColor(color));
     outlinePass(c);
-    drawSeams(P.context(c), elev, blocks);
+    drawSeams(P.context(c), color, blocks);
     return P.sprite(c, HALF_W, HALF_H);
+  }
+
+  // A colour's top face alone, as a tile with no blocks: the art on the button
+  // that picks it.
+  function swatch(color) {
+    return column(color, B.FLOOR);
   }
 
   // ---- The floor grid ------------------------------------------------------
@@ -500,11 +508,18 @@
 
   var memoHold = P.memo(holdStep);
 
+  // A wedge stands on the tile's top, so its art does not read the elevation;
+  // it takes one to call like the column under it.
   B.tiles = {
     grid: P.memo(grid),
     column: P.memo(column),
-    ramp: P.memo(function (elev, viewFacing) { return wedge(elev, rampShape(viewFacing)); }),
-    stairs: P.memo(function (elev, viewFacing) { return wedge(elev, stairsShape(viewFacing)); }),
+    swatch: P.memo(swatch),
+    ramp: P.memo(function (color, elev, viewFacing) {
+      return wedge(color, rampShape(viewFacing));
+    }),
+    stairs: P.memo(function (color, elev, viewFacing) {
+      return wedge(color, stairsShape(viewFacing));
+    }),
     ghost: P.memo(ghost),
     outline: P.memo(outline),
     holdMask: function (progress) {

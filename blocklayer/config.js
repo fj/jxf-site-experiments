@@ -56,18 +56,22 @@
     { key: "jump", label: "Jump" }
   ];
 
-  // The top face's colour at each elevation: cool and dark on the floor, warm
-  // and bright up high, so height reads without a label.
-  B.ELEVATION_COLORS = {
-    "0": "#4fa3e0",
-    "1": "#7ed957",
-    "2": "#a6de56",
-    "3": "#cfe25a",
-    "4": "#f2d55c",
-    "5": "#f2ae4f",
-    "6": "#ef8a42",
-    "7": "#e05038"
-  };
+  // The colours a tile's top face is painted in: the spectrum, then three
+  // greys. Height reads from the labels and from the shading of the sides.
+  B.PALETTE = [
+    { key: "red", label: "Red", hex: "#e0453c" },
+    { key: "orange", label: "Orange", hex: "#ef8a42" },
+    { key: "yellow", label: "Yellow", hex: "#f2d55c" },
+    { key: "green", label: "Green", hex: "#7ed957" },
+    { key: "blue", label: "Blue", hex: "#4fa3e0" },
+    { key: "indigo", label: "Indigo", hex: "#5e7ce2" },
+    { key: "violet", label: "Violet", hex: "#a86fe0" },
+    { key: "grey-light", label: "Light grey", hex: "#d0d3d8" },
+    { key: "grey", label: "Grey", hex: "#8a8f99" },
+    { key: "grey-dark", label: "Dark grey", hex: "#4a4e57" }
+  ];
+
+  B.DEFAULT_COLOR = "green";     // what a tile takes when nothing names a colour
 
   B.COLORS = {
     outline: "#1f1a2e",

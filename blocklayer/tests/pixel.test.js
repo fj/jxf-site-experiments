@@ -7,7 +7,7 @@ const { load } = require("./load");
 const B = load(["config.js", "pixel.js"]);
 const P = B.pixel;
 
-const GREEN = "#7ed957";        // 126, 217, 87: the top face at elevation 1
+const GREEN = "#7ed957";        // 126, 217, 87: the palette's green
 
 describe("pixel: parseHex and toHex", () => {
   it("parses a hex colour into its three channels, whatever the case", () => {
@@ -30,7 +30,7 @@ describe("pixel: parseHex and toHex", () => {
   });
 
   it("round-trips every colour in the palette", () => {
-    const palette = Object.values(B.ELEVATION_COLORS).concat(Object.values(B.COLORS));
+    const palette = B.PALETTE.map((c) => c.hex).concat(Object.values(B.COLORS));
     for (const hex of palette) assert.equal(P.toHex(P.parseHex(hex)), hex, hex);
   });
 });

@@ -25,7 +25,8 @@ function load(names, window = {}) {
 
 function tile(overrides = {}) {
   return {
-    x: 1, y: 2, elev: 0, shape: "block", facing: "N", decor: null, marks: [], ...overrides
+    x: 1, y: 2, elev: 0, color: "green", shape: "block", facing: "N", decor: null, marks: [],
+    ...overrides
   };
 }
 

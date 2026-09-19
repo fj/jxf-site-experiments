@@ -5,8 +5,8 @@ const assert = require("node:assert/strict");
 const { load } = require("./load");
 const { fakeDocument, descend, control } = require("./dom");
 
-const SIZE_MIN = 2;
-const SIZE_MAX = 32;
+const SIZE_MIN = 1;                // config.js: the smallest board
+const SIZE_MAX = 64;               // ...and the largest
 const START = { w: 8, h: 8 };
 const MOUNT_TAG = "div";
 const CANVAS_W = 480;
@@ -36,27 +36,25 @@ globalThis.FileReader = class {
   readAsText() { this.onload(); }
 };
 
-// The three calls the other changes in flight bring, standing in for the real
-// ones: a board of w by h holds the cells from 0 up to each bound, and a
-// resize drops the tiles outside it.
-function stubContract(B, calls) {
-  const bound = (n) => B.clamp(n, SIZE_MIN, SIZE_MAX);
-  const outside = (level, w, h) => B.level.all(level)
-    .filter((tile) => tile.x >= bound(w) || tile.y >= bound(h));
-  B.SIZE_MIN = SIZE_MIN;
-  B.SIZE_MAX = SIZE_MAX;
+// The three calls the app makes on the level and the camera, logged on their
+// way through, so a test can say what the wiring asked for as well as what the
+// level became.
+function watchContract(B, calls) {
+  const outside = B.level.outside;
+  const resize = B.level.resize;
+  const clampPan = B.view.clampPan;
   B.level.outside = (level, w, h) => {
     calls.push(["outside", w, h]);
     return outside(level, w, h);
   };
   B.level.resize = (level, w, h) => {
     calls.push(["resize", w, h]);
-    const lost = outside(level, w, h);
-    lost.forEach((tile) => B.level.remove(level, tile.x, tile.y));
-    level.size = { w: bound(w), h: bound(h) };
-    return lost;
+    return resize(level, w, h);
   };
-  B.view.clampPan = (view, size) => { calls.push(["clampPan", size.w, size.h]); };
+  B.view.clampPan = (view, size, frame) => {
+    calls.push(["clampPan", size.w, size.h]);
+    return clampPan(view, size, frame);
+  };
 }
 
 // The app booted into a mount of its own, on a level of `tiles` at the
@@ -70,7 +68,7 @@ function boot(tiles = []) {
 
   const B = load(MODULES, window);
   const calls = [];
-  stubContract(B, calls);
+  watchContract(B, calls);
 
   const level = B.level.create();
   level.size = { ...START };

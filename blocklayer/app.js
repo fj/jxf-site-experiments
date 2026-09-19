@@ -324,8 +324,7 @@
       sched();
     },
     add: function (x, y) {
-      B.level.add(state.level, x, y, state.newElev, state.color);
-      edited();
+      if (B.level.add(state.level, x, y, state.newElev, state.color)) edited();
     },
     select: function (x, y) {
       selectCells(B.selection.only(x, y));

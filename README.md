@@ -225,13 +225,16 @@ quarter turns, zooms at whole-number factors, pans in the four compass
 directions, hides or shows the elevation labels, the marks and the decor, and
 draws the tiles solid or see-through. A light grey grid rules the floor under
 the scene. Editing happens on the canvas: hover shows where a tile would go,
-click or drag adds tiles, click selects one, the wheel raises or lowers the
-selected tile, the right button held removes one, and the right button away
-from the selected tile drops the selection. The keyboard does the same work:
-`W` and `S` move the selected tile, or the height a new tile gets when nothing
-is selected, `Shift+W` and `Shift+S` move the whole level, `C` steps the colour
-new tiles are painted, and the marks sit in a compass rose under the right hand.
-The toolbar is icons only.
+click or drag adds tiles, click selects one, `Ctrl` or `Cmd` with a click puts
+a tile in the selection or takes it out, `Shift` with a drag sweeps a box of
+them in, the wheel raises or lowers the selection, the right button held removes
+a tile, and the right button away from the selection drops it. Every edit —
+shape, facing, colour, decor, marks, height, removal — applies to the whole
+selection, which a raise moves as one body or not at all. The keyboard does the
+same work: `W` and `S` move the selection, or the height a new tile gets when
+nothing is selected, `Shift+W` and `Shift+S` move the whole level, `C` steps the
+colour new tiles are painted, and the marks sit in a compass rose under the
+right hand. The toolbar is icons only.
 
 The scene is drawn at the sprites' own scale on an offscreen canvas and blitted
 up by a whole number, so pixels stay square. Every sprite is built in code from

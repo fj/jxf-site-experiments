@@ -45,6 +45,7 @@ function fakeCanvas() {
     width: WIDTH,
     height: HEIGHT,
     focused: false,
+    focusOptions: null,
     captured: null,
     addEventListener(type, fn) {
       (listeners[type] = listeners[type] || []).push(fn);
@@ -52,7 +53,7 @@ function fakeCanvas() {
     getBoundingClientRect() {
       return { left: 0, top: 0, right: WIDTH, bottom: HEIGHT, width: WIDTH, height: HEIGHT };
     },
-    focus() { canvas.focused = true; },
+    focus(options) { canvas.focused = true; canvas.focusOptions = options; },
     setPointerCapture(id) { canvas.captured = id; },
     fire(type, props = {}) {
       const e = {
@@ -139,6 +140,14 @@ describe("input: adding by click and drag", () => {
     assert.equal(r.canvas.focused, true);
     assert.equal(r.canvas.captured, 7);
     assert.equal(e.prevented, true);
+  });
+
+  // Focus scrolls its element into view by default, which would move the page
+  // under the press and put the tile in the cell the pointer left behind.
+  it("takes focus without scrolling the canvas into view", () => {
+    const r = rig();
+    r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: PRIMARY });
+    assert.deepEqual(r.canvas.focusOptions, { preventScroll: true });
   });
 
   it("a click, and each cell of a drag, hovers the tile it added in place of the cell", () => {

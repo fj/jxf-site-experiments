@@ -85,6 +85,7 @@
   var REMOVE_SELECTED_KEY = "x";                  // ...and this one only with one
   var ARROW_KEY = "Arrow";                        // what an arrow key's e.key starts with
   var SHIFT_NAME = "Shift+";
+  var NO_SCROLL = { preventScroll: true };        // how the canvas takes focus
 
   function boundKey(table, handler, arg) {
     var keys = Object.keys(table);
@@ -192,7 +193,9 @@
     function onDown(e) {
       if (e.button !== PRIMARY_BUTTON && e.button !== SECONDARY_BUTTON) return;
       e.preventDefault();
-      canvas.focus();
+      // Focus scrolls the canvas into view unless it is told not to, which
+      // would move the page under the press and pick the wrong cell.
+      canvas.focus(NO_SCROLL);
       canvas.setPointerCapture(e.pointerId);
       var hit = pick(e);
       if (e.button === PRIMARY_BUTTON) {

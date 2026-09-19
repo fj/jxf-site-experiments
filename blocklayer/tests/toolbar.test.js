@@ -476,6 +476,14 @@ describe("toolbar: sync over a selection of many tiles", () => {
       assert.equal(r.find("color", entry.key).disabled, false, entry.key);
     }
   });
+
+  it("reads a tile from before the colours as the foreground, wherever it sits", () => {
+    const r = rig();
+    const painted = selectingCells(CELLS, (tile) => tile.color(FOREGROUND));
+    delete B.level.get(painted.level, CELLS[ANCHOR].x, CELLS[ANCHOR].y).color;
+    r.bar.sync({ ...painted, color: FOREGROUND });
+    assert.deepEqual(pressedColors(r), [FOREGROUND], "it agrees with the tile before it");
+  });
 });
 
 describe("toolbar: holding the clear button", () => {

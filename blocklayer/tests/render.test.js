@@ -24,6 +24,8 @@ const UNSELECTED = [3, 3];                   // ...and one it left out
 const BOX = { x0: -30, y0: -11, x1: 41, y1: 26 };
 const SUB_PIXEL = 0.4;                       // a sweep corner between two pixels
 const NO_INK = "none";                       // the fill colour the scene starts at
+const BOX_LINE_PX = 1;                       // how wide render.js draws the box's line
+const BOX_DASH_PX = 3;                       // ...and how long each dash along it is
 
 // render.js over a recording pixel layer: every sprite module answers a
 // tagged stand-in, and each draw of one is logged with its name, where it
@@ -35,7 +37,10 @@ const NO_INK = "none";                       // the fill colour the scene starts
 function stage() {
   const B = load(["config.js", "level.js", "view.js", "render.js"]);
   // The change that turns the selection into a list adds this to config.js.
-  B.inCells = (cells, x, y) => cells.some((cell) => cell.x === x && cell.y === y);
+  // Once it lands these tests bind to the real one, and say so if it differs.
+  if (!B.inCells) {
+    B.inCells = (cells, x, y) => cells.some((cell) => cell.x === x && cell.y === y);
+  }
   const draws = [];
   const fills = [];
   const calls = new Map();
@@ -551,14 +556,21 @@ describe("render: the box a sweep draws", () => {
     }
   });
 
-  it("snaps a sweep between pixels onto the whole-pixel grid", () => {
-    const s = stage();
-    s.state.box = { x0: BOX.x0 - SUB_PIXEL, y0: BOX.y0 - SUB_PIXEL, x1: BOX.x1, y1: BOX.y1 };
-    s.draw();
-    for (const r of rectsOf(s)) {
-      assert.deepEqual([r.x, r.y], [Math.round(r.x), Math.round(r.y)], JSON.stringify(r));
+  // Every corner is pulled off the grid each way, so a rule that always rounds
+  // down or always rounds up moves one of them.
+  it("snaps a sweep between pixels onto the nearest whole pixel", () => {
+    for (const away of [SUB_PIXEL, -SUB_PIXEL]) {
+      const s = stage();
+      s.state.box = {
+        x0: BOX.x0 - away, y0: BOX.y0 - away,
+        x1: BOX.x1 + away, y1: BOX.y1 + away
+      };
+      s.draw();
+      for (const r of rectsOf(s)) {
+        assert.deepEqual([r.x, r.y], [Math.round(r.x), Math.round(r.y)], JSON.stringify(r));
+      }
+      assert.deepEqual(pixelsOf(rectsOf(s)), swept(s), `corners ${away} away`);
     }
-    assert.deepEqual(pixelsOf(rectsOf(s)), swept(s));
   });
 
   it("draws the box in the select colour, dashed with the outline colour", () => {
@@ -568,6 +580,22 @@ describe("render: the box a sweep draws", () => {
     const inks = rectsOf(s).map((r) => r.color);
     assert.equal(inks[0], s.B.COLORS.select, "the first dash is the select colour");
     assert.deepEqual(new Set(inks), new Set([s.B.COLORS.select, s.B.COLORS.outline]));
+  });
+
+  it("lays the two inks in dashes that take turns along a side", () => {
+    const s = stage();
+    s.state.box = { ...BOX };
+    s.draw();
+    const frame = s.frame();
+    const side = rectsOf(s).filter((r) => r.y === frame.oy + BOX.y0 && r.w > BOX_LINE_PX);
+    const inks = [s.B.COLORS.select, s.B.COLORS.outline];
+    side.forEach((r, i) => {
+      const last = i === side.length - 1;
+      const wide = last ? `at most ${BOX_DASH_PX} px across` : `${BOX_DASH_PX} px across`;
+      assert.ok(last ? r.w <= BOX_DASH_PX : r.w === BOX_DASH_PX, `dash ${i} is ${wide}`);
+      assert.equal(r.color, inks[i % inks.length], `dash ${i} takes its turn`);
+    });
+    assert.ok(side.length > inks.length, `${side.length} dashes along the top`);
   });
 
   it("leaves the scene's ink as it found it, so nothing later fills in the box's colour", () => {

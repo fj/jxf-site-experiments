@@ -3,7 +3,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
-const { canvasDocument } = require("./sprite");
+const { fakeDocument, descend } = require("./dom");
 
 const PRIMARY_BUTTON = 0;
 const SECONDARY_BUTTON = 2;
@@ -30,56 +30,6 @@ const BARE_CELLS = [BARE_CELL, { x: 8, y: 8 }];
 const FILE = { name: "level.blocklayer.json" };
 const FOREGROUND = "violet";                 // a foreground the default is not
 const TILE_COLOR = "red";                    // ...and a tile's colour that is neither
-
-// An element with what the toolbar touches and no more: attributes, classes,
-// style properties, children and listeners. fire() delivers an event to them.
-function fakeElement(tag) {
-  const attrs = new Map();
-  const classes = new Set();
-  const listeners = new Map();
-  const style = {
-    setProperty(name, value) { style[name] = value; },
-    getPropertyValue(name) { return style[name] === undefined ? "" : style[name]; }
-  };
-  const el = {
-    tag,
-    className: "",
-    title: "",
-    disabled: false,
-    style,
-    children: [],
-    clicks: 0,
-    classList: {
-      add(name) { classes.add(name); },
-      remove(name) { classes.delete(name); },
-      contains(name) { return classes.has(name); }
-    },
-    setAttribute(name, value) { attrs.set(name, String(value)); },
-    getAttribute(name) { return attrs.has(name) ? attrs.get(name) : null; },
-    addEventListener(type, fn) { listeners.set(type, (listeners.get(type) || []).concat(fn)); },
-    appendChild(child) { el.children.push(child); return child; },
-    click() { el.clicks++; el.fire("click"); },
-    fire(type, props = {}) {
-      const e = {
-        button: PRIMARY_BUTTON, key: "", repeat: false, prevented: false,
-        preventDefault() { this.prevented = true; },
-        ...props
-      };
-      for (const fn of listeners.get(type) || []) fn(e);
-      return e;
-    }
-  };
-  return el;
-}
-
-function fakeDocument() {
-  const canvases = canvasDocument();
-  return {
-    createElement(tag) {
-      return tag === "canvas" ? canvases.createElement(tag) : fakeElement(tag);
-    }
-  };
-}
 
 const B = load([
   "config.js", "pixel.js", "level.js",
@@ -175,12 +125,6 @@ const HANDLERS = [
   "setShape", "cycleFacing", "setColor", "setDecor", "toggleMark",
   "save", "open", "clear"
 ];
-
-function descend(el, found = []) {
-  found.push(el);
-  el.children.forEach((child) => descend(child, found));
-  return found;
-}
 
 const buttons = (root) => descend(root).filter((el) => el.getAttribute(ACT_ATTR) !== null);
 const hookOf = (btn) => `${btn.getAttribute(ACT_ATTR)} ${btn.getAttribute(ARG_ATTR)}`;
@@ -292,6 +236,14 @@ describe("toolbar: the buttons", () => {
     assert.deepEqual(marks.slice(0, GRID * GRID), ARROW_GRID);
     assert.deepEqual(marks.slice(GRID * GRID), B.MARKS.filter((m) => !m.dir).map((m) => m.key));
     for (const btn of buttons(bar.el)) assert.equal(btn.className, `${B.PREFIX}btn`);
+  });
+
+  it("lends the rest of the interface the very words its shape buttons show", () => {
+    const r = rig();
+    for (const shape of B.SHAPES) {
+      assert.equal(B.toolbar.shapeLabel(shape), r.find("shape", shape).title.split(" (")[0]);
+    }
+    assert.equal(B.toolbar.shapeLabel("dome"), "", "a shape no button shows has no word");
   });
 
   it("offers one colour button per palette entry, in palette order", () => {

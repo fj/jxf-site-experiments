@@ -8,8 +8,8 @@
  * not turn with the view. The DOM is built once; sync() sets every pressed and
  * disabled state from the app's state, and the two icons that follow it
  * (solid, facing), leaving an icon alone when it already shows the right
- * glyph. element() and icon() lend the toolbar's builders to the rest of the
- * interface.
+ * glyph. element(), icon() and shapeLabel() lend the toolbar's builders and
+ * its words to the rest of the interface.
  */
 (function () {
   "use strict";
@@ -43,6 +43,12 @@
   // input.js binds one.
   function titled(label, key) {
     return key ? label + " (" + key + ")" : label;
+  }
+
+  // What the toolbar calls a shape, for the rest of the interface to name it
+  // the same way.
+  function shapeLabel(shape) {
+    return SHAPE_LABELS[shape] || "";
   }
 
   function element(tag, name) {
@@ -421,6 +427,7 @@
   B.toolbar = {
     build: build,
     element: element,
-    icon: icon
+    icon: icon,
+    shapeLabel: shapeLabel
   };
 })();

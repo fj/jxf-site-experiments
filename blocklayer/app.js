@@ -1,10 +1,11 @@
 /*
- * Blocklayer — the app entry. Builds the toolbar, the canvas, the hint row
- * and the status line into the mount, keeps the one state object the renderer
- * reads, and maps every toolbar action and pointer gesture onto a call to the
- * modules that hold the rules: each one redraws, refreshes the toolbar, and —
- * when the level changed — saves it on that redraw. The level also goes out to
- * a file and comes back from one, by the picker or dropped on the canvas.
+ * Blocklayer — the app entry. Builds the toolbar, the canvas, the hint row,
+ * the size row, the tip panel and the status line into the mount, keeps the
+ * one state object the renderer reads, and maps every toolbar action and
+ * pointer gesture onto a call to the modules that hold the rules: each one
+ * redraws, refreshes the toolbar, and — when the level changed — saves it on
+ * that redraw. The level also goes out to a file and comes back from one, by
+ * the picker or dropped on the canvas.
  * Wiring only; what a gesture means belongs to the module it calls.
  */
 (function () {
@@ -15,9 +16,11 @@
   if (!B || !root) return;
 
   var storage = B.store.from(window);
+  var opening = B.store.read(storage);
 
   var state = {
-    level: B.store.read(storage),
+    level: opening,
+    size: opening.size,
     view: B.view.create(),
     layers: { elevation: true, marks: true, decor: true },
     opaque: true,
@@ -26,11 +29,15 @@
     selection: [],
     box: null,
     hover: null,
-    hold: null
+    hold: null,
+    pending: null,
+    tip: null
   };
 
   var canvas = null;
   var toolbar = null;
+  var bounds = null;
+  var tip = null;
   var status = null;
 
   // ---- Persistence ---------------------------------------------------------
@@ -81,8 +88,10 @@
       return;
     }
     state.level = level;
+    state.size = level.size;
     setSelection([]);
     state.hover = null;
+    clampPan();
     edited();
   }
 
@@ -119,7 +128,7 @@
     return state.view.zoom * dpr();
   }
 
-  function resize() {
+  function fitCanvas() {
     var w = Math.round(canvas.clientWidth * dpr());
     var h = Math.round(canvas.clientHeight * dpr());
     if (canvas.width !== w) canvas.width = w;
@@ -128,9 +137,15 @@
   }
 
   function watchSize(stage) {
-    if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
-    else window.addEventListener("resize", resize);
-    resize();
+    if (window.ResizeObserver) new ResizeObserver(fitCanvas).observe(stage);
+    else window.addEventListener("resize", fitCanvas);
+    fitCanvas();
+  }
+
+  // Some of the board stays on screen after every move of the camera and
+  // every change of the board's size.
+  function clampPan() {
+    B.view.clampPan(state.view, state.size, B.view.frame(canvas, scale()));
   }
 
   // Where a client point falls in the space the view projects into.
@@ -167,7 +182,14 @@
 
   function changed() {
     toolbar.sync(state);
+    bounds.sync(state);
+    tip.sync(state);
     sched();
+  }
+
+  function moved() {
+    clampPan();
+    changed();
   }
 
   function edited() {
@@ -220,11 +242,41 @@
     edited();
   }
 
+  // The board takes the new size and loses the tiles outside it, which leave
+  // the selection with them.
+  function resizeBoard(w, h) {
+    state.pending = null;
+    B.level.resize(state.level, w, h).forEach(function (tile) {
+      setSelection(B.selection.remove(state.selection, tile.x, tile.y));
+    });
+    state.size = state.level.size;
+    state.hover = null;
+    clampPan();
+    edited();
+  }
+
   // Everything the toolbar and the pointer can do; each reads the keys it needs.
   var handlers = {
-    pan: function (facing) { B.view.pan(state.view, facing, PAN_STEP); changed(); },
-    rotate: function (turns) { B.view.rotate(state.view, turns); changed(); },
-    zoom: function (delta) { B.view.zoom(state.view, delta); changed(); },
+    pan: function (facing) { B.view.pan(state.view, facing, PAN_STEP); moved(); },
+    rotate: function (turns) { B.view.rotate(state.view, turns); moved(); },
+    zoom: function (delta) { B.view.zoom(state.view, delta); moved(); },
+    // A shrink that would drop tiles changes nothing until the reader says so.
+    resize: function (w, h) {
+      var lost = B.level.outside(state.level, w, h);
+      if (!lost.length) {
+        resizeBoard(w, h);
+        return;
+      }
+      state.pending = { w: w, h: h, lost: lost.length };
+      changed();
+    },
+    confirmResize: function () {
+      if (state.pending) resizeBoard(state.pending.w, state.pending.h);
+    },
+    cancelResize: function () {
+      state.pending = null;
+      changed();
+    },
     toggleLayer: function (name) {
       if (!(name in state.layers)) return;
       state.layers[name] = !state.layers[name];
@@ -262,7 +314,11 @@
     pick: pick,
     selection: function () { return state.selection; },
     color: function () { return state.color; },
-    hover: function (hit) {
+    // The panel follows the pointer, so it is refreshed on its own rather
+    // than through the whole interface.
+    hover: function (hit, alt, x, y) {
+      state.tip = B.tip.from(hit, alt, x, y);
+      tip.sync(state);
       if (B.view.sameHit(hit, state.hover)) return;
       state.hover = hit;
       sched();
@@ -339,15 +395,33 @@
     return line;
   }
 
-  function buildSkeleton(mount) {
-    var layout = element("div", "layout");
-    var stage = element("div", "stage");
+  // What the canvas stands on: the hints on one side, the board's size on the
+  // other.
+  function captionRow() {
+    var row = element("div", "captions");
+    row.appendChild(hintRow());
+    row.appendChild(bounds.row);
+    return row;
+  }
+
+  // The canvas and the modal that covers it, which the rows below stay clear of.
+  function boardBox() {
+    var board = element("div", "board");
     canvas = element("canvas", "canvas");
     canvas.tabIndex = 0;
     canvas.setAttribute("aria-label", "Level");
+    board.appendChild(canvas);
+    board.appendChild(bounds.modal);
+    board.appendChild(tip.el);
+    return board;
+  }
+
+  function buildSkeleton(mount) {
+    var layout = element("div", "layout");
+    var stage = element("div", "stage");
     status = statusLine();
-    stage.appendChild(canvas);
-    stage.appendChild(hintRow());
+    stage.appendChild(boardBox());
+    stage.appendChild(captionRow());
     stage.appendChild(status);
     layout.appendChild(toolbar.el);
     layout.appendChild(stage);
@@ -357,6 +431,8 @@
 
   // ---- Boot ----------------------------------------------------------------
   toolbar = B.toolbar.build(handlers);
+  bounds = B.bounds.build(handlers);
+  tip = B.tip.build();
   var stage = buildSkeleton(root);
   B.input.attach(canvas, handlers);
   watchDrops(stage);

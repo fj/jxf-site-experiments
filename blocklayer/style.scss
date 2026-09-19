@@ -1,9 +1,10 @@
 // Styles for the Blocklayer experiment.
 //
-// A column of pixel-art buttons beside the level's canvas, and a hint row and
-// a status line under the canvas. The host owns the mount's outer box; what's
-// here is the layout inside it, the button, the icon's colour per theme, the
-// canvas and the hold-to-clear fill.
+// A column of pixel-art buttons beside the level's canvas, a hint row and a
+// size row under the canvas, and a status line under those, with the resize
+// modal and the tip panel over the canvas. The host owns the mount's outer
+// box; what's here is the layout inside it, the button, the icon's colour per
+// theme, the canvas and the hold-to-clear fill.
 
 @import "../shared/theme";
 
@@ -27,6 +28,17 @@ $blk-ink-dark: #e8e8f0;       // ...and on a dark one
 $blk-hint-gap: 1.2em;
 $blk-hint-item-gap: 0.35em;
 $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothing
+$blk-size-gap: 0.35em;
+$blk-size-field: 4em;         // wide enough for the largest board, and no wider
+$blk-size-pad: 0.2em 0.3em;
+$blk-modal-pad: 0.9em;
+$blk-modal-gap: 0.7em;
+$blk-modal-width: 22em;
+$blk-modal-btn-pad: 0.35em 0.9em;
+$blk-scrim-alpha: 0.5;
+$blk-scrim-dark: #05060a;     // the veil over a dark canvas, which the ink is too near
+$blk-tip-pad: 0.3em 0.5em;
+$blk-tip-width: 12em;
 
 .experiment-ext-blk-layout {
   display: grid;
@@ -148,6 +160,11 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   min-width: 0;
 }
 
+// The canvas and the modal that covers it; the rows below stay in the clear.
+.experiment-ext-blk-board {
+  position: relative;
+}
+
 .experiment-ext-blk-canvas {
   display: block;
   width: 100%;
@@ -170,6 +187,102 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   }
 }
 
+// Where a shrink that would drop tiles asks first, over the canvas it edits.
+.experiment-ext-blk-modal {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: $blk-modal-pad;
+  background: rgba($blk-ink, $blk-scrim-alpha);
+
+  &[hidden] { display: none; }
+
+  @include exp-dark { background: rgba($blk-scrim-dark, $blk-scrim-alpha); }
+}
+
+.experiment-ext-blk-modal-box {
+  display: flex;
+  flex-direction: column;
+  gap: $blk-modal-gap;
+  max-width: $blk-modal-width;
+  padding: $blk-modal-pad;
+  border: $blk-border solid $exp-border;
+  border-radius: $blk-corner;
+  background: $exp-surface;
+  color: $blk-ink;
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+    color: $blk-ink-dark;
+  }
+}
+
+.experiment-ext-blk-modal-text {
+  @extend %blk-caption;
+  margin: 0;
+}
+
+.experiment-ext-blk-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: $blk-size-gap;
+}
+
+.experiment-ext-blk-modal-btn {
+  @extend %blk-caption;
+  appearance: none;
+  padding: $blk-modal-btn-pad;
+  border: $blk-border solid $exp-border;
+  border-radius: $blk-corner;
+  background: $exp-surface;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover { border-color: $exp-link; }
+  &:focus-visible { outline: $blk-border solid $exp-link; outline-offset: 1px; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+
+    &:hover { border-color: $exp-link-dark; }
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
+}
+
+// What Alt over a tile says it is. It is placed from the client point the
+// pointer reports, so it is fixed to the viewport, and it never takes an
+// event the canvas under it wants.
+.experiment-ext-blk-tip {
+  position: fixed;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: $blk-tip-width;
+  padding: $blk-tip-pad;
+  border: $blk-border solid $exp-border;
+  border-radius: $blk-corner;
+  background: $exp-surface;
+  color: $blk-ink;
+  pointer-events: none;
+
+  &[hidden] { display: none; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+    color: $blk-ink-dark;
+  }
+}
+
+.experiment-ext-blk-tip-line {
+  @extend %blk-caption;
+
+  &[hidden] { display: none; }
+}
+
 // A level file dragged over the stage lights the canvas border, as focus does.
 .experiment-ext-blk-stage.is-dropping .experiment-ext-blk-canvas {
   border-color: $exp-link;
@@ -177,11 +290,50 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
   @include exp-dark { border-color: $exp-link-dark; }
 }
 
-// The hint and the status line: small mono text under the canvas.
+// The hint row, the size row and the status line: small mono text under the
+// canvas.
 %blk-caption {
-  margin-top: $blk-text-gap;
   font-family: $exp-mono-font-family;
   font-size: 0.8em;
+}
+
+// The hints on one side of the row, the board's size on the other.
+.experiment-ext-blk-captions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $blk-hint-item-gap $blk-hint-gap;
+  margin-top: $blk-text-gap;
+}
+
+.experiment-ext-blk-size {
+  @extend %blk-caption;
+  display: flex;
+  align-items: center;
+  gap: $blk-size-gap;
+  color: $exp-muted;
+
+  @include exp-dark { color: $exp-muted-dark; }
+}
+
+.experiment-ext-blk-size-input {
+  width: $blk-size-field;
+  padding: $blk-size-pad;
+  font: inherit;
+  color: inherit;
+  border: $blk-border solid $exp-border;
+  border-radius: $blk-corner;
+  background: $exp-surface;
+
+  &:focus-visible { outline: $blk-border solid $exp-link; outline-offset: 1px; }
+
+  @include exp-dark {
+    border-color: $exp-border-dark;
+    background: $exp-surface-dark;
+
+    &:focus-visible { outline-color: $exp-link-dark; }
+  }
 }
 
 .experiment-ext-blk-hint {
@@ -210,6 +362,7 @@ $blk-status-height: 1.4em;    // one line kept clear, so a message shifts nothin
 // Where the app says, briefly, why an opened file was refused.
 .experiment-ext-blk-status {
   @extend %blk-caption;
+  margin-top: $blk-text-gap;
   min-height: $blk-status-height;
   color: $exp-error;
 

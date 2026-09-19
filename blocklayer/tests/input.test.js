@@ -10,6 +10,10 @@ const FRAME_MS = 16;
 const PRIMARY = 0;
 const MIDDLE = 1;
 const SECONDARY = 2;
+const ALT = true;               // as a hover reports the Alt key
+const NO_ALT = false;
+const ALT_DOWN = { key: "Alt", altKey: true };
+const ALT_UP = { key: "Alt", altKey: false };
 
 // A clock and a frame scheduler the test advances by hand.
 function fakeWindow() {
@@ -164,9 +168,9 @@ describe("input: adding by click and drag", () => {
     const a = r.at(10, 10, cell(0, 0));
     const b = r.at(40, 10, cell(1, 0));
     r.fire("pointerdown", { ...a, button: PRIMARY });
-    assert.deepEqual(r.calls, [["add", 0, 0], ["hover", tile(0, 0)]]);
+    assert.deepEqual(r.calls, [["add", 0, 0], ["hover", tile(0, 0), NO_ALT, 10, 10]]);
     r.fire("pointermove", b);
-    assert.deepEqual(r.calls.slice(2), [["add", 1, 0], ["hover", tile(1, 0)]]);
+    assert.deepEqual(r.calls.slice(2), [["add", 1, 0], ["hover", tile(1, 0), NO_ALT, 40, 10]]);
   });
 
   it("a left click on a tile selects it and adds nothing", () => {
@@ -206,7 +210,11 @@ describe("input: adding by click and drag", () => {
     r.fire("pointermove", { clientX: WIDTH + 5, clientY: 10 });
     r.fire("pointermove", b);
     assert.deepEqual(r.of("add"), [[0, 0], [1, 0]]);
-    assert.deepEqual(r.of("hover"), [[tile(0, 0)], [null], [tile(1, 0)]]);
+    assert.deepEqual(r.of("hover"), [
+      [tile(0, 0), NO_ALT, 10, 10],
+      [null, NO_ALT, WIDTH + 5, 10],
+      [tile(1, 0), NO_ALT, 40, 10]
+    ]);
   });
 
   it("a drag that starts on a tile selects it, then adds the empty cells it crosses", () => {
@@ -237,15 +245,21 @@ describe("input: adding by click and drag", () => {
     r.fire("pointerdown", { ...a, button: PRIMARY });
     r.fire("pointermove", t);
     assert.deepEqual(r.of("add"), [[0, 0]]);
-    assert.deepEqual(r.of("hover"), [[tile(0, 0)], [tile(1, 1)]]);
+    assert.deepEqual(r.of("hover"), [
+      [tile(0, 0), NO_ALT, 10, 10],
+      [tile(1, 1), NO_ALT, 20, 20]
+    ]);
   });
 
   it("a pointer outside the canvas hovers nothing", () => {
     const r = rig();
     r.at(WIDTH + 5, 10, cell(9, 9));
     r.fire("pointermove", { clientX: WIDTH + 5, clientY: 10 });
-    r.fire("pointerleave", {});
-    assert.deepEqual(r.of("hover"), [[null], [null]]);
+    r.fire("pointerleave", { clientX: WIDTH + 5, clientY: 10 });
+    assert.deepEqual(r.of("hover"), [
+      [null, NO_ALT, WIDTH + 5, 10],
+      [null, NO_ALT, WIDTH + 5, 10]
+    ], "the same shape of report either way");
   });
 
   it("a middle button press is ignored", () => {
@@ -615,7 +629,10 @@ describe("input: the wheel", () => {
     assert.deepEqual(r.of("raise"), [[1], [-1]]);
     assert.equal(up.prevented, true);
     assert.equal(down.prevented, true);
-    assert.deepEqual(r.of("hover"), [[tile(1, 1)], [tile(1, 1)]]);
+    assert.deepEqual(r.of("hover"), [
+      [tile(1, 1), NO_ALT, 20, 20],
+      [tile(1, 1), NO_ALT, 20, 20]
+    ]);
   });
 
   it("raises a tile that is one of several selected", () => {
@@ -869,6 +886,94 @@ describe("input: the colour keys", () => {
     assert.equal(r.fire("keydown", { key: "c" }).prevented, true);
     assert.equal(r.fire("keydown", { key: "C", ...SHIFT }).prevented, true);
     assert.deepEqual(r.of("setColor"), [[round(1)], [round(2)], [round(1)]]);
+  });
+});
+
+describe("input: Alt with the hover", () => {
+  it("reports Alt held with what the pointer is over, and where it is", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointermove", { ...t, altKey: true });
+    assert.deepEqual(r.of("hover"), [[tile(1, 1), ALT, 20, 20]]);
+  });
+
+  it("reports Alt let go again on the next move", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointermove", { ...t, altKey: true });
+    r.fire("pointermove", t);
+    assert.deepEqual(r.of("hover").pop(), [tile(1, 1), NO_ALT, 20, 20]);
+  });
+
+  // The key comes and goes with the pointer still, and the panel with it.
+  it("reports the same hit again when Alt is pressed with the pointer still", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointermove", t);
+    r.fire("keydown", ALT_DOWN);
+    assert.deepEqual(r.of("hover"), [
+      [tile(1, 1), NO_ALT, 20, 20],
+      [tile(1, 1), ALT, 20, 20]
+    ]);
+  });
+
+  it("reports it again when Alt is let go with the pointer still", () => {
+    const r = rig();
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointermove", { ...t, altKey: true });
+    r.fire("keyup", ALT_UP);
+    assert.deepEqual(r.of("hover"), [
+      [tile(1, 1), ALT, 20, 20],
+      [tile(1, 1), NO_ALT, 20, 20]
+    ]);
+  });
+
+  it("reports nothing again while Alt is held down", () => {
+    const r = rig();
+    r.fire("pointermove", r.at(20, 20, tile(1, 1)));
+    r.fire("keydown", ALT_DOWN);
+    r.fire("keydown", { key: "w", altKey: true });
+    r.fire("keydown", ALT_DOWN);
+    assert.equal(r.of("hover").length, 2, "one report for the key going down");
+  });
+
+  // The tile may be gone by the time Alt arrives, so the point is picked
+  // again rather than the old answer repeated.
+  it("picks the point afresh when Alt comes, so a gone tile is never reported", () => {
+    const r = rig();
+    r.fire("pointermove", r.at(20, 20, tile(1, 1)));
+    r.at(20, 20, cell(1, 1));
+    r.fire("keydown", ALT_DOWN);
+    assert.deepEqual(r.of("hover").pop(), [cell(1, 1), ALT, 20, 20]);
+  });
+
+  it("picks nothing when Alt comes with the pointer beyond the canvas", () => {
+    const r = rig();
+    r.at(WIDTH + 5, 10, tile(9, 9));
+    r.fire("pointermove", { clientX: WIDTH + 5, clientY: 10 });
+    r.fire("keydown", ALT_DOWN);
+    assert.deepEqual(r.of("hover").pop(), [null, ALT, WIDTH + 5, 10]);
+  });
+
+  it("reports nothing at all when Alt moves with the pointer off the canvas", () => {
+    const r = rig();
+    r.fire("keydown", ALT_DOWN);
+    r.fire("keyup", ALT_UP);
+    assert.deepEqual(r.of("hover"), [], "there is no hit to report");
+    r.fire("pointermove", r.at(20, 20, tile(1, 1)));
+    const leaving = r.of("hover").length;
+    r.fire("pointerleave", { clientX: 20, clientY: 20 });
+    r.fire("keydown", ALT_DOWN);
+    assert.equal(r.of("hover").length, leaving + 1, "only the leaving is reported");
+  });
+
+  it("swallows no key while Alt is held, so the canvas keys stay off", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    for (const key of ["Alt", "w", "x", "ArrowUp"]) {
+      assert.equal(r.fire("keydown", { key, altKey: true }).prevented, false, key);
+    }
+    assert.deepEqual(r.calls, []);
   });
 });
 

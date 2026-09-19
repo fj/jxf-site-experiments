@@ -375,13 +375,13 @@
     { icon: "hint-remove", word: "remove" }
   ];
 
-  var element = B.toolbar.element;
+  var element = B.parts.element;
 
   function hintRow() {
     var row = element("div", "hint");
     HINTS.forEach(function (h) {
       var item = element("span", "hint-item");
-      item.appendChild(B.toolbar.icon(h.icon));
+      item.appendChild(B.parts.icon(h.icon));
       item.appendChild(document.createTextNode(h.word));
       row.appendChild(item);
     });

@@ -20,9 +20,7 @@ const PENDING = { w: 3, h: 4, lost: LOST };
 
 const page = fakeDocument();
 const B = load([
-  "config.js", "pixel.js", "level.js",
-  "sprites-tiles.js", "sprites-decor.js", "sprites-marks.js", "sprites-icons.js",
-  "input.js", "toolbar.js", "bounds.js"
+  "config.js", "parts.js", "bounds.js"
 ], { document: page });
 
 B.SIZE_MIN = SIZE_MIN;

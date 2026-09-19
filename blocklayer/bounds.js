@@ -35,7 +35,7 @@
     { ctl: "height", label: "Height in tiles", of: function (size) { return size.h; } }
   ];
 
-  var element = B.toolbar.element;
+  var element = B.parts.element;
 
   function field(spec) {
     var input = element("input", "size-input");

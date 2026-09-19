@@ -8,23 +8,20 @@
  * not turn with the view. The DOM is built once; sync() sets every pressed and
  * disabled state from the app's state, and the two icons that follow it
  * (solid, facing), leaving an icon alone when it already shows the right
- * glyph. element(), icon() and shapeLabel() lend the toolbar's builders and
- * its words to the rest of the interface.
+ * glyph. The elements, the icons and the words all come from parts.js.
  */
 (function () {
   "use strict";
 
   var B = window.BlockLayer = window.BlockLayer || {};
+  var P = B.parts;
 
-  var ICON_SCALE = 2;                                  // CSS px per sprite px
   var HOLD_VAR = "--" + B.PREFIX + "hold";             // the fill animation's length
   var HOLDING_CLASS = "is-holding";
   var PRIMARY_BUTTON = 0;
   var HOLD_KEYS = [" ", "Enter"];
   var FILE_ACCEPT = ".json";
   var STILL_ROT = 0;                                   // a still mark is the same at every rotation
-  var ICON_ATTR = "data-icon";                         // the glyph an icon shows
-  var ARROW_ICON = "arrow-";                           // ...which for a compass arrow is this + dir
 
   var PAN_LABELS = { N: "North", E: "East", S: "South", W: "West" };
   var PAN_SLOTS = [null, "N", null, "W", null, "E", null, "S", null];
@@ -35,7 +32,6 @@
     { name: "marks", title: "Marks", icon: "layer-marks" },
     { name: "decor", title: "Decor", icon: "layer-decor" }
   ];
-  var SHAPE_LABELS = { block: "Block", ramp: "Ramp", stairs: "Stairs" };
   var FACING_LABEL = "Facing";
   var EITHER_KEY = "/";                                // between two keys in one title
 
@@ -45,33 +41,21 @@
     return key ? label + " (" + key + ")" : label;
   }
 
-  // What the toolbar calls a shape, for the rest of the interface to name it
-  // the same way.
-  function shapeLabel(shape) {
-    return SHAPE_LABELS[shape] || "";
-  }
-
-  function element(tag, name) {
-    var el = document.createElement(tag);
-    el.className = B.PREFIX + name;
-    return el;
-  }
-
   function group(name) {
-    var el = element("div", "group");
+    var el = P.element("div", "group");
     el.setAttribute("data-group", name);
     return el;
   }
 
   function spacer() {
-    var el = element("span", "spacer");
+    var el = P.element("span", "spacer");
     el.setAttribute("aria-hidden", "true");
     return el;
   }
 
   // data-act and data-arg are the hooks the driver and the tests find a button by.
   function button(act, arg, title, onClick) {
-    var btn = element("button", "btn");
+    var btn = P.element("button", "btn");
     btn.type = "button";
     btn.setAttribute("data-act", act);
     btn.setAttribute("data-arg", arg);
@@ -84,49 +68,6 @@
     var btn = button(act, arg, title, onClick);
     btn.setAttribute("aria-pressed", "false");
     return btn;
-  }
-
-  // Coloured pixel art on a button: a decor object or a still mark.
-  function image(parent, sprite) {
-    var img = element("img", "image");
-    img.alt = "";
-    img.draggable = false;
-    img.src = B.pixel.dataUrl(sprite);
-    img.width = sprite.canvas.width * ICON_SCALE;
-    img.height = sprite.canvas.height * ICON_SCALE;
-    parent.appendChild(img);
-  }
-
-  // A UI glyph is a mask over the element's text colour, which the stylesheet
-  // sets per theme; the key names the glyph so a repeat is skipped.
-  function setIcon(span, key, sprite) {
-    if (span.getAttribute(ICON_ATTR) === key) return;
-    var url = "url(\"" + B.pixel.crispUrl(sprite) + "\")";
-    span.setAttribute(ICON_ATTR, key);
-    span.style.setProperty("mask-image", url);
-    span.style.setProperty("-webkit-mask-image", url);
-    span.style.width = sprite.canvas.width * ICON_SCALE + "px";
-    span.style.height = sprite.canvas.height * ICON_SCALE + "px";
-  }
-
-  function setGlyph(span, name) {
-    setIcon(span, name, B.icons.sprite(name));
-  }
-
-  function setArrow(span, dir) {
-    setIcon(span, ARROW_ICON + dir, B.icons.arrow(dir));
-  }
-
-  function icon(name) {
-    var span = element("span", "icon");
-    setGlyph(span, name);
-    return span;
-  }
-
-  function arrowIcon(dir) {
-    var span = element("span", "icon");
-    setArrow(span, dir);
-    return span;
   }
 
   function press(btn, on) {
@@ -188,7 +129,7 @@
       if (!facing) return el.appendChild(spacer());
       var title = titled(PAN_LABELS[facing], B.input.keyFor("pan", facing));
       var btn = button("pan", facing, title, function () { handlers.pan(facing); });
-      btn.appendChild(arrowIcon(facing));
+      btn.appendChild(P.arrowIcon(facing));
       el.appendChild(btn);
     });
     return el;
@@ -198,7 +139,7 @@
   function stepButton(act, step, label, glyph, run) {
     var title = titled(label, B.input.keyFor(act, step));
     var btn = button(act, step, title, function () { run(step); });
-    btn.appendChild(icon(glyph));
+    btn.appendChild(P.icon(glyph));
     return btn;
   }
 
@@ -215,12 +156,12 @@
     var el = group("layers");
     LAYER_BUTTONS.forEach(function (l) {
       var btn = toggle("layer", l.name, l.title, function () { handlers.toggleLayer(l.name); });
-      btn.appendChild(icon(l.icon));
+      btn.appendChild(P.icon(l.icon));
       refs.layers[l.name] = btn;
       el.appendChild(btn);
     });
     refs.opaque = toggle("opaque", "", "Solid", function () { handlers.toggleOpaque(); });
-    refs.opaqueIcon = icon(opaqueIcon(true));
+    refs.opaqueIcon = P.icon(opaqueIcon(true));
     refs.opaque.appendChild(refs.opaqueIcon);
     el.appendChild(refs.opaque);
     return el;
@@ -229,9 +170,9 @@
   function shapeGroup(refs, handlers) {
     var el = group("shape");
     B.SHAPES.forEach(function (shape) {
-      var title = titled(SHAPE_LABELS[shape], B.input.keyFor("setShape", shape));
+      var title = titled(P.shapeLabel(shape), B.input.keyFor("setShape", shape));
       var btn = toggle("shape", shape, title, function () { handlers.setShape(shape); });
-      btn.appendChild(icon("shape-" + shape));
+      btn.appendChild(P.icon("shape-" + shape));
       refs.shapes[shape] = btn;
       el.appendChild(btn);
     });
@@ -240,7 +181,7 @@
     refs.facing = button("facing", "", titled(FACING_LABEL, turnKeys), function () {
       handlers.cycleFacing();
     });
-    refs.facingIcon = arrowIcon(B.FACINGS[0]);
+    refs.facingIcon = P.arrowIcon(B.FACINGS[0]);
     refs.facing.appendChild(refs.facingIcon);
     el.appendChild(refs.facing);
     return el;
@@ -257,7 +198,7 @@
       var btn = toggle("color", entry.key, titled(entry.label, stepKeys), function () {
         handlers.setColor(entry.key);
       });
-      image(btn, B.tiles.swatch(entry.key));
+      P.image(btn, B.tiles.swatch(entry.key));
       refs.colors[entry.key] = btn;
       el.appendChild(btn);
     });
@@ -269,7 +210,7 @@
     B.DECOR.forEach(function (d) {
       var title = titled(d.label, B.input.keyFor("setDecor", d.key));
       var btn = toggle("decor", d.key, title, function () { handlers.setDecor(d.key); });
-      image(btn, B.decor.icon(d.key));
+      P.image(btn, B.decor.icon(d.key));
       refs.decor[d.key] = btn;
       el.appendChild(btn);
     });
@@ -284,8 +225,8 @@
       if (!m) return el.appendChild(spacer());
       var title = titled(m.label, B.input.keyFor("toggleMark", m.key));
       var btn = toggle("mark", m.key, title, function () { handlers.toggleMark(m.key); });
-      if (m.dir) btn.appendChild(arrowIcon(m.dir));
-      else image(btn, B.marks.sprite(m.key, STILL_ROT));
+      if (m.dir) btn.appendChild(P.arrowIcon(m.dir));
+      else P.image(btn, B.marks.sprite(m.key, STILL_ROT));
       refs.marks[m.key] = btn;
       el.appendChild(btn);
     });
@@ -311,13 +252,13 @@
   function fileGroup(refs, handlers, picker) {
     var el = group("file");
     var save = button("save", "", "Save", function () { handlers.save(); });
-    save.appendChild(icon("file-save"));
+    save.appendChild(P.icon("file-save"));
     el.appendChild(save);
     var open = button("open", "", "Open", function () { picker.click(); });
-    open.appendChild(icon("file-open"));
+    open.appendChild(P.icon("file-open"));
     el.appendChild(open);
     refs.clear = button("clear", "", "Clear");
-    refs.clear.appendChild(icon("clear"));
+    refs.clear.appendChild(P.icon("clear"));
     el.appendChild(refs.clear);
     el.appendChild(picker);
     return el;
@@ -363,7 +304,7 @@
   }
 
   function build(handlers) {
-    var el = element("div", "toolbar");
+    var el = P.element("div", "toolbar");
     el.style.setProperty(HOLD_VAR, B.HOLD_MS + "ms");
 
     var refs = { layers: {}, shapes: {}, colors: {}, decor: {}, marks: {} };
@@ -383,7 +324,7 @@
         press(refs.layers[l.name], !!state.layers[l.name]);
       });
       press(refs.opaque, !!state.opaque);
-      setGlyph(refs.opaqueIcon, opaqueIcon(state.opaque));
+      P.setGlyph(refs.opaqueIcon, opaqueIcon(state.opaque));
     }
 
     // One slope in the selection is enough to turn, and the arrow shows the
@@ -395,7 +336,7 @@
         });
       });
       refs.facing.disabled = !tiles.some(function (tile) { return B.level.sloped(tile); });
-      setArrow(refs.facingIcon, anchor ? anchor.facing : B.FACINGS[0]);
+      P.setArrow(refs.facingIcon, anchor ? anchor.facing : B.FACINGS[0]);
       B.DECOR.forEach(function (d) {
         syncToggle(refs.decor[d.key], tiles, function (tile) {
           return tile.decor === d.key;
@@ -424,10 +365,5 @@
     return { el: el, sync: sync };
   }
 
-  B.toolbar = {
-    build: build,
-    element: element,
-    icon: icon,
-    shapeLabel: shapeLabel
-  };
+  B.toolbar = { build: build };
 })();

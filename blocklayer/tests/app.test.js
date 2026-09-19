@@ -22,7 +22,7 @@ const MODULES = [
   "config.js", "pixel.js", "level.js", "file.js", "view.js", "selection.js",
   "demo.js", "store.js", "sprites-tiles.js", "sprites-decor.js",
   "sprites-marks.js", "sprites-icons.js", "render.js", "input.js",
-  "toolbar.js", "bounds.js", "tip.js"
+  "parts.js", "toolbar.js", "bounds.js", "tip.js"
 ];
 
 // app.js schedules its redraws on the bare global, and a frame that never
@@ -313,7 +313,7 @@ describe("app: Alt over a tile", () => {
     assert.deepEqual(said(r), [
       `Elevation ${tile.elev}`,
       r.B.PALETTE.filter((c) => c.key === tile.color)[0].label,
-      r.B.toolbar.shapeLabel(tile.shape)
+      r.B.parts.shapeLabel(tile.shape)
     ]);
   });
 

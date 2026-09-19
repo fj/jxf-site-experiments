@@ -255,9 +255,11 @@ opened from; rotation, projection, picking, the frame and the way in from a
 pointer; which cells are chosen, which every module asks `selection.js`; the
 level a first visit starts with; the level the browser keeps — all unit-tested
 under `tests/`), `sprites-tiles.js`, `sprites-decor.js`, `sprites-marks.js`,
-`sprites-icons.js`, `render.js`, `toolbar.js`, `input.js`, `bounds.js` (the
-size row the reader sets the board by, and the modal that guards a lossy
-shrink), `tip.js` (the panel Alt opens on a tile), and `app.js` last — the
+`sprites-icons.js`, `render.js`, `input.js`, `parts.js` (the elements, the
+icons and the shape vocabulary every panel builds from), `toolbar.js`,
+`bounds.js` (the size row the reader sets the board by, and the modal that
+guards a lossy shrink), `tip.js` (the panel Alt opens on a tile), and
+`app.js` last — the
 DOM, the listeners and the frame scheduler, and nothing else — with the kit's
 `shared/png.js` for the file download.
 The level autosaves to `localStorage`, and a `.blocklayer.json` dropped on the

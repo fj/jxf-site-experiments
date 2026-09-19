@@ -3,8 +3,8 @@
  * held: its elevation, its colour, its shape, and its decor object when it
  * carries one. from() answers where the panel stands, and nothing while Alt is
  * up or the pointer is over no tile; sync() shows it beside the pointer, never
- * under it. Every word comes from the lists the toolbar and the level read, so
- * nothing is spelled twice.
+ * under it. Every word comes from the lists config.js holds and the shape
+ * vocabulary parts.js keeps, so nothing is spelled twice.
  */
 (function () {
   "use strict";
@@ -15,7 +15,7 @@
   var POINTER_GAP = 14;             // px from the pointer, so the panel never covers it
   var ELEV_WORD = "Elevation";
 
-  var element = B.toolbar.element;
+  var element = B.parts.element;
 
   function labelOf(entries, key) {
     for (var i = 0; i < entries.length; i++) {
@@ -47,7 +47,7 @@
       var tile = tip.tile;
       elev.textContent = ELEV_WORD + " " + tile.elev;
       color.textContent = labelOf(B.PALETTE, tile.color);
-      shape.textContent = B.toolbar.shapeLabel(tile.shape);
+      shape.textContent = B.parts.shapeLabel(tile.shape);
       decor.textContent = labelOf(B.DECOR, tile.decor);
       decor.hidden = !tile.decor;
       el.style.left = tip.x + POINTER_GAP + "px";

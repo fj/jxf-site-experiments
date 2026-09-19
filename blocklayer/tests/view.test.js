@@ -251,6 +251,34 @@ describe("view: hit", () => {
 });
 
 describe("view: pick", () => {
+  // The hole a ring of four neighbours leaves, which each of them paints over:
+  //     .X.
+  //     X.X
+  //     .X.
+  it("answers the empty cell a ring of four neighbours surrounds, over all of its floor", () => {
+    const hole = { x: 1, y: -2 };
+    const ring = [[0, -2], [2, -2], [1, -1], [1, -3]];
+    const reachX = B.TILE_W / 2;
+    const reachY = B.TILE_H / 2;
+    for (const rot of ROTS) {
+      for (const elev of [B.ELEV_MIN, B.NEW_TILE_ELEV, B.ELEV_MAX]) {
+        const view = viewAt(rot, { x: 9, y: -5 });
+        const level = L.create();
+        for (const [x, y] of ring) L.add(level, x, y, elev);
+        const p = V.project(view, hole.x, hole.y, B.FLOOR);
+        assert.deepEqual(V.pick(view, level, p.sx, p.sy), { cell: hole }, `rot ${rot} elev ${elev}`);
+        for (let dx = -reachX; dx <= reachX; dx++) {
+          for (let dy = -reachY; dy <= reachY; dy++) {
+            const name = `rot ${rot} elev ${elev} ${dx},${dy}`;
+            const under = V.cellAt(view, p.sx + dx, p.sy + dy, B.FLOOR);
+            if (!B.sameCell(under, hole.x, hole.y)) continue;
+            assert.deepEqual(V.pick(view, level, p.sx + dx, p.sy + dy).cell, hole, name);
+          }
+        }
+      }
+    }
+  });
+
   it("lets a tall tile in front hide a lower one behind it", () => {
     const { view, level } = scene();
     L.add(level, 0, 0, 0);
@@ -280,6 +308,39 @@ describe("view: pick", () => {
     assert.deepEqual(V.pick(view, level, p.sx + 4, p.sy + 20), { tile: only });
   });
 
+  it("picks a tile by its top face at every rotation, whatever its shape", () => {
+    const at = { x: 2, y: -1 };
+    const TOP_FACE = [[0, 0], [0, -7], [0, 7], [15, 0], [-15, 0], [8, -3]];
+    const PROBE_ELEV = 3;                // clear of the floor and of the ceiling
+    for (const rot of ROTS) {
+      for (const shape of B.SHAPES) {
+        const view = viewAt(rot, { x: 9, y: -5 });
+        const level = L.create();
+        const probe = L.add(level, at.x, at.y, PROBE_ELEV);
+        L.setShape(level, at.x, at.y, shape);
+        const p = V.project(view, at.x, at.y, L.top(probe));
+        for (const [dx, dy] of TOP_FACE) {
+          const name = `rot ${rot} ${shape} ${dx},${dy}`;
+          assert.deepEqual(V.pick(view, level, p.sx + dx, p.sy + dy), { tile: probe }, name);
+        }
+      }
+    }
+  });
+
+  it("picks a tall column by a side face, where the ray meets its cell lower down", () => {
+    const { view, level } = scene();
+    const TALL = 5;
+    const tall = L.add(level, 0, 0, TALL);
+    const p = V.project(view, 0, 0, TALL);
+    for (let drop = 1; drop <= TALL; drop++) {
+      for (const dx of [-8, 0, 8]) {
+        const name = `${drop} blocks down, ${dx} across`;
+        const got = V.pick(view, level, p.sx + dx, p.sy + drop * B.BLOCK_H);
+        assert.deepEqual(got, { tile: tall }, name);
+      }
+    }
+  });
+
   it("picks a tile with no blocks by its top face, which lies on the floor", () => {
     const { view, level } = scene();
     const flat = L.add(level, 0, 0, B.ELEV_MIN);
@@ -303,15 +364,16 @@ describe("view: pick", () => {
     }
   });
 
-  it("gives the cell whose floor centre touches a lone column's side its own centre, " +
-    "and the tile one pixel in", () => {
+  // The cost of the ray: the low part of a short column's side face covers a
+  // floor cell the ray meets before it reaches the column's own height.
+  it("gives the cell whose floor a short column's side face covers to that cell", () => {
     const { view, level } = scene();
-    const lone = L.add(level, 0, 0, B.NEW_TILE_ELEV);
+    L.add(level, 0, 0, B.NEW_TILE_ELEV);
     for (const [x, y] of [[0, -1], [-1, 0]]) {
       const p = V.project(view, x, y, B.FLOOR);
       const inward = p.sx > 0 ? -1 : 1;
       assert.deepEqual(V.pick(view, level, p.sx, p.sy), { cell: { x, y } }, `(${x},${y})`);
-      assert.deepEqual(V.pick(view, level, p.sx + inward, p.sy), { tile: lone }, `(${x},${y})`);
+      assert.deepEqual(V.pick(view, level, p.sx + inward, p.sy), { cell: { x, y } }, `(${x},${y}) in`);
     }
   });
 
@@ -400,6 +462,27 @@ describe("view: pick", () => {
     const left = V.pick(view, level, p.sx - B.TILE_W / 2, p.sy);
     assert.deepEqual(right, { cell: { x: 1, y: 0 }, edge: true });
     assert.deepEqual(left, { cell: { x: 0, y: 1 }, edge: true });
+  });
+
+  it("never names a cell that holds a tile, at every rotation and pan", () => {
+    const SWEEP = 24;                    // px either way from the patch's centre
+    const patch = [[0, 0], [1, 0], [2, 0], [0, 1], [2, 1], [0, 2], [1, 2], [2, 2]];
+    for (const rot of ROTS) {
+      for (const pan of [{ x: 0, y: 0 }, { x: 9, y: -5 }, { x: -13, y: 21 }]) {
+        const view = viewAt(rot, pan);
+        const level = L.create();
+        patch.forEach(([x, y], i) => L.add(level, x, y, i % (B.ELEV_MAX + 1)));
+        const p = V.project(view, 1, 1, B.FLOOR);
+        for (let dx = -SWEEP; dx <= SWEEP; dx++) {
+          for (let dy = -SWEEP; dy <= SWEEP; dy++) {
+            const got = V.pick(view, level, p.sx + dx, p.sy + dy);
+            if (!got.cell) continue;
+            const name = `rot ${rot} pan ${pan.x},${pan.y} at ${dx},${dy}`;
+            assert.equal(L.get(level, got.cell.x, got.cell.y), null, name);
+          }
+        }
+      }
+    }
   });
 });
 

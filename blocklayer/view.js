@@ -108,13 +108,15 @@
     return dx < HALF_TILE_W && dy >= -edge && dy <= height + edge;
   }
 
-  // The front-most tile whose silhouette is under the point, else the cell of
-  // the floor under it: where a new column's base would stand. A column covers
-  // its own floor cell, so the cell is always empty.
+  // The first tile the ray from the eye through the point meets, else the cell
+  // of the floor under it: where a new column's base would stand. The cell the
+  // point falls in at each height, from the top down, is that ray. The floor is
+  // the last step, so the cell it answers with is always empty.
   function pick(view, level, sx, sy) {
-    var tiles = order(view, B.level.all(level));
-    for (var i = tiles.length - 1; i >= 0; i--) {
-      if (hit(view, tiles[i], sx, sy)) return { tile: tiles[i] };
+    for (var z = B.ELEV_MAX; z >= B.FLOOR; z--) {
+      var cell = cellAt(view, sx, sy, z);
+      var tile = B.level.get(level, cell.x, cell.y);
+      if (tile && B.level.top(tile) >= z) return { tile: tile };
     }
     var empty = { cell: cellAt(view, sx, sy, B.FLOOR) };
     if (onGridLine(view, sx, sy, B.FLOOR)) empty.edge = true;

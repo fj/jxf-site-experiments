@@ -171,6 +171,81 @@ describe("level: inside", () => {
   });
 });
 
+describe("level: outside and resize", () => {
+  const SMALLER = { w: 2, h: 2 };
+  // The cells past that smaller board, and the cells still on it, in the order
+  // the level is given them, which is not the order toJSON sorts them into.
+  const DROPPED = [[BOARD.w - 1, BOARD.h - 1], [BOARD.w - 1, 0], [0, BOARD.h - 1]];
+  const KEPT = [[0, 0], [1, 1]];
+  const LAID_OUT = [DROPPED[0], KEPT[0], DROPPED[1], KEPT[1], DROPPED[2]];
+
+  const cellsOf = (tiles) => tiles.map((t) => [t.x, t.y]);
+
+  function board() {
+    const level = L.create(BOARD.w, BOARD.h);
+    for (const [x, y] of LAID_OUT) L.add(level, x, y);
+    return level;
+  }
+
+  it("names the tiles a smaller board would drop, in the level's own order", () => {
+    assert.deepEqual(cellsOf(L.outside(board(), SMALLER.w, SMALLER.h)), DROPPED);
+  });
+
+  it("names the tiles themselves, not copies of them", () => {
+    const level = board();
+    const [first] = L.outside(level, SMALLER.w, SMALLER.h);
+    assert.equal(first, L.get(level, DROPPED[0][0], DROPPED[0][1]));
+  });
+
+  it("names nothing for a board that grows, or one of the same size", () => {
+    const level = board();
+    assert.deepEqual(L.outside(level, BOARD.w + 1, BOARD.h + 1), []);
+    assert.deepEqual(L.outside(level, BOARD.w, BOARD.h), []);
+  });
+
+  it("changes nothing at all while naming them", () => {
+    const level = board();
+    const before = structuredClone(level);
+    L.outside(level, SMALLER.w, SMALLER.h);
+    assert.deepEqual(level, before);
+  });
+
+  it("clamps the size it is asked about, so a board of no size keeps one cell", () => {
+    const pastTheFirstCell = LAID_OUT.filter(([x, y]) => !(x === 0 && y === 0));
+    assert.deepEqual(cellsOf(L.outside(board(), 0, 0)), pastTheFirstCell);
+  });
+
+  it("resizes, drops what no longer fits and keeps the rest", () => {
+    const level = board();
+    assert.deepEqual(cellsOf(L.resize(level, SMALLER.w, SMALLER.h)), DROPPED);
+    assert.deepEqual(level.size, SMALLER);
+    assert.equal(L.count(level), KEPT.length);
+    for (const [x, y] of KEPT) assert.ok(L.get(level, x, y), `${x},${y} stays`);
+    for (const [x, y] of DROPPED) assert.equal(L.get(level, x, y), null, `${x},${y} goes`);
+  });
+
+  it("drops nothing when the board grows", () => {
+    const level = board();
+    assert.deepEqual(L.resize(level, BOARD.w + 1, BOARD.h + 1), []);
+    assert.deepEqual(level.size, { w: BOARD.w + 1, h: BOARD.h + 1 });
+    assert.equal(L.count(level), LAID_OUT.length);
+  });
+
+  it("clamps and rounds the new size, as create does", () => {
+    const level = board();
+    L.resize(level, B.SIZE_MAX + 1, BOARD.h + 0.4);
+    assert.deepEqual(level.size, { w: B.SIZE_MAX, h: BOARD.h });
+  });
+
+  it("leaves a board that takes the cells the new one holds and refuses the rest", () => {
+    const level = board();
+    L.resize(level, SMALLER.w, SMALLER.h);
+    assert.equal(L.add(level, DROPPED[0][0], DROPPED[0][1]), null);
+    L.remove(level, KEPT[0][0], KEPT[0][1]);
+    assert.ok(L.add(level, KEPT[0][0], KEPT[0][1]));
+  });
+});
+
 describe("level: the elevation range", () => {
   it("runs from flat ground to seven blocks, and a new tile is one block high", () => {
     assert.deepEqual([B.ELEV_MIN, B.ELEV_MAX, B.NEW_TILE_ELEV], [0, 7, 1]);

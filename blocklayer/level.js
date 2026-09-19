@@ -94,6 +94,23 @@
     level.tiles = {};
   }
 
+  // The tiles a resize to w by h would drop, in the level's own order. Nothing
+  // changes.
+  function outside(level, w, h) {
+    var size = makeSize(w, h);
+    return all(level).filter(function (tile) {
+      return !onBoard(size, tile.x, tile.y);
+    });
+  }
+
+  // Takes the new size and answers the tiles it has no room for, which go.
+  function resize(level, w, h) {
+    var dropped = outside(level, w, h);
+    level.size = makeSize(w, h);
+    dropped.forEach(function (tile) { remove(level, tile.x, tile.y); });
+    return dropped;
+  }
+
   function sloped(tile) {
     return SLOPED_SHAPES.indexOf(tile.shape) >= 0;
   }
@@ -272,6 +289,8 @@
     add: add,
     remove: remove,
     clear: clear,
+    outside: outside,
+    resize: resize,
     sloped: sloped,
     top: top,
     maxElev: maxElev,

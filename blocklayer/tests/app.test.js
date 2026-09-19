@@ -179,6 +179,10 @@ function boot(tiles = [], storage = null) {
       fireDoc("visibilitychange");
     },
     cells() { return B.level.all(level).map((tile) => [tile.x, tile.y]).sort(); },
+    // The tile standing at (x, y) on the level the app holds now.
+    tileAt(x, y) { return B.level.get(this.frame().level, x, y); },
+    // The cells the selection holds, as the renderer is handed them.
+    selected() { return this.frame().selection.map((cell) => [cell.x, cell.y]); },
     // Each text the storage was written, read back as the level it holds.
     saved() { return storage ? storage.writes.map((text) => B.file.parse(text)) : []; },
     ctl(name) {
@@ -314,6 +318,95 @@ describe("app: the frames it draws on", () => {
     assert.equal(r.waiting(), 1, "and the next edit rides the frame already asked for");
     assert.equal(r.frame().level, r.level, "the renderer reads the app's own level");
     assert.equal(r.drawn.length, 2);
+  });
+});
+
+// A pair of tiles side by side, for a selection of one or of both.
+const PAIR = [[0, 0], [1, 0]];
+
+describe("app: the controls that edit the tiles", () => {
+  // The app with the tile at (0, 0) selected, ready for the toolbar.
+  const selecting = () => {
+    const r = boot(PAIR);
+    r.press(0, 0);
+    assert.deepEqual(r.selected(), [PAIR[0]], "the press selected the tile");
+    return r;
+  };
+
+  it("shapes the selected tile with the shape button", () => {
+    const r = selecting();
+    r.find("shape", "stairs").fire("click");
+    assert.equal(r.tileAt(0, 0).shape, "stairs");
+  });
+
+  it("gives the selected tile a decor object with the decor button", () => {
+    const r = selecting();
+    r.find("decor", "chest").fire("click");
+    assert.equal(r.tileAt(0, 0).decor, "chest");
+  });
+
+  it("marks the selected tile with the mark button", () => {
+    const r = selecting();
+    r.find("mark", "teleport").fire("click");
+    assert.deepEqual(r.tileAt(0, 0).marks, ["teleport"]);
+  });
+
+  it("paints the selection with the colour button", () => {
+    const r = selecting();
+    r.find("color", "violet").fire("click");
+    assert.equal(r.tileAt(0, 0).color, "violet");
+  });
+
+  it("takes the colour button as the next tile's colour while nothing is selected", () => {
+    const r = boot();
+    r.find("color", "orange").fire("click");
+    r.press(2, 2);
+    assert.equal(r.tileAt(2, 2).color, "orange");
+  });
+
+  it("turns the slopes in the selection and leaves a tile that has none alone", () => {
+    const r = selecting();
+    r.find("shape", "ramp").fire("click");
+    r.press(1, 0, { ctrlKey: true });
+    assert.deepEqual(r.selected(), PAIR, "a slope and a block, together");
+    const block = r.tileAt(1, 0).facing;
+    r.find("facing", "").fire("click");
+    assert.equal(r.tileAt(0, 0).facing, r.B.FACINGS[1], "the ramp turned");
+    assert.equal(r.tileAt(1, 0).facing, block, "and the block did not");
+  });
+});
+
+describe("app: the controls that take tiles away", () => {
+  it("takes the tile and its cell out of the selection on Delete", () => {
+    const r = boot(PAIR);
+    r.press(0, 0);
+    r.canvas.fire("keydown", { key: "Delete" });
+    assert.deepEqual(r.cells(), [PAIR[1]]);
+    assert.deepEqual(r.selected(), [], "the cell goes with the tile");
+  });
+
+  it("empties the level and the selection when the reader holds the clear button", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = boot(PAIR);
+    r.press(0, 0);
+    r.find("clear", "").fire("pointerdown", { button: PRIMARY });
+    t.mock.timers.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.cells(), []);
+    assert.deepEqual(r.selected(), []);
+  });
+});
+
+describe("app: the controls that change the selection", () => {
+  it("selects a tile, takes another in and out with Ctrl, and drops the lot on Escape", () => {
+    const r = boot(PAIR);
+    r.press(0, 0);
+    assert.deepEqual(r.selected(), [PAIR[0]]);
+    r.press(1, 0, { ctrlKey: true });
+    assert.deepEqual(r.selected(), PAIR);
+    r.press(1, 0, { ctrlKey: true });
+    assert.deepEqual(r.selected(), [PAIR[0]], "Ctrl takes it back out");
+    r.canvas.fire("keydown", { key: "Escape" });
+    assert.deepEqual(r.selected(), []);
   });
 });
 

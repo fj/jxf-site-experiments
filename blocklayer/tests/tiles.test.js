@@ -25,65 +25,98 @@ const HALF_H = B.TILE_H / 2;
 const ELEVATIONS = [];
 for (let elev = B.ELEV_MIN; elev <= B.ELEV_MAX; elev++) ELEVATIONS.push(elev);
 
+const COLORS = B.PALETTE.map((c) => c.key);
+const COLOR = B.DEFAULT_COLOR;            // the colour a tile takes unasked
+const OTHER_COLOR = COLORS.find((key) => key !== B.DEFAULT_COLOR);
+const GREYS = ["grey-light", "grey", "grey-dark"];   // lightest first
+const GREY_SPREAD = 32;                   // the most two channels of a grey part by
+const SEAM_SHADE = -0.18;                 // how far under its face a seam is shaded
+
 const colours = (sprite) => new Set(sprite.canvas.filled.values());
-const top = (elev) => B.ELEVATION_COLORS[String(elev)];
-const face = (elev, side) => P.shade(top(elev), B.FACE_SHADES[side]);
+const top = (color) => B.PALETTE.find((c) => c.key === color).hex;
+const face = (color, side) => P.shade(top(color), B.FACE_SHADES[side]);
+const seam = (color, side) => P.shade(face(color, side), SEAM_SHADE);
+const brightness = (hex) => P.parseHex(hex).reduce((sum, channel) => sum + channel, 0);
+const spread = (hex) => Math.max(...P.parseHex(hex)) - Math.min(...P.parseHex(hex));
 
-describe("tiles: the elevation colours", () => {
-  it("names a colour for every elevation in the range and none outside it", () => {
-    assert.deepEqual(new Set(Object.keys(B.ELEVATION_COLORS)),
-      new Set(ELEVATIONS.map(String)));
+describe("tiles: the palette", () => {
+  it("names each colour once, with a label and a hex of its own", () => {
+    assert.equal(new Set(COLORS).size, B.PALETTE.length);
+    assert.equal(new Set(B.PALETTE.map((c) => c.hex)).size, B.PALETTE.length);
+    for (const c of B.PALETTE) assert.ok(c.label.length > 0, c.key);
   });
 
-  it("gives each elevation its own colour, and builds a column there", () => {
-    const tops = ELEVATIONS.map(top);
-    assert.equal(new Set(tops).size, tops.length);
-    for (const elev of ELEVATIONS) {
-      assert.ok(T.column(elev).canvas.filled.size > 0, `elevation ${elev}`);
+  it("builds a column in every colour, each its own top face and an outline", () => {
+    for (const color of COLORS) {
+      assert.deepEqual(colours(T.column(color, B.ELEV_MIN)),
+        new Set([top(color), B.COLORS.outline]), color);
     }
   });
 
-  it("sinks a tile with no blocks into a cool blue", () => {
-    const [r, g, b] = P.parseHex(top(B.ELEV_MIN));
-    assert.ok(b > r && b > g, top(B.ELEV_MIN));
+  it("holds the colour a tile takes when nothing names one", () => {
+    assert.ok(COLORS.includes(B.DEFAULT_COLOR), B.DEFAULT_COLOR);
   });
 
-  it("warms every step of the climb, from green at the foot to red at the top", () => {
-    // Red leads green once a colour turns warm, so the difference climbs too.
-    const warmth = (elev) => {
-      const [r, g] = P.parseHex(top(elev));
-      return r - g;
-    };
-    const foot = B.ELEV_MIN + 1;
-    for (let elev = foot + 1; elev <= B.ELEV_MAX; elev++) {
-      assert.ok(warmth(elev) > warmth(elev - 1), `elevation ${elev} over ${elev - 1}`);
+  it("keeps its three greys near-neutral and every other colour full of colour", () => {
+    for (const color of COLORS) {
+      assert.equal(spread(top(color)) < GREY_SPREAD, GREYS.includes(color),
+        `${color} is ${top(color)}`);
     }
-    assert.ok(warmth(foot) < 0, `green at ${foot}`);
-    assert.ok(warmth(B.ELEV_MAX) > 0, `red at ${B.ELEV_MAX}`);
+  });
+
+  it("darkens its greys in the order their names read", () => {
+    const tones = GREYS.map((color) => brightness(top(color)));
+    for (let i = 1; i < tones.length; i++) {
+      assert.ok(tones[i] < tones[i - 1], `${GREYS[i]} under ${GREYS[i - 1]}`);
+    }
+  });
+
+  it("refuses a colour it does not hold", () => {
+    assert.throws(() => T.column("puce", B.ELEV_MIN), /no colour/);
   });
 });
 
 describe("tiles: column", () => {
   it("draws a tile with no blocks as its top face alone, outlined", () => {
-    const flat = T.column(B.ELEV_MIN);
+    const flat = T.column(COLOR, B.ELEV_MIN);
     assert.equal(flat.canvas.height, B.TILE_H);
-    assert.deepEqual(colours(flat), new Set([top(B.ELEV_MIN), B.COLORS.outline]));
+    assert.deepEqual(colours(flat), new Set([top(COLOR), B.COLORS.outline]));
   });
 
   it("draws a side face on each side of a tile that has a block", () => {
-    const elev = B.ELEV_MIN + 1;
-    const one = T.column(elev);
+    const one = T.column(COLOR, B.ELEV_MIN + 1);
     assert.equal(one.canvas.height, B.TILE_H + B.BLOCK_H);
     assert.deepEqual(colours(one), new Set([
-      top(elev), face(elev, "left"), face(elev, "right"), B.COLORS.outline
+      top(COLOR), face(COLOR, "left"), face(COLOR, "right"), B.COLORS.outline
     ]));
   });
 
+  it("shades the two side faces of a column in its own colour, at every height", () => {
+    for (const color of COLORS) {
+      for (const elev of ELEVATIONS.filter((e) => e > B.ELEV_MIN)) {
+        const tones = colours(T.column(color, elev));
+        const at = `${color} at ${elev}`;
+        assert.ok(tones.has(top(color)), `${at}: its top`);
+        assert.ok(tones.has(face(color, "left")), `${at}: its left face`);
+        assert.ok(tones.has(face(color, "right")), `${at}: its right face`);
+      }
+    }
+  });
+
+  it("seams two stacked blocks a shade under the faces they meet on, in its own colour", () => {
+    const stacked = B.ELEV_MIN + 2;
+    for (const color of COLORS) {
+      const tones = colours(T.column(color, stacked));
+      assert.ok(tones.has(seam(color, "left")), `${color}: its left seam`);
+      assert.ok(tones.has(seam(color, "right")), `${color}: its right seam`);
+    }
+  });
+
   it("seams two stacked blocks in a darker tone, whatever the column's height", () => {
-    assert.equal(colours(T.column(B.ELEV_MIN)).size, FLAT_TONES);
-    assert.equal(colours(T.column(B.ELEV_MIN + 1)).size, BLOCK_TONES);
-    assert.equal(colours(T.column(B.ELEV_MIN + 2)).size, SEAM_TONES);
-    assert.equal(colours(T.column(B.ELEV_MAX)).size, SEAM_TONES);
+    assert.equal(colours(T.column(COLOR, B.ELEV_MIN)).size, FLAT_TONES);
+    assert.equal(colours(T.column(COLOR, B.ELEV_MIN + 1)).size, BLOCK_TONES);
+    assert.equal(colours(T.column(COLOR, B.ELEV_MIN + 2)).size, SEAM_TONES);
+    assert.equal(colours(T.column(COLOR, B.ELEV_MAX)).size, SEAM_TONES);
   });
 });
 
@@ -130,10 +163,9 @@ const onLeft = (viewFacing) => viewFacing.charAt(1) === "l";
 const mirrorFacing = (viewFacing) => viewFacing.charAt(0) + (onLeft(viewFacing) ? "r" : "l");
 const SLOPE_IN_VIEW = B.VIEW_FACINGS.find(seesSlope);
 
-const wedgeOf = (shape, elev, viewFacing) => T[shape](elev, viewFacing);
+const wedgeOf = (shape, color, viewFacing) => T[shape](color, WEDGE_ELEV, viewFacing);
 const inkDown = (art, x) => art.filter((row) => row.charAt(x) === INK).length;
 const topInkRow = (art) => art.findIndex((row) => row.includes(INK));
-const brightness = (hex) => P.parseHex(hex).reduce((sum, channel) => sum + channel, 0);
 
 // How many times a colour starts down a column of a sprite: each flat face the
 // column crosses counts once.
@@ -165,8 +197,8 @@ describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
   it("mirrors a wedge left to right when the facing puts its high edge on the left", () => {
     for (const shape of SLOPED) {
       for (const viewFacing of B.VIEW_FACINGS) {
-        const art = rows(wedgeOf(shape, WEDGE_ELEV, viewFacing));
-        const twin = rows(wedgeOf(shape, WEDGE_ELEV, mirrorFacing(viewFacing)));
+        const art = rows(wedgeOf(shape, COLOR, viewFacing));
+        const twin = rows(wedgeOf(shape, COLOR, mirrorFacing(viewFacing)));
         assert.deepEqual(art, P.hflip(twin), `${shape} ${viewFacing}`);
         assert.notDeepEqual(art, twin, `${shape} ${viewFacing} is not its own mirror`);
       }
@@ -176,7 +208,7 @@ describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
   it("stands a block tall down the side its high edge is on, an edge down the other", () => {
     for (const shape of SLOPED) {
       for (const viewFacing of B.VIEW_FACINGS) {
-        const art = rows(wedgeOf(shape, WEDGE_ELEV, viewFacing));
+        const art = rows(wedgeOf(shape, COLOR, viewFacing));
         const sides = [0, B.TILE_W - 1];
         const high = onLeft(viewFacing) ? sides[0] : sides[1];
         const low = onLeft(viewFacing) ? sides[1] : sides[0];
@@ -190,7 +222,7 @@ describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
   it("rises over the tile's far corner only from a facing that shows the slope", () => {
     for (const shape of SLOPED) {
       for (const viewFacing of B.VIEW_FACINGS) {
-        const sprite = wedgeOf(shape, WEDGE_ELEV, viewFacing);
+        const sprite = wedgeOf(shape, COLOR, viewFacing);
         const aBlockOverTheFarCorner = rows(sprite)[sprite.oy - HALF_H - B.BLOCK_H];
         const at = `${shape} ${viewFacing}`;
         assert.equal(aBlockOverTheFarCorner.includes(INK), seesSlope(viewFacing), at);
@@ -204,17 +236,30 @@ describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
   it("climbs a flight of stairs in flat treads, where a ramp climbs one unbroken slope", () => {
     for (const viewFacing of B.VIEW_FACINGS.filter(seesSlope)) {
       const flats = (shape) =>
-        colourRuns(wedgeOf(shape, WEDGE_ELEV, viewFacing), HALF_W, top(WEDGE_ELEV));
+        colourRuns(wedgeOf(shape, COLOR, viewFacing), HALF_W, top(COLOR));
       assert.equal(flats("stairs"), TREADS, `stairs ${viewFacing}`);
       assert.equal(flats("ramp"), 0, `ramp ${viewFacing}`);
     }
   });
 
-  it("sets every wedge down on the tile's diamond, where the column under it ends", () => {
-    const flat = T.column(B.ELEV_MIN);
+  // A wedge stands on the tile's top, so the column under it carries the height.
+  it("cuts the same wedge at every elevation, in the colour it is asked for", () => {
     for (const shape of SLOPED) {
       for (const viewFacing of B.VIEW_FACINGS) {
-        const sprite = wedgeOf(shape, WEDGE_ELEV, viewFacing);
+        const art = P.dataUrl(wedgeOf(shape, OTHER_COLOR, viewFacing));
+        for (const elev of ELEVATIONS) {
+          assert.equal(P.dataUrl(T[shape](OTHER_COLOR, elev, viewFacing)), art,
+            `${shape} ${viewFacing} at ${elev}`);
+        }
+      }
+    }
+  });
+
+  it("sets every wedge down on the tile's diamond, where the column under it ends", () => {
+    const flat = T.column(COLOR, B.ELEV_MIN);
+    for (const shape of SLOPED) {
+      for (const viewFacing of B.VIEW_FACINGS) {
+        const sprite = wedgeOf(shape, COLOR, viewFacing);
         assert.deepEqual(rows(sprite).slice(sprite.oy), rows(flat).slice(flat.oy),
           `${shape} ${viewFacing}`);
       }
@@ -222,22 +267,21 @@ describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
   });
 
   it("shades the side face a wedge shows like a block's on that side, whichever way it faces", () => {
-    for (const elev of ELEVATIONS) {
+    for (const color of COLORS) {
       for (const viewFacing of B.VIEW_FACINGS) {
         const side = onLeft(viewFacing) ? "left" : "right";
-        const tones = colours(T.ramp(elev, viewFacing));
-        assert.ok(tones.has(face(elev, side)), `elevation ${elev} ${viewFacing}: a ${side} face`);
+        const tones = colours(wedgeOf("ramp", color, viewFacing));
+        assert.ok(tones.has(face(color, side)), `${color} ${viewFacing}: a ${side} face`);
       }
     }
   });
 
-  it("shades a slope darker than the tile's top and lighter than its sides, at every elevation", () => {
-    for (const elev of ELEVATIONS) {
-      const tones = colours(T.ramp(elev, SLOPE_IN_VIEW));
-      const at = `elevation ${elev}`;
-      const slope = [...tones].find((c) => c !== B.COLORS.outline && c !== face(elev, "right"));
-      assert.ok(brightness(slope) < brightness(top(elev)), `${at}: under its top`);
-      assert.ok(brightness(slope) > brightness(face(elev, "left")), `${at}: over its sides`);
+  it("shades a slope darker than the tile's top and lighter than its sides, in every colour", () => {
+    for (const color of COLORS) {
+      const tones = colours(wedgeOf("ramp", color, SLOPE_IN_VIEW));
+      const slope = [...tones].find((c) => c !== B.COLORS.outline && c !== face(color, "right"));
+      assert.ok(brightness(slope) < brightness(top(color)), `${color}: under its top`);
+      assert.ok(brightness(slope) > brightness(face(color, "left")), `${color}: over its sides`);
     }
   });
 });
@@ -248,7 +292,7 @@ describe("tiles: outline", () => {
       for (const shape of SLOPED) {
         for (const viewFacing of B.VIEW_FACINGS) {
           const ring = T.outline(shape, viewFacing, kind);
-          const wedge = wedgeOf(shape, WEDGE_ELEV, viewFacing);
+          const wedge = wedgeOf(shape, COLOR, viewFacing);
           const art = rows(wedge);
           const at = `${shape} ${viewFacing} ${kind}`;
           rows(ring).forEach((row, y) => {
@@ -402,7 +446,7 @@ describe("tiles: holdMask", () => {
     for (let step = 1; step <= HOLD_STEPS; step++) {
       assert.ok(filled[step] > filled[step - 1], `step ${step} over step ${step - 1}`);
     }
-    assert.equal(filled[HOLD_STEPS], T.column(B.ELEV_MIN).canvas.filled.size,
+    assert.equal(filled[HOLD_STEPS], T.column(COLOR, B.ELEV_MIN).canvas.filled.size,
       "the whole top face where the hold ends");
   });
 

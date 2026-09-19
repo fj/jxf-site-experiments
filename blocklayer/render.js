@@ -43,8 +43,8 @@
   }
 
   function wedge(tile, viewFacing) {
-    if (tile.shape === "ramp") return B.tiles.ramp(tile.elev, viewFacing);
-    if (tile.shape === "stairs") return B.tiles.stairs(tile.elev, viewFacing);
+    if (tile.shape === "ramp") return B.tiles.ramp(tile.color, tile.elev, viewFacing);
+    if (tile.shape === "stairs") return B.tiles.stairs(tile.color, tile.elev, viewFacing);
     return null;
   }
 
@@ -78,7 +78,7 @@
     var slope = wedge(tile, viewFacing);
 
     ctx.globalAlpha = state.opaque ? 1 : TRANSPARENT_ALPHA;
-    B.pixel.draw(ctx, B.tiles.column(tile.elev), at.x, at.y);
+    B.pixel.draw(ctx, B.tiles.column(tile.color, tile.elev), at.x, at.y);
     if (slope) B.pixel.draw(ctx, slope, at.x, at.y);
     ctx.globalAlpha = 1;
 

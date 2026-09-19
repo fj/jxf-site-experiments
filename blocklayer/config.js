@@ -56,19 +56,6 @@
     { key: "jump", label: "Jump" }
   ];
 
-  // The top face's colour at each elevation: cool and dark on the floor, warm
-  // and bright up high, so height reads without a label.
-  B.ELEVATION_COLORS = {
-    "0": "#4fa3e0",
-    "1": "#7ed957",
-    "2": "#a6de56",
-    "3": "#cfe25a",
-    "4": "#f2d55c",
-    "5": "#f2ae4f",
-    "6": "#ef8a42",
-    "7": "#e05038"
-  };
-
   // The colours a tile's top face is painted in: the spectrum, then three
   // greys. Height reads from the labels and from the shading of the sides.
   B.PALETTE = [

@@ -7,8 +7,10 @@ const { load } = require("./load");
 const B = load(["config.js", "level.js", "view.js", "demo.js"]);
 const L = B.level;
 
+const COLOR_KEYS = B.PALETTE.map((c) => c.key);
 const DECOR_KEYS = B.DECOR.map((d) => d.key);
 const FIRST_ROT = B.view.create().rot;
+const PLATEAU_ELEV = 2;
 
 describe("demo: the first level", () => {
   const demo = B.demo.level();
@@ -62,6 +64,15 @@ describe("demo: the first level", () => {
       const seen = B.view.viewFacing(FIRST_ROT, t.facing);
       assert.ok(seen === "ur" || seen === "ul", `${t.shape} facing ${t.facing} is seen ${seen}`);
     }
+  });
+
+  it("paints the level in every colour of the palette", () => {
+    assert.deepEqual(new Set(tiles.map((t) => t.color)), new Set(COLOR_KEYS));
+  });
+
+  it("gives tiles of one height more than one colour, so colour does not read as height", () => {
+    const plateau = tiles.filter((t) => t.elev === PLATEAU_ELEV);
+    assert.ok(new Set(plateau.map((t) => t.color)).size > 1);
   });
 
   it("shows every decor object once", () => {

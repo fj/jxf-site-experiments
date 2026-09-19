@@ -39,6 +39,9 @@ const BOARD = { w: 3, h: 5 };
 // clearing a canvas empties it.
 function stage() {
   const B = load(["config.js", "level.js", "view.js", "selection.js", "render.js"]);
+  // The board lands in level.js with its own `inside`; until then, this one.
+  B.level.inside = (level, x, y) =>
+    x >= 0 && y >= 0 && x < level.size.w && y < level.size.h;
   const draws = [];
   const fills = [];
   const calls = new Map();
@@ -290,6 +293,34 @@ describe("render: the ghost", () => {
       s.draw();
       assert.ok(!s.names().includes("ghost"), JSON.stringify(hover));
       assert.equal(s.names().filter((n) => n === "column").length, 1, JSON.stringify(hover));
+    }
+  });
+
+  it("is not drawn over a cell off the board, past any edge of it", () => {
+    const off = [
+      { x: -1, y: 0 }, { x: 0, y: -1 },
+      { x: BOARD.w, y: 0 }, { x: 0, y: BOARD.h },
+      { x: BOARD.w, y: BOARD.h }
+    ];
+    for (const cell of off) {
+      const s = stage();
+      s.state.hover = { cell };
+      s.draw();
+      assert.ok(!s.names().includes("ghost"), JSON.stringify(cell));
+      assert.deepEqual(s.asked("ghost"), [], JSON.stringify(cell));
+    }
+  });
+
+  it("is drawn over every cell of the board, corner cells and all", () => {
+    const on = [
+      { x: 0, y: 0 }, { x: BOARD.w - 1, y: 0 },
+      { x: 0, y: BOARD.h - 1 }, { x: BOARD.w - 1, y: BOARD.h - 1 }
+    ];
+    for (const cell of on) {
+      const s = stage();
+      s.state.hover = { cell };
+      s.draw();
+      assert.equal(drawsNamed(s, "ghost").length, 1, JSON.stringify(cell));
     }
   });
 

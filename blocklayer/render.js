@@ -161,10 +161,12 @@
   }
 
   // The column a click would add, placed like the tile it would become so it
-  // takes its turn in depth order and a column in front of it covers it.
+  // takes its turn in depth order and a column in front of it covers it. A
+  // cell off the board takes no tile, so it shows no ghost.
   function ghostEntry(state) {
     var cell = state.hover && state.hover.cell;
-    return cell ? { x: cell.x, y: cell.y, elev: state.newElev } : null;
+    if (!cell || !B.level.inside(state.level, cell.x, cell.y)) return null;
+    return { x: cell.x, y: cell.y, elev: state.newElev };
   }
 
   // One side of the sweep box: dashes from (x, y), across or down, each in the

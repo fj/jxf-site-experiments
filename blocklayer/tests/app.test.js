@@ -12,7 +12,9 @@ const MOUNT_TAG = "div";
 const CANVAS_W = 480;
 const CANVAS_H = 320;
 const DPR = 1;                     // the device pixel ratio the fake page reports
+const FRAME_MS = 16;               // ms the page leaves between the frames it draws
 const PRIMARY = 0;
+const SECONDARY = 2;
 const ALT_DOWN = { key: "Alt", altKey: true };
 const ALT_UP = { key: "Alt", altKey: false };
 
@@ -113,6 +115,19 @@ function boot(tiles = [], storage = null, dpr = DPR) {
   const mount = document.createElement(MOUNT_TAG);
   const window = { document, devicePixelRatio: dpr };
   if (storage) window.localStorage = storage;
+  // input.js runs the hold that removes a tile on the page's own clock and
+  // frames, which a test moves on by hand.
+  let now = 0;
+  let nextFrame = 1;
+  let holdFrames = [];
+  window.performance = { now: () => now };
+  window.requestAnimationFrame = (fn) => {
+    holdFrames.push({ id: nextFrame, fn });
+    return nextFrame++;
+  };
+  window.cancelAnimationFrame = (id) => {
+    holdFrames = holdFrames.filter((f) => f.id !== id);
+  };
   // The page's own listeners: input.js watches Alt on the window, so the
   // canvas need never hold focus for the tip to come and go, and app.js
   // watches the document for the page going out of sight.
@@ -185,6 +200,25 @@ function boot(tiles = [], storage = null, dpr = DPR) {
     // already standing there is selected.
     press(x, y, props = {}) {
       canvas.fire("pointerdown", { ...this.over(x, y), button: PRIMARY, ...props });
+    },
+    // The reader holds the right button down on the tile at (x, y), which
+    // wipes it away, and lets the button go again.
+    hold(x, y) {
+      canvas.fire("pointerdown", { ...this.over(x, y), button: SECONDARY });
+    },
+    letGo(x, y) {
+      canvas.fire("pointerup", { ...this.over(x, y), button: SECONDARY });
+    },
+    // The page's clock moves on by `ms`, frame by frame, and a hold reads
+    // each frame as it goes.
+    tick(ms) {
+      const end = now + ms;
+      while (now < end) {
+        now = Math.min(now + FRAME_MS, end);
+        const due = holdFrames;
+        holdFrames = [];
+        due.forEach((f) => f.fn(now));
+      }
     },
     firePage,
     // The reader turns to another tab, and back.
@@ -529,6 +563,52 @@ describe("app: the controls that take tiles away", () => {
     t.mock.timers.tick(r.B.HOLD_MS);
     assert.deepEqual(r.cells(), []);
     assert.deepEqual(r.selected(), []);
+  });
+});
+
+describe("app: the right button held on a tile", () => {
+  const HELD = [2, 3];
+  const PARTS = 4;                 // the parts of a hold a test watches it in
+
+  // The wipe the renderer is handed: the cell it covers and how far it has
+  // come, or none at all.
+  const wipe = (r) => r.frame().hold;
+
+  // The app with the tile at HELD under the right button, drawn once.
+  const holding = () => {
+    const r = boot([HELD]);
+    r.frame();
+    r.hold(...HELD);
+    return r;
+  };
+
+  it("wipes the held tile further on each frame, and takes it away at the end", () => {
+    const r = holding();
+    assert.equal(r.waiting(), 1, "the press asked for the frame the wipe shows on");
+    assert.deepEqual(wipe(r), { x: HELD[0], y: HELD[1], progress: 0 });
+    let last = 0;
+    for (let part = 1; part < PARTS; part++) {
+      r.tick(r.B.HOLD_MS / PARTS);
+      assert.equal(r.waiting(), 1, `part ${part}: the wipe asked for its frame`);
+      const now = wipe(r);
+      assert.deepEqual([now.x, now.y], HELD, `part ${part}: over the tile held`);
+      assert.ok(now.progress > last, `part ${part}: further on than the frame before`);
+      last = now.progress;
+    }
+    assert.deepEqual(r.cells(), [HELD], "the tile stands while the hold runs");
+    r.tick(r.B.HOLD_MS / PARTS);
+    assert.deepEqual(r.cells(), [], "and goes once the hold is up");
+    assert.equal(wipe(r), null, "the wipe goes with it");
+  });
+
+  it("takes the wipe off and leaves the tile when the reader lets go early", () => {
+    const r = holding();
+    r.tick(r.B.HOLD_MS / PARTS);
+    r.letGo(...HELD);
+    assert.equal(r.waiting(), 1, "the wipe going asked for its frame too");
+    assert.equal(wipe(r), null);
+    r.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.cells(), [HELD], "a hold let go takes no tile away");
   });
 });
 

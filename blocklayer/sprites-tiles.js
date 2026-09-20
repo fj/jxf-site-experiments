@@ -527,16 +527,14 @@
 
   var memoHold = P.memo(holdStep);
 
-  // A wedge stands on the tile's top, so its art does not read the elevation;
-  // it takes one to call like the column under it.
   B.tiles = {
     grid: P.memo(grid),
     column: P.memo(column),
     swatch: P.memo(swatch),
-    ramp: P.memo(function (color, elev, viewFacing) {
+    ramp: P.memo(function (color, viewFacing) {
       return wedge(color, rampShape(viewFacing));
     }),
-    stairs: P.memo(function (color, elev, viewFacing) {
+    stairs: P.memo(function (color, viewFacing) {
       return wedge(color, stairsShape(viewFacing));
     }),
     ghost: P.memo(ghost),

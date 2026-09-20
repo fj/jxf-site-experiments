@@ -27,7 +27,6 @@ for (let elev = B.ELEV_MIN; elev <= B.ELEV_MAX; elev++) ELEVATIONS.push(elev);
 
 const COLORS = B.PALETTE.map((c) => c.key);
 const COLOR = B.DEFAULT_COLOR;            // the colour a tile takes unasked
-const OTHER_COLOR = COLORS.find((key) => key !== B.DEFAULT_COLOR);
 const GREYS = ["grey-light", "grey", "grey-dark"];   // lightest first
 const GREY_SPREAD = 32;                   // the most two channels of a grey part by
 const SEAM_SHADE = -0.18;                 // how far under its face a seam is shaded
@@ -177,7 +176,6 @@ describe("tiles: ghost", () => {
 
 const SLOPED = ["ramp", "stairs"];       // the shapes that stand on a wedge
 const RINGS = ["select", "hover", "pulse"];  // the highlights a tile is ringed with
-const WEDGE_ELEV = B.ELEV_MIN + 1;       // a wedge rises a block over its elevation
 const TREADS = 4;                        // the flat steps a flight of stairs climbs in
 
 // A view facing names the screen side a tile's high edge is on: up, which
@@ -187,7 +185,7 @@ const onLeft = (viewFacing) => viewFacing.charAt(1) === "l";
 const mirrorFacing = (viewFacing) => viewFacing.charAt(0) + (onLeft(viewFacing) ? "r" : "l");
 const SLOPE_IN_VIEW = B.VIEW_FACINGS.find(seesSlope);
 
-const wedgeOf = (shape, color, viewFacing) => T[shape](color, WEDGE_ELEV, viewFacing);
+const wedgeOf = (shape, color, viewFacing) => T[shape](color, viewFacing);
 const inkDown = (art, x) => art.filter((row) => row.charAt(x) === INK).length;
 const topInkRow = (art) => art.findIndex((row) => row.includes(INK));
 
@@ -266,19 +264,8 @@ describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
     }
   });
 
-  // A wedge stands on the tile's top, so the column under it carries the height.
-  it("cuts the same wedge at every elevation, in the colour it is asked for", () => {
-    for (const shape of SLOPED) {
-      for (const viewFacing of B.VIEW_FACINGS) {
-        const art = P.dataUrl(wedgeOf(shape, OTHER_COLOR, viewFacing));
-        for (const elev of ELEVATIONS) {
-          assert.equal(P.dataUrl(T[shape](OTHER_COLOR, elev, viewFacing)), art,
-            `${shape} ${viewFacing} at ${elev}`);
-        }
-      }
-    }
-  });
-
+  // A wedge stands on the tile's top, so the column under it carries the
+  // height and the wedge is cut from the colour and the facing alone.
   it("sets every wedge down on the tile's diamond, where the column under it ends", () => {
     const flat = T.column(COLOR, B.ELEV_MIN);
     for (const shape of SLOPED) {
@@ -291,11 +278,13 @@ describe("tiles: the wedge a ramp and a flight of stairs stand on", () => {
   });
 
   it("shades the side face a wedge shows like a block's on that side, whichever way it faces", () => {
-    for (const color of COLORS) {
-      for (const viewFacing of B.VIEW_FACINGS) {
-        const side = onLeft(viewFacing) ? "left" : "right";
-        const tones = colours(wedgeOf("ramp", color, viewFacing));
-        assert.ok(tones.has(face(color, side)), `${color} ${viewFacing}: a ${side} face`);
+    for (const shape of SLOPED) {
+      for (const color of COLORS) {
+        for (const viewFacing of B.VIEW_FACINGS) {
+          const side = onLeft(viewFacing) ? "left" : "right";
+          const tones = colours(wedgeOf(shape, color, viewFacing));
+          assert.ok(tones.has(face(color, side)), `${shape} ${color} ${viewFacing}: a ${side} face`);
+        }
       }
     }
   });

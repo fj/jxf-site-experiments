@@ -98,8 +98,8 @@
   }
 
   function wedge(tile, viewFacing) {
-    if (tile.shape === "ramp") return B.tiles.ramp(tile.color, tile.elev, viewFacing);
-    if (tile.shape === "stairs") return B.tiles.stairs(tile.color, tile.elev, viewFacing);
+    if (tile.shape === "ramp") return B.tiles.ramp(tile.color, viewFacing);
+    if (tile.shape === "stairs") return B.tiles.stairs(tile.color, viewFacing);
     return null;
   }
 

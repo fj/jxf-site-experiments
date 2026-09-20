@@ -245,15 +245,24 @@
     changed();
   }
 
+  // A hover names the tile the pointer found, so one naming a tile that is
+  // gone has to go with it: the pointer may rest where it is and pick nothing
+  // afresh.
+  function forgetHover(x, y) {
+    if (B.sameCell(state.hover && state.hover.tile, x, y)) state.hover = null;
+  }
+
   function remove(x, y) {
     if (!B.level.remove(state.level, x, y)) return;
     setSelection(B.selection.remove(state.selection, x, y));
+    forgetHover(x, y);
     edited();
   }
 
   function clear() {
     B.level.clear(state.level);
     setSelection([]);
+    state.hover = null;
     edited();
   }
 

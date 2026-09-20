@@ -375,9 +375,11 @@ describe("app: the redraws a flashing highlight asks for", () => {
     assert.equal(r.frame(CLOCK).time, CLOCK);
   });
 
+  // The clock starts part way through a cycle, so the first wait is a part of
+  // one: a flash on a beat of its own would miss it.
   it("asks for the redraw each turn of the flash needs, turn after turn", (t) => {
     t.mock.timers.enable({ apis: ["setTimeout"] });
-    let clock = 0;
+    let clock = CLOCK;
     const r = flashing(clock);
     for (const turn of TURNS) {
       const wait = r.B.pulse.untilFlip(clock);
@@ -420,6 +422,20 @@ describe("app: the redraws a flashing highlight asks for", () => {
     assert.equal(r.frame().hover, null);
     t.mock.timers.tick(A_WHILE);
     assert.equal(r.waiting(), 0);
+  });
+
+  // The pointer rests where the tile was, so nothing picks afresh: the app
+  // has to let the hover go with the tile.
+  it("stops once the tile it rings is taken away", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = flashing();
+    r.canvas.fire("pointerdown", { ...r.onFloor(0, 0), button: PRIMARY });
+    assert.deepEqual(r.selected(), [[0, 0]], "the tile under the pointer is selected");
+    r.canvas.fire("keydown", { key: "Delete" });
+    r.frame();
+    assert.deepEqual(r.cells(), [], "and taken away");
+    t.mock.timers.tick(A_WHILE);
+    assert.equal(r.waiting(), 0, "nothing flashes over a tile that is gone");
   });
 });
 

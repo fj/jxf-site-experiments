@@ -21,7 +21,7 @@ const ALT_UP = { key: "Alt", altKey: false };
 // the stubs below give it.
 const MODULES = [
   "config.js", "pixel.js", "level.js", "file.js", "view.js", "selection.js",
-  "demo.js", "store.js", "sprites-tiles.js", "sprites-decor.js",
+  "pulse.js", "demo.js", "store.js", "sprites-tiles.js", "sprites-decor.js",
   "sprites-marks.js", "sprites-icons.js", "render.js", "input.js",
   "parts.js", "toolbar.js", "bounds.js", "tip.js"
 ];
@@ -146,6 +146,13 @@ function boot(tiles = [], storage = null, dpr = DPR) {
   const view = B.view.create();
   const scale = view.zoom * dpr;
 
+  // Where on the page the point over cell (x, y) at height z is drawn.
+  const pageAt = (x, y, z) => {
+    const origin = B.view.frame(canvas, scale);
+    const at = B.view.project(view, x, y, z);
+    return { clientX: (at.sx + origin.ox) * scale, clientY: (at.sy + origin.oy) * scale };
+  };
+
   return {
     B,
     window,
@@ -154,11 +161,12 @@ function boot(tiles = [], storage = null, dpr = DPR) {
     canvas,
     drawn,
     // Every frame the app has asked for runs, as the browser would run them,
-    // and the state the renderer was handed last comes back.
-    frame() {
+    // each on the clock the page reads at `at`, and the state the renderer was
+    // handed last comes back.
+    frame(at = 0) {
       const due = scheduled;
       scheduled = [];
-      due.forEach((fn) => fn());
+      due.forEach((fn) => fn(at));
       return drawn.length ? drawn[drawn.length - 1].state : null;
     },
     // How many frames the app is waiting on.
@@ -167,10 +175,11 @@ function boot(tiles = [], storage = null, dpr = DPR) {
     // floor of that cell while no tile stands there.
     over(x, y) {
       const standing = B.level.get(level, x, y);
-      const origin = B.view.frame(canvas, scale);
-      const at = B.view.project(view, x, y, standing ? B.level.top(standing) : B.FLOOR);
-      return { clientX: (at.sx + origin.ox) * scale, clientY: (at.sy + origin.oy) * scale };
+      return pageAt(x, y, standing ? B.level.top(standing) : B.FLOOR);
     },
+    // Where the floor of the cell at (x, y) is drawn, whatever stands on it:
+    // the point a see-through level reads that cell from.
+    onFloor(x, y) { return pageAt(x, y, B.FLOOR); },
     of(name) { return calls.filter((c) => c[0] === name).map((c) => c.slice(1)); },
     // The reader presses on the cell at (x, y): a tile goes there, or the one
     // already standing there is selected.
@@ -344,6 +353,92 @@ describe("app: the frames it draws on", () => {
   });
 });
 
+describe("app: the redraws a flashing highlight asks for", () => {
+  const CLOCK = 1234;              // a time the page might hand a frame
+  const A_MOMENT = 1;              // ms either side of a turn of the flash
+  const A_WHILE = 5000;            // ms: more cycles of the flash than anyone counts
+  const TURNS = [1, 2, 3];         // turns of the colour, one after another
+
+  // The app see-through with the pointer over the tile at (0, 0), drawn once
+  // on the clock at `at`: a highlight that flashes.
+  const flashing = (at = 0) => {
+    const r = boot([[0, 0]]);
+    r.find("opaque", "").fire("click");
+    r.canvas.fire("pointermove", r.onFloor(0, 0));
+    r.frame(at);
+    assert.equal(r.frame().hover.tile, r.tileAt(0, 0), "the pointer is on the tile");
+    return r;
+  };
+
+  it("hands the renderer the clock the page gave the frame", () => {
+    const r = boot();
+    assert.equal(r.frame(CLOCK).time, CLOCK);
+  });
+
+  // The clock starts part way through a cycle, so the first wait is a part of
+  // one: a flash on a beat of its own would miss it.
+  it("asks for the redraw each turn of the flash needs, turn after turn", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    let clock = CLOCK;
+    const r = flashing(clock);
+    for (const turn of TURNS) {
+      const wait = r.B.pulse.untilFlip(clock);
+      assert.equal(r.waiting(), 0, `turn ${turn}: the frame just drawn waits on nothing`);
+      t.mock.timers.tick(wait - A_MOMENT);
+      assert.equal(r.waiting(), 0, `turn ${turn}: and asks for none before the colour turns`);
+      t.mock.timers.tick(A_MOMENT);
+      assert.equal(r.waiting(), 1, `turn ${turn}: the turn asked for its redraw`);
+      clock += wait;
+      r.frame(clock);
+    }
+    assert.equal(r.drawn.length, TURNS.length + 1, "one frame each, and the first");
+  });
+
+  it("asks for none while the level is solid, tile hovered or not", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = boot([[0, 0]]);
+    r.canvas.fire("pointermove", r.over(0, 0));
+    r.frame();
+    assert.equal(r.frame().hover.tile, r.tileAt(0, 0));
+    t.mock.timers.tick(A_WHILE);
+    assert.equal(r.waiting(), 0);
+    assert.equal(r.drawn.length, 1, "and draws the one frame only");
+  });
+
+  it("stops once the level is solid again", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = flashing();
+    r.find("opaque", "").fire("click");
+    r.frame();
+    t.mock.timers.tick(A_WHILE);
+    assert.equal(r.waiting(), 0, "the timer the flash held went with it");
+  });
+
+  it("stops once the highlight goes", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = flashing();
+    r.canvas.fire("pointerleave", r.onFloor(0, 0));
+    r.frame();
+    assert.equal(r.frame().hover, null);
+    t.mock.timers.tick(A_WHILE);
+    assert.equal(r.waiting(), 0);
+  });
+
+  // The pointer rests where the tile was, so nothing picks afresh: the app
+  // has to let the hover go with the tile.
+  it("stops once the tile it rings is taken away", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const r = flashing();
+    r.canvas.fire("pointerdown", { ...r.onFloor(0, 0), button: PRIMARY });
+    assert.deepEqual(r.selected(), [[0, 0]], "the tile under the pointer is selected");
+    r.canvas.fire("keydown", { key: "Delete" });
+    r.frame();
+    assert.deepEqual(r.cells(), [], "and taken away");
+    t.mock.timers.tick(A_WHILE);
+    assert.equal(r.waiting(), 0, "nothing flashes over a tile that is gone");
+  });
+});
+
 describe("app: the canvas the board is drawn on", () => {
   const DENSE = 2;                 // device pixels per CSS pixel on a sharp screen
 
@@ -486,15 +581,53 @@ describe("app: the controls that change the selection", () => {
     assert.equal(r.frame().box, null, "which goes when the sweep ends");
     assert.deepEqual(r.selected(), PAIR);
   });
+
+  // A sweep that goes nowhere is a click, and follows the plane the rest of
+  // the clicks read: no column in front answers for the cell.
+  it("reads a sweep of no size on the floor plane once the level is see-through", () => {
+    const r = boot([[1, 1]]);
+    const shiftClick = () => {
+      const at = { ...r.onFloor(0, 0), button: PRIMARY };
+      r.canvas.fire("pointerdown", { ...at, shiftKey: true });
+      r.canvas.fire("pointerup", at);
+    };
+    shiftClick();
+    assert.deepEqual(r.selected(), [[1, 1]], "the ray meets the column in front");
+    r.canvas.fire("keydown", { key: "Escape" });
+    r.find("opaque", "").fire("click");
+    shiftClick();
+    assert.deepEqual(r.selected(), [], "and the cell under the pointer holds no tile");
+  });
 });
 
 describe("app: what the pointer is over", () => {
+  // A column one cell toward the eye, which covers the floor of (0, 0): what
+  // the ray meets over that floor while the level is solid.
+  const IN_FRONT = [[1, 1]];
+
   it("hands the renderer the tile under the pointer, and none once it leaves", () => {
     const r = boot(PAIR);
     r.canvas.fire("pointermove", r.over(0, 0));
     assert.equal(r.frame().hover.tile, r.tileAt(0, 0));
     r.canvas.fire("pointerleave", r.over(0, 0));
     assert.equal(r.frame().hover, null);
+  });
+
+  it("hovers the cell on the floor plane once the level is see-through", () => {
+    const r = boot(IN_FRONT);
+    r.canvas.fire("pointermove", r.over(0, 0));
+    assert.equal(r.frame().hover.tile, r.tileAt(1, 1), "the ray meets the column in front");
+    r.find("opaque", "").fire("click");
+    r.canvas.fire("pointermove", r.over(0, 0));
+    assert.deepEqual(r.frame().hover.cell, { x: 0, y: 0 });
+  });
+
+  it("lays a tile on that cell rather than selecting the column in front", () => {
+    const r = boot(IN_FRONT);
+    r.find("opaque", "").fire("click");
+    r.press(0, 0);
+    assert.deepEqual(r.cells(), [[0, 0], [1, 1]]);
+    assert.deepEqual(r.selected(), [], "and it selects nothing");
   });
 });
 

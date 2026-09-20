@@ -626,6 +626,100 @@ describe("view: pick", () => {
   });
 });
 
+describe("view: pick on the floor plane", () => {
+  const PANS = [{ x: 0, y: 0 }, { x: 9, y: -5 }];
+  const flat = (view, level, sx, sy) => V.pick(view, level, sx, sy, true);
+
+  it("answers the cell under the point, not the tall column in front of it", () => {
+    const { view, level } = scene();
+    const front = L.add(level, 1, 1, B.ELEV_MAX);
+    const p = V.project(view, 0, 0, B.FLOOR);
+    assert.deepEqual(V.pick(view, level, p.sx, p.sy), { tile: front }, "the ray meets the column");
+    assert.deepEqual(flat(view, level, p.sx, p.sy), { cell: { x: 0, y: 0 } });
+  });
+
+  it("answers the tile standing on the cell under the point, however tall", () => {
+    const at = { x: 1, y: 2 };
+    for (const rot of ROTS) {
+      for (const pan of PANS) {
+        for (const elev of [B.ELEV_MIN, B.NEW_TILE_ELEV, B.ELEV_MAX]) {
+          const view = viewAt(rot, pan);
+          const level = L.create();
+          const standing = L.add(level, at.x, at.y, elev);
+          const p = V.project(view, at.x, at.y, B.FLOOR);
+          const name = `rot ${rot} pan ${pan.x},${pan.y} elev ${elev}`;
+          assert.deepEqual(flat(view, level, p.sx, p.sy), { tile: standing }, name);
+        }
+      }
+    }
+  });
+
+  // The top of a tall column is drawn well above its own cell, so the point
+  // over it lies on the floor of a cell further back, which is the cell the
+  // reader sees the pointer on while the level is see-through.
+  it("leaves a column's top face to the cell whose floor that point lies on", () => {
+    const { view, level } = scene();
+    const tall = L.add(level, 0, 0, B.ELEV_MAX);
+    const top = V.project(view, 0, 0, B.ELEV_MAX);
+    const behind = V.cellAt(view, top.sx, top.sy, B.FLOOR);
+    assert.deepEqual(V.pick(view, level, top.sx, top.sy), { tile: tall }, "the ray meets its top");
+    assert.deepEqual(flat(view, level, top.sx, top.sy), { cell: behind });
+    assert.notDeepEqual(behind, { x: tall.x, y: tall.y });
+  });
+
+  // The hole a ring of four tall neighbours leaves, which each of them paints
+  // over while the level is solid.
+  it("answers an empty cell a ring of tall neighbours walls in, at every rotation", () => {
+    const hole = { x: 1, y: 2 };
+    const ring = [[0, 2], [2, 2], [1, 1], [1, 3]];
+    for (const rot of ROTS) {
+      for (const pan of PANS) {
+        const view = viewAt(rot, pan);
+        const level = L.create();
+        for (const [x, y] of ring) L.add(level, x, y, B.ELEV_MAX);
+        const p = V.project(view, hole.x, hole.y, B.FLOOR);
+        const name = `rot ${rot} pan ${pan.x},${pan.y}`;
+        assert.deepEqual(flat(view, level, p.sx, p.sy), { cell: hole }, name);
+      }
+    }
+  });
+
+  it("flags a point on the line between two cells as an edge, and a centre not at all", () => {
+    for (const rot of ROTS) {
+      const view = viewAt(rot, PANS[1]);
+      const level = L.create();
+      const a = V.project(view, 0, 0, B.FLOOR);
+      const b = V.project(view, 1, 0, B.FLOOR);
+      const between = flat(view, level, (a.sx + b.sx) / 2, (a.sy + b.sy) / 2);
+      assert.equal(between.edge, true, `rot ${rot}`);
+      assert.ok([[0, 0], [1, 0]].some(([x, y]) => B.sameCell(between.cell, x, y)), `rot ${rot}`);
+      assert.deepEqual(flat(view, level, a.sx, a.sy), { cell: { x: 0, y: 0 } }, `rot ${rot} centre`);
+    }
+  });
+
+  // Only an empty cell carries the flag; a tile is answered with on its own,
+  // as the ray answers with it.
+  it("answers the tile the line falls on with no edge flag", () => {
+    const { view, level } = scene();
+    const a = V.project(view, 0, 0, B.FLOOR);
+    const b = V.project(view, 1, 0, B.FLOOR);
+    const on = { sx: (a.sx + b.sx) / 2, sy: (a.sy + b.sy) / 2 };
+    const cell = V.cellAt(view, on.sx, on.sy, B.FLOOR);
+    assert.equal(flat(view, level, on.sx, on.sy).edge, true, "empty, it is an edge");
+    const lone = L.add(level, cell.x, cell.y, B.NEW_TILE_ELEV);
+    assert.deepEqual(flat(view, level, on.sx, on.sy), { tile: lone });
+  });
+
+  it("casts the ray as it always did while the flag is off", () => {
+    const { view, level } = scene();
+    const front = L.add(level, 1, 1, B.ELEV_MAX);
+    const p = V.project(view, 0, 0, B.FLOOR);
+    for (const off of [undefined, false, null, 0]) {
+      assert.deepEqual(V.pick(view, level, p.sx, p.sy, off), { tile: front }, String(off));
+    }
+  });
+});
+
 describe("view: within", () => {
   // Four tiles in a square, in an order no view puts them in, and one past
   // the square that its box never reaches at any rotation.
@@ -770,6 +864,19 @@ describe("view: within a box of no size", () => {
     const p = V.project(view, 0, 0, B.FLOOR);
     assert.deepEqual(V.within(view, level, pinned(p)), []);
     assert.deepEqual(V.within(V.create(), L.create(), pinned(p)), []);
+  });
+
+  // The click a sweep of no size makes reads the floor plane with the rest of
+  // them, so a shift-click and a plain click name the same thing.
+  it("reads that click on the floor plane while the flag is set", () => {
+    const { view, level } = scene();
+    const front = L.add(level, 1, 1, B.ELEV_MAX);
+    const standing = L.add(level, 0, 0, B.NEW_TILE_ELEV);
+    const p = V.project(view, 0, 0, B.FLOOR);
+    assert.deepEqual(V.within(view, level, pinned(p)), [front], "the ray meets the column");
+    assert.deepEqual(V.within(view, level, pinned(p), true), [standing]);
+    const empty = V.project(view, 2, 0, B.FLOOR);
+    assert.deepEqual(V.within(view, level, pinned(empty), true), [], "and nothing over a cell");
   });
 
   it("is a box, not a click, when only one side has no length", () => {

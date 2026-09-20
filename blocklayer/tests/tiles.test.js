@@ -176,7 +176,7 @@ describe("tiles: ghost", () => {
 });
 
 const SLOPED = ["ramp", "stairs"];       // the shapes that stand on a wedge
-const RINGS = ["select", "hover"];       // the kinds of highlight a tile is ringed with
+const RINGS = ["select", "hover", "pulse"];  // the highlights a tile is ringed with
 const WEDGE_ELEV = B.ELEV_MIN + 1;       // a wedge rises a block over its elevation
 const TREADS = 4;                        // the flat steps a flight of stairs climbs in
 
@@ -355,10 +355,24 @@ describe("tiles: outline", () => {
   });
 
   it("draws a select ring thicker than a hover ring, each in its own colour", () => {
-    const [select, hover] = RINGS.map((kind) => T.outline("ramp", SLOPE_IN_VIEW, kind));
+    const [select, hover, pulse] = RINGS.map((kind) => T.outline("ramp", SLOPE_IN_VIEW, kind));
     assert.deepEqual(colours(select), new Set([B.COLORS.select]));
     assert.deepEqual(colours(hover), new Set([B.COLORS.hover]));
+    assert.deepEqual(colours(pulse), new Set([B.COLORS.pulse]));
     assert.ok(select.canvas.filled.size > hover.canvas.filled.size);
+    assert.equal(new Set([B.COLORS.select, B.COLORS.hover, B.COLORS.pulse]).size, RINGS.length,
+      "and no two rings share an ink, so the flash shows on either of them");
+  });
+
+  // The flash reads as the same ring in another colour, so nothing about the
+  // tile seems to move as it turns over.
+  it("draws the pulse ring the shape and the width of the select ring", () => {
+    for (const shape of SLOPED.concat("block")) {
+      for (const viewFacing of B.VIEW_FACINGS) {
+        assert.deepEqual(rows(T.outline(shape, viewFacing, "pulse")),
+          rows(T.outline(shape, viewFacing, "select")), `${shape} ${viewFacing}`);
+      }
+    }
   });
 });
 

@@ -100,12 +100,26 @@
     });
   }
 
+  // The cell of the floor plane under the point, and the tile standing on it
+  // if one does. A see-through level hides nothing behind a column, so the
+  // pointer addresses the cell it is over rather than the column in front.
+  function pickFlat(view, level, sx, sy) {
+    var cell = cellAt(view, sx, sy, B.FLOOR);
+    var tile = B.level.get(level, cell.x, cell.y);
+    if (tile) return { tile: tile };
+    var empty = { cell: cell };
+    if (onGridLine(view, sx, sy, B.FLOOR)) empty.edge = true;
+    return empty;
+  }
+
   // The first tile the ray from the eye through the point meets, else the cell
   // of the floor under it: where a new column's base would stand. The ray
   // crosses two cells a block; reading only the one at each whole height lets
   // the floor win a side face, which is what keeps a walled-in cell reachable.
   // The floor is the last step, so the cell it answers with is always empty.
-  function pick(view, level, sx, sy) {
+  // `flat` reads the floor plane instead; without it the ray is unchanged.
+  function pick(view, level, sx, sy, flat) {
+    if (flat) return pickFlat(view, level, sx, sy);
     for (var z = B.ELEV_MAX; z >= B.FLOOR; z--) {
       var cell = cellAt(view, sx, sy, z);
       var tile = B.level.get(level, cell.x, cell.y);
@@ -127,11 +141,11 @@
   // The tiles a swept box holds: those whose top face's centre lies in it, in
   // the level's own order. The box is in the space project() answers, and its
   // corners come in either order. A box of no size is a click, so it takes the
-  // tile under its corner however the ray reaches it, which a box that caught
-  // only top faces would miss.
-  function within(view, level, box) {
+  // tile under its corner the way pick() reads that point, `flat` and all,
+  // which a box that caught only top faces would miss.
+  function within(view, level, box, flat) {
     if (box.x0 === box.x1 && box.y0 === box.y1) {
-      var hit = pick(view, level, box.x0, box.y0);
+      var hit = pick(view, level, box.x0, box.y0, flat);
       return hit.tile ? [hit.tile] : [];
     }
     var left = Math.min(box.x0, box.x1);

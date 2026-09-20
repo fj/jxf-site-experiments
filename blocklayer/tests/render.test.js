@@ -23,6 +23,11 @@ const UNSELECTED = [3, 3];                   // ...and one it left out
 // centre, so a corner read the wrong way round lands elsewhere.
 const BOX = { x0: -30, y0: -11, x1: 41, y1: 26 };
 const SUB_PIXEL = 0.4;                       // a sweep corner between two pixels
+const MS_PER_S = 1000;
+const HALVES = 2;                            // the magenta half of a cycle, and the other
+const CYCLE_MS = MS_PER_S / load(["config.js"]).PULSE_HZ;
+const LIT_TIME = CYCLE_MS / HALVES / HALVES; // a time in the magenta half
+const UNLIT_TIME = CYCLE_MS - LIT_TIME;      // ...and one in the half after it
 const NO_INK = "none";                       // the fill colour the scene starts at
 const LINE_PX = 1;                           // how wide render.js draws a dashed line
 const DASH_PX = 3;                           // ...and how long each dash along it is
@@ -38,7 +43,7 @@ const BOARD = { w: 3, h: 5 };
 // as a "rect" with its colour, and clearing the scene empties both logs, as
 // clearing a canvas empties it.
 function stage() {
-  const B = load(["config.js", "level.js", "view.js", "selection.js", "render.js"]);
+  const B = load(["config.js", "level.js", "view.js", "selection.js", "pulse.js", "render.js"]);
   // The board lands in level.js with its own `inside`; until then, this one.
   B.level.inside = (level, x, y) =>
     x >= 0 && y >= 0 && x < level.size.w && y < level.size.h;
@@ -134,7 +139,8 @@ function stage() {
     selection: [],
     box: null,
     hover: null,
-    hold: null
+    hold: null,
+    time: 0                      // the clock the frame carries, as the app boots it
   };
   return {
     B,
@@ -719,6 +725,64 @@ describe("render: the highlight ring", () => {
     s.add(0, 0, TILE_ELEV);
     s.draw();
     assert.deepEqual(drawsNamed(s, "outline"), []);
+  });
+});
+
+describe("render: the ring that flashes on a see-through level", () => {
+  // The ring a tile takes, the level see-through or solid, at that time.
+  const kindAt = (s, tile, opaque, time) => {
+    s.state.opaque = opaque;
+    s.state.time = time;
+    s.draw();
+    const asked = s.asked("outline");
+    assert.equal(asked.length, 1, `${asked.length} rings`);
+    return asked[0][2];
+  };
+
+  it("flashes the ring round a hovered tile for the first half of the cycle", () => {
+    const s = stage();
+    const tile = s.add(0, 0, TILE_ELEV);
+    s.state.hover = { tile };
+    assert.equal(kindAt(s, tile, false, LIT_TIME), "pulse");
+    assert.equal(kindAt(s, tile, false, UNLIT_TIME), "hover", "its own ring for the second half");
+  });
+
+  it("flashes the ring round a selected tile in the same beat", () => {
+    const s = stage();
+    const tile = s.add(0, 0, TILE_ELEV);
+    s.state.selection = [{ x: tile.x, y: tile.y }];
+    assert.equal(kindAt(s, tile, false, LIT_TIME), "pulse");
+    assert.equal(kindAt(s, tile, false, UNLIT_TIME), "select");
+  });
+
+  it("leaves a solid level its own rings, whatever the clock says", () => {
+    const s = stage();
+    const tile = s.add(0, 0, TILE_ELEV);
+    s.state.hover = { tile };
+    assert.equal(kindAt(s, tile, true, LIT_TIME), "hover");
+    assert.equal(kindAt(s, tile, true, UNLIT_TIME), "hover");
+  });
+
+  it("flashes only the tiles it rings, and leaves the rest of the level alone", () => {
+    const s = stage();
+    const picked = s.add(0, 0, TILE_ELEV);
+    s.add(...UNSELECTED, TILE_ELEV);
+    s.state.opaque = false;
+    s.state.selection = [{ x: picked.x, y: picked.y }];
+    s.state.time = LIT_TIME;
+    s.draw();
+    assert.deepEqual(s.asked("outline"), [[picked.shape, viewFacingOf(s, picked), "pulse"]]);
+  });
+
+  it("keeps the flash to a cycle of its own, over cycles of the clock", () => {
+    const s = stage();
+    const tile = s.add(0, 0, TILE_ELEV);
+    s.state.hover = { tile };
+    for (const cycle of [0, 1, 7]) {
+      const from = cycle * CYCLE_MS;
+      assert.equal(kindAt(s, tile, false, from + LIT_TIME), "pulse", `cycle ${cycle}`);
+      assert.equal(kindAt(s, tile, false, from + UNLIT_TIME), "hover", `cycle ${cycle}`);
+    }
   });
 });
 

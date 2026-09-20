@@ -33,7 +33,8 @@
     hover: null,
     hold: null,
     pending: null,
-    tip: null
+    tip: null,
+    time: 0
   };
 
   var canvas = null;
@@ -155,9 +156,11 @@
     return B.view.basePoint(canvas, scale(), clientX, clientY);
   }
 
+  // A see-through level reads the floor plane, so the pointer always addresses
+  // the cell it is over.
   function pick(clientX, clientY) {
     var p = at(clientX, clientY);
-    return p && B.view.pick(state.view, state.level, p.x, p.y);
+    return p && B.view.pick(state.view, state.level, p.x, p.y, !state.opaque);
   }
 
   // Two client corners as a rectangle in the same space, in the order swept:
@@ -170,14 +173,24 @@
 
   // ---- Render --------------------------------------------------------------
   var rafId = null;
+  var pulseTimer = null;
 
-  function frame() {
+  // The frame reads the time the browser hands it, so the flash keeps the
+  // page's own clock, and asks for the redraw its next turn needs. Nothing
+  // waits once the flash is over.
+  function frame(time) {
     rafId = null;
+    state.time = time;
     flushSave();
     B.render.draw(canvas, state, scale());
+    if (B.pulse.live(state)) pulseTimer = setTimeout(sched, B.pulse.untilFlip(state.time));
   }
 
+  // A redraw already asked for stands, and the timer waiting on the flash
+  // gives way to it: one of the two is pending, never both.
   function sched() {
+    clearTimeout(pulseTimer);
+    pulseTimer = null;
     if (rafId) return;
     rafId = requestAnimationFrame(frame);
   }
@@ -232,15 +245,24 @@
     changed();
   }
 
+  // A hover names the tile the pointer found, so one naming a tile that is
+  // gone has to go with it: the pointer may rest where it is and pick nothing
+  // afresh.
+  function forgetHover(x, y) {
+    if (B.sameCell(state.hover && state.hover.tile, x, y)) state.hover = null;
+  }
+
   function remove(x, y) {
     if (!B.level.remove(state.level, x, y)) return;
     setSelection(B.selection.remove(state.selection, x, y));
+    forgetHover(x, y);
     edited();
   }
 
   function clear() {
     B.level.clear(state.level);
     setSelection([]);
+    state.hover = null;
     edited();
   }
 
@@ -334,11 +356,13 @@
     toggleSelect: function (x, y) {
       selectCells(B.selection.toggle(state.selection, x, y));
     },
-    // A sweep's two client corners: every tile inside joins the selection.
+    // A sweep's two client corners: every tile inside joins the selection. A
+    // sweep of no size is a click, and reads the floor plane as one.
     selectBox: function (x0, y0, x1, y1) {
       var box = baseBox(x0, y0, x1, y1);
       if (!box) return;
-      selectCells(B.selection.add(state.selection, B.view.within(state.view, state.level, box)));
+      var inside = B.view.within(state.view, state.level, box, !state.opaque);
+      selectCells(B.selection.add(state.selection, inside));
     },
     // The rectangle the sweep is drawing, for the renderer; box(null) ends it.
     box: function (x0, y0, x1, y1) {

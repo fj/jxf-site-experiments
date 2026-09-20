@@ -103,10 +103,17 @@
     return null;
   }
 
-  function outlineKind(state, tile) {
+  function ringKind(state, tile) {
     if (B.selection.holds(state.selection, tile.x, tile.y)) return "select";
     if (B.sameCell(hoveredTile(state), tile.x, tile.y)) return "hover";
     return null;
+  }
+
+  // A ring on a see-through level takes the flash for half of every cycle.
+  function outlineKind(state, tile) {
+    var kind = ringKind(state, tile);
+    if (kind && !state.opaque && B.pulse.lit(state.time)) return "pulse";
+    return kind;
   }
 
   function drawMarks(ctx, rot, marks, cx, startY) {

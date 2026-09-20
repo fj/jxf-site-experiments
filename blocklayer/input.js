@@ -3,9 +3,9 @@
  * gestures: click or drag over empty cells to add, click a tile to select it,
  * Ctrl or Cmd with a click to toggle a tile in the selection, Shift with a
  * drag to sweep every tile in a box into it, wheel over the selection to
- * elevate it, hold the right button to remove, press the right button off the
- * selection to deselect, and keys that move the view, move the level, step the
- * foreground colour, or edit the selection.
+ * elevate it, hold the right button to remove, drag the right button to pan
+ * the scene, release it off the selection to deselect, and keys that move the
+ * view, move the level, step the foreground colour, or edit the selection.
  * Nothing here knows the level; every gesture ends in one of the handlers.
  * Every hover reports what is under the pointer, whether Alt is held and where
  * the pointer is, and Alt coming or going picks the same point again, so what
@@ -19,6 +19,8 @@
 
   var PRIMARY_BUTTON = 0;
   var SECONDARY_BUTTON = 2;
+  var PAN_SLOP = 4;                 // client px a right press may wander and stay a press
+  var PANNING_CLASS = "is-panning"; // what the canvas wears while a pan is live
 
   // Each key names the handler it calls and what it passes. The view keys go
   // by e.key and the rest by its lowercase form. A level key acts whatever is
@@ -131,6 +133,9 @@
     var lastCell = null;
     var hold = null;
     var sweep = null;       // where a shift drag began, in client space
+    // A live right press: where it began, where its next pan step starts,
+    // whether it would drop the selection, and whether it has become a pan.
+    var press = null;
     var alt = false;
     var last = null;        // where the pointer was, in client space
 
@@ -228,12 +233,62 @@
       });
     }
 
-    // The selection survives a right button only on a tile it holds.
-    function dropSelection(tile) {
+    // Whether a right press here would drop the selection, which survives
+    // only on a tile it holds. The press works this out at once, and the
+    // release makes it, since a press that pans drops nothing.
+    function dropsSelection(tile) {
       var cells = handlers.selection();
-      if (!cells.length) return;
-      if (tile && B.selection.holds(cells, tile.x, tile.y)) return;
-      handlers.deselect();
+      return !!cells.length && !(tile && B.selection.holds(cells, tile.x, tile.y));
+    }
+
+    function startPress(e, tile) {
+      press = {
+        x: e.clientX,             // where the press began, which the slop is measured from
+        y: e.clientY,
+        from: null,               // ...and where the next pan step starts, once it pans
+        drops: dropsSelection(tile),
+        panning: false
+      };
+    }
+
+    function pastSlop(e) {
+      return Math.abs(e.clientX - press.x) > PAN_SLOP ||
+        Math.abs(e.clientY - press.y) > PAN_SLOP;
+    }
+
+    // The press is a pan from here on: the hold goes, the canvas shows the
+    // mode, and the first step starts where the press began, so the cell it
+    // began on comes back under the pointer.
+    function startPan() {
+      press.panning = true;
+      press.from = { x: press.x, y: press.y };
+      cancelHold();
+      canvas.classList.add(PANNING_CLASS);
+    }
+
+    // A press that wanders past the slop is a pan, not a click, and the scene
+    // follows the pointer step by step from then on.
+    function trackPress(e) {
+      if (!press.panning && !pastSlop(e)) return;
+      if (!press.panning) startPan();
+      handlers.panDrag(press.from.x, press.from.y, e.clientX, e.clientY);
+      press.from = { x: e.clientX, y: e.clientY };
+    }
+
+    // The press is over and answers for nothing: the hold goes, and a pan
+    // takes its class off the canvas.
+    function cancelPress() {
+      if (press && press.panning) canvas.classList.remove(PANNING_CLASS);
+      press = null;
+      cancelHold();
+    }
+
+    // The release ends the press. One that never became a pan drops the
+    // selection it worked out at the press.
+    function endPress() {
+      var ended = press;
+      cancelPress();
+      if (ended && !ended.panning && ended.drops) handlers.deselect();
     }
 
     // The box the sweep covers so far, from the press to the pointer. Both
@@ -291,11 +346,14 @@
         return;
       }
       var tile = hit && hit.tile;
-      dropSelection(tile);
+      startPress(e, tile);
       if (tile) startHold(tile);
     }
 
+    // The pan comes before the pick, so what the hover reports is read from
+    // the view the pan has just made.
     function onMove(e) {
+      if (press) trackPress(e);
       if (sweep) trackSweep(e);
       var hit = pick(e);
       var cell = hit && hit.cell;
@@ -312,17 +370,17 @@
         endDrag();
         endSweep(e);
       }
-      if (e.button === SECONDARY_BUTTON) cancelHold();
+      if (e.button === SECONDARY_BUTTON) endPress();
     }
 
     function onCancel() {
       endDrag();
       clearSweep();
-      cancelHold();
+      cancelPress();
     }
 
     function onLeave(e) {
-      cancelHold();
+      cancelPress();
       hoverNothing(e);
     }
 

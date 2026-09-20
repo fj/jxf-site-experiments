@@ -282,6 +282,16 @@
   // Everything the toolbar and the pointer can do; each reads the keys it needs.
   var handlers = {
     pan: function (facing) { B.view.pan(state.view, facing, PAN_STEP); moved(); },
+    // One step of a drag that takes the scene with it. The two client points
+    // are where the step began and where the pointer is now — not two corners
+    // — and the view moves by the travel between them, in base pixels.
+    panDrag: function (x0, y0, x1, y1) {
+      var from = at(x0, y0);
+      var to = at(x1, y1);
+      if (!from || !to) return;
+      B.view.panBy(state.view, to.x - from.x, to.y - from.y);
+      moved();
+    },
     rotate: function (turns) { B.view.rotate(state.view, turns); moved(); },
     zoom: function (delta) { B.view.zoom(state.view, delta); moved(); },
     // A shrink that would drop tiles changes nothing until the reader says so.

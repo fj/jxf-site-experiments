@@ -229,8 +229,8 @@ addresses as well: it reads the floor plane, so the cell the pointer is over
 answers, and no column in front takes the hover, the click or the removal
 instead. The ring around the hovered or the selected tile flashes magenta
 twice a second while the level is see-through, and the canvas redraws when
-that colour turns over rather than on every frame the browser offers.
-A light grey grid rules the board's floor, inside
+that colour turns over rather than on every frame the browser offers. A light
+grey grid rules the board's floor, inside
 an outline that shows where the level ends; tiles live only on it. Editing
 happens on the canvas: hover shows where a tile would go, `Alt` with the
 pointer reads a tile out — elevation, colour, shape, decor —
@@ -255,14 +255,13 @@ up by a whole number, so pixels stay square. Every sprite is built in code from
 the palette in `config.js` — nothing is a bitmap file. Modules on the
 `BlockLayer` namespace, in load order: `config.js`, `pixel.js` (anchored
 sprites, string-art, shading, memoizing), `level.js`, `file.js`, `view.js`,
-`selection.js`, `pulse.js`, `demo.js` and `store.js` (the pure models: tiles and their
-edits and validation; the `*.blocklayer.json` file a level is saved to and
-opened from; rotation, projection, picking, the frame and the way in from a
-pointer; which cells are chosen, which every module asks `selection.js`; the
-beat the see-through highlight flashes on, and how long a frame has until it
-turns; the
-level a first visit starts with, which `app.js` falls back on; the level the
-browser keeps, and nothing when it keeps none — all unit-tested
+`selection.js`, `pulse.js`, `demo.js` and `store.js` (the pure models: tiles
+and their edits and validation; the `*.blocklayer.json` file a level is saved
+to and opened from; rotation, projection, picking, the frame and the way in
+from a pointer; which cells are chosen, which every module asks `selection.js`;
+the beat the see-through highlight flashes on, and how long a frame has until
+it turns; the level a first visit starts with, which `app.js` falls back on;
+the level the browser keeps, and nothing when it keeps none — all unit-tested
 under `tests/`), `sprites-tiles.js`, `sprites-decor.js`, `sprites-marks.js`,
 `sprites-icons.js`, `render.js`, `input.js`, `parts.js` (the elements, the
 icons and the shape vocabulary every panel builds from), `toolbar.js`,

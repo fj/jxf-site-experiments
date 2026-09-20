@@ -6,11 +6,18 @@ const { load } = require("./load");
 
 const WIDTH = 400;
 const HEIGHT = 300;
+// Two more sizes for the visible canvas: one narrower than the first, then one
+// taller, so a frame that shrinks and a frame that grows both show.
+const NARROWER = { width: 240, height: HEIGHT };
+const TALLER = { width: 240, height: 480 };
+// ...and two that leave it no bitmap either way, as a collapsed container does.
+const COLLAPSED = [{ width: 0, height: HEIGHT }, { width: WIDTH, height: 0 }];
 const SCALE = 2;
 const PANS = [{ x: 0, y: 0 }, { x: 7, y: -3 }, { x: -40, y: 120 }];
 const ROTS = [0, 1, 2, 3];      // the quarter turns the view is read at
 const COMPASS_SIZE = 24;        // the stand-in compass, which the badge sits under
 const DECOR_OY = 20;            // ...and how tall the stand-in decor object stands
+const LABEL_DY = 4;             // base px render.js drops a label below the top face
 const FULL_ALPHA = 1;
 const TRANSPARENT_ALPHA = 0.45; // how solid render.js draws a see-through tile
 const TILE_ELEV = 2;            // blocks under a tile, so a top read wrong lands elsewhere
@@ -148,6 +155,8 @@ function stage() {
     draws,
     fills,
     blits,
+    // The canvas the reader sees, whose size a test may change under the app.
+    canvas,
     ink: () => scene.fillStyle,
     clipped: () => clip,
     asked: (name) => calls.get(name) || [],
@@ -209,6 +218,9 @@ const anchorOf = (s, tile) => {
   return [frame.ox + p.sx, frame.oy + p.sy];
 };
 
+// Where each column's label landed. The badge is a label too, and drawn last.
+const labelsAt = (s) => drawsNamed(s, "label").slice(0, -1).map((d) => [d.x, d.y]);
+
 // A tile of the given shape, facing east, with the view turned a quarter, so
 // the facing the view reads is not the tile's own.
 const turnedTile = (s, x, y, shape) => {
@@ -256,6 +268,16 @@ describe("render: the elevation labels", () => {
     s.add(1, 1, s.B.ELEV_MAX);
     s.draw();
     assert.deepEqual(columnLabels(s), [String(s.B.ELEV_MIN), String(s.B.ELEV_MAX)]);
+  });
+
+  it("drops each label under its own column's top face, not under the first one's", () => {
+    const s = stage();
+    const tiles = [s.add(0, 0, TILE_ELEV), s.add(BOARD.w - 1, BOARD.h - 1, s.B.ELEV_MAX)];
+    s.draw();
+    assert.deepEqual(labelsAt(s), tiles.map((tile) => {
+      const [x, y] = anchorOf(s, tile);
+      return [x, y + LABEL_DY];
+    }));
   });
 
   it("draws no label while the elevation layer is off", () => {
@@ -993,7 +1015,7 @@ describe("render: the marks a tile carries", () => {
 });
 
 describe("render: the blit to the visible canvas", () => {
-  const blitOf = (s) => s.blits.find((b) => b.image);
+  const blitOf = (s) => s.blits.findLast((b) => b.image);
 
   it("stretches the base scene over the canvas by the scale it is given", () => {
     const s = stage();
@@ -1016,5 +1038,35 @@ describe("render: the blit to the visible canvas", () => {
     const [cleared, blit] = s.blits;
     assert.deepEqual(cleared.cleared, [0, 0, WIDTH, HEIGHT]);
     assert.ok(blit.image, "the scene follows the clear");
+  });
+
+  // The scene is kept from frame to frame, so a canvas that changes size has
+  // to take it with it; a stale one leaves part of the canvas unpainted.
+  it("refits the scene to the frame when the canvas changes size", () => {
+    const s = stage();
+    s.draw();
+    for (const size of [NARROWER, TALLER]) {
+      Object.assign(s.canvas, size);
+      s.draw();
+      const frame = s.frame();
+      const blit = blitOf(s);
+      const name = `${size.width} by ${size.height}`;
+      assert.deepEqual([blit.image.width, blit.image.height], [frame.w, frame.h], name);
+      assert.deepEqual([blit.w, blit.h], [frame.w * SCALE, frame.h * SCALE], name);
+    }
+  });
+});
+
+describe("render: a canvas with no size", () => {
+  it("draws nothing at all, rather than a scene of no size", () => {
+    for (const size of COLLAPSED) {
+      const s = stage();
+      Object.assign(s.canvas, size);
+      s.draw();
+      const name = `${size.width} by ${size.height}`;
+      assert.deepEqual(s.draws, [], name);
+      assert.deepEqual(s.fills, [], name);
+      assert.deepEqual(s.blits, [], name);
+    }
   });
 });

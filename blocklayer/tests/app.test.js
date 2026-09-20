@@ -891,6 +891,8 @@ describe("app: a shrink that would lose tiles", () => {
 
 describe("app: the controls that move the view", () => {
   const FAR = 40;                  // presses: further than the board and the frame together
+  const DRAG = 60;                 // client px: a drag past the slop, and short of the clamp
+  const FAR_DRAG = 4000;           // ...and one that would leave the board far behind
   const LAYERS = { elevation: true, marks: true, decor: true };
 
   // Whether the board's floor still overlaps what the canvas shows.
@@ -928,6 +930,37 @@ describe("app: the controls that move the view", () => {
       push(r, "pan", facing, FAR);
       assert.equal(onScreen(r), true, facing);
     }
+  });
+
+  // The reader takes hold of the scene at `from` and carries the pointer away
+  // by (dx, dy), which is a pan once it is past the slop input.js allows.
+  const dragBy = (r, from, dx, dy) => {
+    const to = { clientX: from.clientX + dx, clientY: from.clientY + dy };
+    r.canvas.fire("pointerdown", { ...from, button: SECONDARY });
+    r.canvas.fire("pointermove", to);
+    r.canvas.fire("pointerup", { ...to, button: SECONDARY });
+    return to;
+  };
+
+  it("pans by a right drag, which leaves the cell it took hold of under the pointer", () => {
+    const HELD = [2, 3];
+    const r = boot([HELD]);
+    const home = { ...r.frame().view.pan };
+    const scale = r.frame().view.zoom * DPR;
+    dragBy(r, r.over(...HELD), DRAG, -DRAG);
+    assert.deepEqual({ ...r.frame().view.pan }, {
+      x: home.x + DRAG / scale,
+      y: home.y - DRAG / scale
+    }, "the view moved by the pointer's own travel");
+    assert.equal(r.frame().hover.tile, r.tileAt(...HELD), "and the tile is still under it");
+  });
+
+  it("keeps some of the board on screen however far a drag carries it", () => {
+    const r = boot();
+    const asked = r.of("clampPan").length;
+    dragBy(r, r.over(0, 0), FAR_DRAG, FAR_DRAG);
+    assert.ok(r.of("clampPan").length > asked, "the drag is clamped like any other move");
+    assert.equal(onScreen(r), true);
   });
 
   it("turns the view a quarter at a time, round either way", () => {

@@ -919,6 +919,33 @@ describe("view: sameHit", () => {
   });
 });
 
+describe("view: panBy", () => {
+  const SHIFT = { x: 12, y: -8 };       // base pixels, one way along each axis
+
+  it("adds the shift to the pan and answers the view's own pan", () => {
+    const view = viewAt(0, { x: 3, y: 4 });
+    const answer = V.panBy(view, SHIFT.x, SHIFT.y);
+    assert.deepEqual(view.pan, { x: 3 + SHIFT.x, y: 4 + SHIFT.y });
+    assert.equal(answer, view.pan);
+  });
+
+  it("accumulates, so a shift and its opposite come home", () => {
+    const view = V.create();
+    V.panBy(view, SHIFT.x, SHIFT.y);
+    assert.deepEqual(V.panBy(view, -SHIFT.x, -SHIFT.y), { x: 0, y: 0 });
+  });
+
+  it("moves the scene by the shift itself, at every rotation", () => {
+    for (const rot of ROTS) {
+      const view = viewAt(rot);
+      const before = V.project(view, 1, 2, 0);
+      V.panBy(view, SHIFT.x, SHIFT.y);
+      const after = { sx: before.sx + SHIFT.x, sy: before.sy + SHIFT.y };
+      assert.deepEqual(V.project(view, 1, 2, 0), after, `rot ${rot}`);
+    }
+  });
+});
+
 describe("view: pan", () => {
   it("moves the scene down-left when the camera goes north at rot 0", () => {
     const view = V.create();

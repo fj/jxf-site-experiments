@@ -10,6 +10,10 @@ const FRAME_MS = 16;
 const PRIMARY = 0;
 const MIDDLE = 1;
 const SECONDARY = 2;
+const PAN_SLOP = 4;             // input.js: client px a right press may wander and stay a press
+const PANNING_CLASS = "is-panning";   // ...and what the canvas wears once it pans
+const NUDGE = 2;                // a move that stays inside the slop
+const FAR = PAN_SLOP + 1;       // ...and the shortest one that does not
 const ALT = true;               // as a hover reports the Alt key
 const NO_ALT = false;
 const ALT_DOWN = { key: "Alt", altKey: true };
@@ -55,12 +59,18 @@ function fakeWindow() {
 
 function fakeCanvas() {
   const listeners = {};
+  const classes = new Set();
   const canvas = {
     width: WIDTH,
     height: HEIGHT,
     focused: false,
     focusOptions: null,
     captured: null,
+    classList: {
+      add(name) { classes.add(name); },
+      remove(name) { classes.delete(name); },
+      contains(name) { return classes.has(name); }
+    },
     addEventListener(type, fn) {
       (listeners[type] = listeners[type] || []).push(fn);
     },
@@ -122,6 +132,7 @@ function rig() {
       if (at !== -1) selection.splice(at, 1);
     },
     pan: record("pan"),
+    panDrag: record("panDrag"),
     rotate: record("rotate"),
     zoom: record("zoom"),
     deselect: record("deselect"),
@@ -147,6 +158,9 @@ function rig() {
     },
     select(...cells) { selection = cells; },
     of(name) { return calls.filter((c) => c[0] === name).map((c) => c.slice(1)); },
+    // The names of the handler calls, in the order they were made.
+    names() { return calls.map((c) => c[0]); },
+    panning() { return canvas.classList.contains(PANNING_CLASS); },
     fire(type, props) { return canvas.fire(type, props); }
   };
 }
@@ -500,16 +514,19 @@ describe("input: hold to remove", () => {
     }
   });
 
+  // A nudge inside the slop is no pan, so what it does to the hold is the
+  // hold's own rule: the cell under the pointer, not how far it went.
   it("moving off the tile cancels the hold; moving on it does not", () => {
     const r = rig();
     const t = r.at(20, 20, tile(1, 1));
-    const c = r.at(10, 10, cell(0, 0));
+    const c = r.at(20 + NUDGE, 20, cell(0, 0));
     r.fire("pointerdown", { ...t, button: SECONDARY });
     r.tick(r.B.HOLD_MS / 4);
     r.fire("pointermove", { clientX: 20, clientY: 20 });
     assert.notEqual(r.of("hold").pop()[2], null);
     r.fire("pointermove", c);
     assert.deepEqual(r.of("hold").pop(), [1, 1, null]);
+    assert.deepEqual(r.of("panDrag"), [], "and it panned nothing");
     r.tick(r.B.HOLD_MS);
     assert.deepEqual(r.of("remove"), []);
   });
@@ -517,7 +534,7 @@ describe("input: hold to remove", () => {
   it("moving onto another tile cancels the hold too", () => {
     const r = rig();
     const t = r.at(20, 20, tile(1, 1));
-    const other = r.at(50, 50, tile(2, 2));
+    const other = r.at(20 + NUDGE, 20 + NUDGE, tile(2, 2));
     r.fire("pointerdown", { ...t, button: SECONDARY });
     r.fire("pointermove", other);
     assert.deepEqual(r.of("hold").pop(), [1, 1, null]);
@@ -553,22 +570,29 @@ describe("input: hold to remove", () => {
   });
 });
 
+// The drop is worked out at the press and made at the release, since only the
+// release knows the press was no pan.
 describe("input: the right button and the selection", () => {
-  it("a right press on an empty cell drops the selection and starts no hold", () => {
+  it("a right press on an empty cell drops the selection at the release, and starts no hold", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
-    r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: SECONDARY });
+    const c = r.at(10, 10, cell(0, 0));
+    r.fire("pointerdown", { ...c, button: SECONDARY });
     r.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.calls, [], "the press itself changes nothing");
+    r.fire("pointerup", { ...c, button: SECONDARY });
     assert.deepEqual(r.calls, [["deselect"]]);
   });
 
-  it("a right press on another tile drops the selection, then holds to remove that tile", () => {
+  it("a right press on another tile holds to remove it, and drops the selection at the release", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
-    r.fire("pointerdown", { ...r.at(50, 50, tile(2, 2)), button: SECONDARY });
-    assert.deepEqual(r.calls, [["deselect"], ["hold", 2, 2, 0]]);
+    const t = r.at(50, 50, tile(2, 2));
+    r.fire("pointerdown", { ...t, button: SECONDARY });
+    assert.deepEqual(r.calls, [["hold", 2, 2, 0]]);
     r.tick(r.B.HOLD_MS);
     assert.deepEqual(r.of("remove"), [[2, 2]]);
+    r.fire("pointerup", { ...t, button: SECONDARY });
     assert.deepEqual(r.of("deselect"), [[]]);
   });
 
@@ -577,27 +601,60 @@ describe("input: the right button and the selection", () => {
       const where = `${hit.tile.x},${hit.tile.y}`;
       const r = rig();
       r.select({ x: 1, y: 1 });
-      r.fire("pointerdown", { ...r.at(50, 50, hit), button: SECONDARY });
-      assert.deepEqual(r.of("deselect"), [[]], where);
+      const t = r.at(50, 50, hit);
+      r.fire("pointerdown", { ...t, button: SECONDARY });
       assert.deepEqual(r.of("hold"), [[hit.tile.x, hit.tile.y, 0]], where);
+      r.fire("pointerup", { ...t, button: SECONDARY });
+      assert.deepEqual(r.of("deselect"), [[]], where);
     }
   });
 
-  it("a right press off the canvas drops the selection and starts no hold", () => {
+  it("a right press off the canvas drops the selection at the release, and starts no hold", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
     r.at(WIDTH + 5, 10, tile(9, 9));
-    r.fire("pointerdown", { clientX: WIDTH + 5, clientY: 10, button: SECONDARY });
+    const off = { clientX: WIDTH + 5, clientY: 10, button: SECONDARY };
+    r.fire("pointerdown", off);
+    assert.deepEqual(r.calls, [], "the press itself changes nothing");
+    r.fire("pointerup", off);
     assert.deepEqual(r.calls, [["deselect"]]);
+  });
+
+  // The gesture is over, so the drop it was going to make is off as well.
+  it("a press ended by a cancel or a leave drops nothing", () => {
+    for (const type of ["pointercancel", "pointerleave"]) {
+      const r = rig();
+      r.select({ x: 1, y: 1 });
+      const c = r.at(10, 10, cell(0, 0));
+      r.fire("pointerdown", { ...c, button: SECONDARY });
+      r.fire(type, c);
+      r.fire("pointerup", { ...c, button: SECONDARY });
+      assert.deepEqual(r.of("deselect"), [], type);
+    }
   });
 
   it("a right press on the selected tile keeps the selection and still removes it", () => {
     const r = rig();
     r.select({ x: 1, y: 1 });
-    r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: SECONDARY });
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointerdown", { ...t, button: SECONDARY });
     assert.deepEqual(r.of("hold"), [[1, 1, 0]]);
     r.tick(r.B.HOLD_MS);
     assert.deepEqual(r.of("remove"), [[1, 1]]);
+    r.fire("pointerup", { ...t, button: SECONDARY });
+    assert.deepEqual(r.of("deselect"), []);
+  });
+
+  // The press was on a tile the selection held, so it drops nothing — even
+  // though the hold has taken that tile out of the selection by the release.
+  it("reads the selection at the press, not at the release", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 }, { x: 2, y: 2 });
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointerdown", { ...t, button: SECONDARY });
+    r.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.of("remove"), [[1, 1]]);
+    r.fire("pointerup", { ...t, button: SECONDARY });
     assert.deepEqual(r.of("deselect"), []);
   });
 
@@ -606,17 +663,23 @@ describe("input: the right button and the selection", () => {
       const where = `${hit.tile.x},${hit.tile.y}`;
       const r = rig();
       r.select({ x: 1, y: 1 }, { x: 2, y: 2 });
-      r.fire("pointerdown", { ...r.at(50, 50, hit), button: SECONDARY });
-      assert.deepEqual(r.of("deselect"), deselects, where);
+      const t = r.at(50, 50, hit);
+      r.fire("pointerdown", { ...t, button: SECONDARY });
       assert.deepEqual(r.of("hold"), [[hit.tile.x, hit.tile.y, 0]], where);
+      r.fire("pointerup", { ...t, button: SECONDARY });
+      assert.deepEqual(r.of("deselect"), deselects, where);
     }
   });
 
   it("with nothing selected, a right press deselects nothing, on a tile or off one", () => {
     const r = rig();
-    r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: SECONDARY });
-    r.fire("pointerdown", { ...r.at(20, 20, tile(1, 1)), button: SECONDARY });
+    const c = r.at(10, 10, cell(0, 0));
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointerdown", { ...c, button: SECONDARY });
+    r.fire("pointerup", { ...c, button: SECONDARY });
+    r.fire("pointerdown", { ...t, button: SECONDARY });
     r.tick(r.B.HOLD_MS);
+    r.fire("pointerup", { ...t, button: SECONDARY });
     assert.deepEqual(r.of("deselect"), []);
     assert.deepEqual(r.of("remove"), [[1, 1]]);
   });
@@ -627,6 +690,121 @@ describe("input: the right button and the selection", () => {
     r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: PRIMARY });
     r.fire("pointerdown", { ...r.at(50, 50, tile(2, 2)), button: PRIMARY });
     assert.deepEqual(r.of("deselect"), []);
+  });
+});
+
+describe("input: the right button dragged to pan", () => {
+  // A right press on the tile at (1, 1), which the drags below take hold of.
+  const held = (r) => {
+    const t = r.at(20, 20, tile(1, 1));
+    r.fire("pointerdown", { ...t, button: SECONDARY });
+    return t;
+  };
+
+  const moveTo = (r, x, y) => r.fire("pointermove", { clientX: x, clientY: y });
+
+  it("pans nothing while the press stays inside the slop", () => {
+    const r = rig();
+    held(r);
+    moveTo(r, 20 + PAN_SLOP, 20 - PAN_SLOP);
+    assert.deepEqual(r.of("panDrag"), []);
+    assert.equal(r.panning(), false);
+  });
+
+  it("passes the slop on either axis, and pans the whole distance from the press", () => {
+    for (const [dx, dy] of [[FAR, NUDGE], [NUDGE, -FAR]]) {
+      const r = rig();
+      held(r);
+      moveTo(r, 20 + dx, 20 + dy);
+      assert.deepEqual(r.of("panDrag"), [[20, 20, 20 + dx, 20 + dy]], `${dx},${dy}`);
+    }
+  });
+
+  // A slow drag arrives as a run of small moves. The slop is measured from
+  // the press, so they add up to a pan that starts where the press began.
+  it("measures the slop from the press, however small the moves are", () => {
+    const r = rig();
+    held(r);
+    for (let step = 1; step <= PAN_SLOP; step++) moveTo(r, 20 + step, 20);
+    assert.deepEqual(r.of("panDrag"), [], "no step so far is past the slop");
+    moveTo(r, 20 + FAR, 20);
+    assert.deepEqual(r.of("panDrag"), [[20, 20, 20 + FAR, 20]]);
+  });
+
+  it("pans by each later step's own travel, so the scene keeps up with the pointer", () => {
+    const r = rig();
+    held(r);
+    moveTo(r, 20 + FAR, 20);
+    moveTo(r, 20 + FAR + NUDGE, 20 - NUDGE);
+    assert.deepEqual(r.of("panDrag"), [
+      [20, 20, 20 + FAR, 20],
+      [20 + FAR, 20, 20 + FAR + NUDGE, 20 - NUDGE]
+    ]);
+  });
+
+  // The pan carries that tile along with the scene, so it is still under the
+  // pointer: the hold ends because the press panned, not because it moved off.
+  it("cancels the hold, so the tile the press began on stays", () => {
+    const r = rig();
+    held(r);
+    r.tick(r.B.HOLD_MS / 4);
+    r.fire("pointermove", r.at(20 + FAR, 20, tile(1, 1)));
+    assert.deepEqual(r.of("hold").pop(), [1, 1, null]);
+    assert.equal(r.pending(), 0);
+    r.tick(r.B.HOLD_MS);
+    assert.deepEqual(r.of("remove"), []);
+  });
+
+  it("drops no selection, wherever the drag began or ended", () => {
+    const r = rig();
+    r.select({ x: 1, y: 1 });
+    r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: SECONDARY });
+    moveTo(r, 10 + FAR, 10);
+    r.fire("pointerup", { clientX: 10 + FAR, clientY: 10, button: SECONDARY });
+    assert.deepEqual(r.of("deselect"), []);
+  });
+
+  it("marks the canvas while the pan is live, and clears the mark at the release", () => {
+    const r = rig();
+    held(r);
+    assert.equal(r.panning(), false, "a press alone is no pan");
+    moveTo(r, 20 + FAR, 20);
+    assert.equal(r.panning(), true);
+    r.fire("pointerup", { clientX: 20 + FAR, clientY: 20, button: SECONDARY });
+    assert.equal(r.panning(), false);
+  });
+
+  it("ends at the release, at a cancel and at the pointer leaving, and pans no further", () => {
+    const enders = [
+      ["pointerup", { button: SECONDARY }],
+      ["pointercancel", {}],
+      ["pointerleave", {}]
+    ];
+    for (const [type, props] of enders) {
+      const r = rig();
+      held(r);
+      moveTo(r, 20 + FAR, 20);
+      r.fire(type, { clientX: 20 + FAR, clientY: 20, ...props });
+      assert.equal(r.panning(), false, type);
+      moveTo(r, 20 + FAR * 2, 20);
+      assert.equal(r.of("panDrag").length, 1, type);
+    }
+  });
+
+  // What the pan moved under the pointer is what the hover has to read.
+  it("pans before it reports the hover", () => {
+    const r = rig();
+    held(r);
+    moveTo(r, 20 + FAR, 20);
+    assert.deepEqual(r.names().slice(r.names().indexOf("panDrag")), ["panDrag", "hover"]);
+  });
+
+  it("a left drag lays its tiles and pans nothing", () => {
+    const r = rig();
+    r.fire("pointerdown", { ...r.at(10, 10, cell(0, 0)), button: PRIMARY });
+    r.fire("pointermove", r.at(10 + FAR, 10, cell(1, 0)));
+    assert.deepEqual(r.of("panDrag"), []);
+    assert.deepEqual(r.of("add"), [[0, 0], [1, 0]]);
   });
 });
 

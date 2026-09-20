@@ -222,22 +222,23 @@ palette of ten (the rainbow's seven and three greys), carrying at most one decor
 object (a chest, a rock, three crystal pillars, a switch) and any number of
 marks (eight compass arrows, a teleport, a rope, a jump). The view turns in
 quarter turns, zooms at whole-number factors, pans in the four compass
-directions, hides or shows the elevation labels, the marks and the decor, and
-draws the tiles solid or see-through, and never so far past the board's edge
-that none of it is in sight. A see-through level changes what the pointer
-addresses as well: it reads the floor plane, so the cell the pointer is over
-answers, and no column in front takes the hover, the click or the removal
-instead. The ring around the hovered or the selected tile flashes magenta
-twice a second while the level is see-through, and the canvas redraws when
-that colour turns over rather than on every frame the browser offers. A light
-grey grid rules the board's floor, inside
-an outline that shows where the level ends; tiles live only on it. Editing
+directions or with a drag of the right button, hides or shows the elevation
+labels, the marks and the decor, and draws the tiles solid or see-through, and
+never so far past the board's edge that none of it is in sight. A see-through
+level changes what the pointer addresses as well: it reads the floor plane, so
+the cell the pointer is over answers, and no column in front takes the hover,
+the click or the removal instead. The ring around the hovered or the selected
+tile flashes magenta twice a second while the level is see-through, and the
+canvas redraws when that colour turns over rather than on every frame the
+browser offers. A light grey grid rules the board's floor, inside an outline
+that shows where the level ends; tiles live only on it. Editing
 happens on the canvas: hover shows where a tile would go, `Alt` with the
 pointer reads a tile out — elevation, colour, shape, decor —
 click or drag adds tiles, click selects one, `Ctrl` or `Cmd` with a click puts
 a tile in the selection or takes it out, `Shift` with a drag sweeps a box of
-them in, the wheel raises or lowers the selection, the right button held removes
-a tile, and the right button away from the selection drops it. Every edit —
+them in, the wheel raises or lowers the selection, the right button held
+removes a tile, the right button dragged takes hold of the scene and pans it,
+and the right button released away from the selection drops it. Every edit —
 shape, facing, colour, decor, marks, height, removal — applies to the whole
 selection, which a raise moves as one body or not at all. The keyboard does the
 same work: `W` and `S` move the selection, or the height a new tile gets when

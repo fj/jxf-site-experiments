@@ -177,6 +177,9 @@ $blk-tip-width: 12em;
   border-radius: $blk-corner;
   background: $blk-canvas-bg;
 
+  // While a right drag carries the scene, which input.js marks the canvas for.
+  &.is-panning { cursor: grabbing; }
+
   &:focus-visible { border-color: $exp-link; }
 
   @include exp-dark {

@@ -108,12 +108,12 @@ function stage() {
   B.tiles = {
     grid: () => gridTile,
     column: (color, elev) => { record("column", color, elev); return tag("column"); },
-    ramp: (color, elev, viewFacing) => {
-      record("ramp", color, elev, viewFacing);
+    ramp: (color, viewFacing) => {
+      record("ramp", color, viewFacing);
       return tag("ramp");
     },
-    stairs: (color, elev, viewFacing) => {
-      record("stairs", color, elev, viewFacing);
+    stairs: (color, viewFacing) => {
+      record("stairs", color, viewFacing);
       return tag("stairs");
     },
     ghost: (elev) => { record("ghost", elev); return tag("ghost"); },
@@ -611,11 +611,11 @@ describe("render: the wedge a sloped tile stands on", () => {
     }
   });
 
-  it("cuts the wedge to the tile's elevation and to the facing the view sees", () => {
+  it("cuts the wedge to the facing the view sees, not to the tile's own", () => {
     const s = stage();
     const tile = turnedTile(s, 0, 0, "ramp");
     s.draw();
-    assert.deepEqual(s.asked("ramp"), [[tile.color, tile.elev, viewFacingOf(s, tile)]]);
+    assert.deepEqual(s.asked("ramp"), [[tile.color, viewFacingOf(s, tile)]]);
     assert.notEqual(viewFacingOf(s, tile), s.B.view.viewFacing(0, tile.facing));
   });
 });
@@ -638,7 +638,7 @@ describe("render: the colour a tile is drawn in", () => {
       s.B.level.setColor(s.state.level, tile.x, tile.y, color);
       s.draw();
       assert.deepEqual(s.asked("column"), [[color, tile.elev]], shape);
-      assert.deepEqual(s.asked(shape), [[color, tile.elev, viewFacingOf(s, tile)]], shape);
+      assert.deepEqual(s.asked(shape), [[color, viewFacingOf(s, tile)]], shape);
     }
   });
 });

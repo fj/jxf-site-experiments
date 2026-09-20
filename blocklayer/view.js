@@ -158,14 +158,22 @@
     });
   }
 
+  // The one writer of the pan: it moves by a shift in base pixels, which the
+  // scene moves with.
+  function panBy(view, dx, dy) {
+    view.pan.x += dx;
+    view.pan.y += dy;
+    return view.pan;
+  }
+
+  // The camera steps `tiles` cells toward a world facing, so the scene goes
+  // the other way by as much.
   function pan(view, facing, tiles) {
     var step = STEP[facing];
     if (!step) return view.pan;
     var from = project(view, 0, 0, 0);
     var to = project(view, step.x, step.y, 0);
-    view.pan.x -= (to.sx - from.sx) * tiles;
-    view.pan.y -= (to.sy - from.sy) * tiles;
-    return view.pan;
+    return panBy(view, (from.sx - to.sx) * tiles, (from.sy - to.sy) * tiles);
   }
 
   // The board's floor plane on screen: `poly`, its four corners in the order
@@ -242,6 +250,7 @@
     rotate: rotate,
     zoom: zoom,
     pan: pan,
+    panBy: panBy,
     toView: toView,
     fromView: fromView,
     project: project,

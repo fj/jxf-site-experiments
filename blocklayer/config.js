@@ -43,7 +43,8 @@
     { key: "rock", label: "Rock" },
     { key: "crystal-blue", label: "Blue crystal" },
     { key: "crystal-yellow", label: "Yellow crystal" },
-    { key: "crystal-red", label: "Red crystal" }
+    { key: "crystal-red", label: "Red crystal" },
+    { key: "switch", label: "Switch" }
   ];
 
   B.MARKS = [

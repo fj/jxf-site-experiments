@@ -30,6 +30,7 @@ const BARE_CELLS = [BARE_CELL, { x: 8, y: 8 }];
 const FILE = { name: "level.blocklayer.json" };
 const FOREGROUND = "violet";                 // a foreground the default is not
 const TILE_COLOR = "red";                    // ...and a tile's colour that is neither
+const SWITCH = "switch";                     // a decor object to press a button with
 
 const B = load([
   "config.js", "pixel.js", "level.js",
@@ -250,6 +251,10 @@ describe("toolbar: the buttons", () => {
     assert.deepEqual(slotsOf(rig().bar.el, "color"), B.PALETTE.map((entry) => entry.key));
   });
 
+  it("offers one decor button per decor object, in config order", () => {
+    assert.deepEqual(slotsOf(rig().bar.el, "decor"), B.DECOR.map((d) => d.key));
+  });
+
   it("calls the handler a button stands for when it is clicked", () => {
     const r = rig();
     const clickable = BUTTONS.filter((spec) => spec.fires);
@@ -323,6 +328,15 @@ describe("toolbar: sync", () => {
       assert.equal(btn.disabled, false, `${spec.act} ${spec.arg}`);
       assert.equal(pressedOf(btn), on ? PRESSED : RELEASED, `${spec.act} ${spec.arg}`);
     }
+  });
+
+  it("presses the switch alone while the tile carries it, and sets it on a click", () => {
+    const r = rig();
+    r.bar.sync(selecting((tile) => tile.decor(SWITCH)));
+    const pressed = B.DECOR.filter((d) => pressedOf(r.find("decor", d.key)) === PRESSED);
+    assert.deepEqual(pressed.map((d) => d.key), [SWITCH]);
+    r.find("decor", SWITCH).fire("click");
+    assert.deepEqual(r.calls, [["setDecor", SWITCH]]);
   });
 
   it("presses the selected tile's colour, and the foreground while none is selected", () => {

@@ -35,9 +35,11 @@
   var HOLD_ALPHA = 0.7;
   var HOLD_STEPS = 16;
   var GRID_ALPHA = 0.55;
+  var BOLD_RING = 2;                     // px of a ring the reader is meant to follow
   var KINDS = {                          // the highlight ringing a tile, by kind
-    select: { width: 2, color: B.COLORS.select },
-    hover: { width: 1, color: B.COLORS.hover }
+    select: { width: BOLD_RING, color: B.COLORS.select },
+    hover: { width: 1, color: B.COLORS.hover },
+    pulse: { width: BOLD_RING, color: B.COLORS.pulse }
   };
   var PLUS_ARM = 2;                      // the ghost's "+" reaches this far from its centre
   var FRONT_EDGE_X = HALF_W - 1;         // the left face's last column: where it meets the right

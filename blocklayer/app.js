@@ -33,7 +33,8 @@
     hover: null,
     hold: null,
     pending: null,
-    tip: null
+    tip: null,
+    time: 0
   };
 
   var canvas = null;
@@ -172,14 +173,24 @@
 
   // ---- Render --------------------------------------------------------------
   var rafId = null;
+  var pulseTimer = null;
 
-  function frame() {
+  // The frame reads the time the browser hands it, so the flash keeps the
+  // page's own clock, and asks for the redraw its next turn needs. Nothing
+  // waits once the flash is over.
+  function frame(time) {
     rafId = null;
+    state.time = time;
     flushSave();
     B.render.draw(canvas, state, scale());
+    if (B.pulse.live(state)) pulseTimer = setTimeout(sched, B.pulse.untilFlip(state.time));
   }
 
+  // A redraw already asked for stands, and the timer waiting on the flash
+  // gives way to it: one of the two is pending, never both.
   function sched() {
+    clearTimeout(pulseTimer);
+    pulseTimer = null;
     if (rafId) return;
     rafId = requestAnimationFrame(frame);
   }

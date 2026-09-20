@@ -30,6 +30,7 @@
   B.ZOOM_DEFAULT = 2;
   B.HOLD_MS = 500;         // the right button held this long removes a tile
   B.STATUS_MS = 3000;      // a message on the status line stays this long
+  B.PULSE_HZ = 2;          // times a second a see-through highlight flashes
 
   B.SHAPES = ["block", "ramp", "stairs"];
   B.FACINGS = ["N", "E", "S", "W"];             // world compass; N is -y, E is +x
@@ -82,6 +83,7 @@
     ghost: "#ffffff",
     select: "#fff7a8",
     hover: "#ffffff",
+    pulse: "#e83fd0",        // the flash on a see-through highlight, on any canvas
     hold: "#ff4d3d",
     label: "#1f1a2e",
     labelText: "#ffffff",

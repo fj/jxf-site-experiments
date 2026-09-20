@@ -25,6 +25,7 @@ scripts:
   - file.js
   - view.js
   - selection.js
+  - pulse.js
   - demo.js
   - store.js
   - sprites-tiles.js

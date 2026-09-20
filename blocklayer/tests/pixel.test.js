@@ -3,11 +3,17 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
+const { canvasDocument, rows } = require("./sprite");
 
 const B = load(["config.js", "pixel.js"]);
 const P = B.pixel;
 
+// fromRows paints on a canvas, so it needs a document to make one; the rest of
+// the module needs no page at all.
+const DRAWN = load(["config.js", "pixel.js"], { document: canvasDocument() }).pixel;
+
 const GREEN = "#7ed957";        // 126, 217, 87: the palette's green
+const BLACK = "#000000";
 
 describe("pixel: parseHex and toHex", () => {
   it("parses a hex colour into its three channels, whatever the case", () => {
@@ -93,6 +99,37 @@ describe("pixel: hflip, vflip and transpose", () => {
     const up = [".#.", "###", ".#.", ".#."];
     assert.deepEqual(P.transpose(up), [".#..", "####", ".#.."]);
     assert.deepEqual(P.hflip(P.transpose(up)), ["..#.", "####", "..#."]);
+  });
+});
+
+describe("pixel: fromRows", () => {
+  const PALETTE = { "#": GREEN, o: BLACK };
+  // A dot and a space both leave a pixel clear. The art is taller than it is
+  // wide, so an anchor taken from the wrong side shows.
+  const ART = ["#o#", ". .", "..#", "o.o"];
+  const ART_W = 3;
+  const ART_H = 4;
+  const MIDDLE_X = 1;
+  const MIDDLE_Y = 2;
+
+  it("paints a pixel for each character, in the colour the palette gives it", () => {
+    const s = DRAWN.fromRows(ART, PALETTE);
+    assert.deepEqual([s.canvas.width, s.canvas.height], [ART_W, ART_H]);
+    assert.deepEqual(rows(s), ["###", "...", "..#", "#.#"]);
+    assert.equal(s.canvas.filled.get("0,0"), GREEN);
+    assert.equal(s.canvas.filled.get("1,0"), BLACK);
+    assert.deepEqual([s.ox, s.oy], [MIDDLE_X, MIDDLE_Y], "anchored on its own middle");
+  });
+
+  // Art that is short of a pixel, or long by one, would build a sprite askew.
+  it("refuses art whose rows are not all of a width", () => {
+    for (const art of [["##", "#"], ["#", "##"]]) {
+      assert.throws(() => DRAWN.fromRows(art, PALETTE), /width/, art.join(" "));
+    }
+  });
+
+  it("refuses a character the palette gives no colour", () => {
+    assert.throws(() => DRAWN.fromRows(["#x"], PALETTE), /colour/);
   });
 });
 

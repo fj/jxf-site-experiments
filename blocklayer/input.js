@@ -72,7 +72,7 @@
     ",": ["toggleMark", "arrow-se"]
   };
 
-  // 1 to 5 toggle the decor, in toolbar order.
+  // 1 to 6 toggle the decor, in toolbar order.
   B.DECOR.forEach(function (d, i) { TILE_KEYS[String(i + 1)] = ["setDecor", d.key]; });
 
   // Shift makes the elevation keys act on every tile at once.

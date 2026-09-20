@@ -3,9 +3,10 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
-const { canvasDocument, rows } = require("./sprite");
+const { canvasDocument, rows, INK } = require("./sprite");
 
 const ICON_SIZE = 16;
+const SWITCH = "switch";              // the decor that stands a lever off its base
 
 const B = load(["config.js", "pixel.js", "sprites-decor.js"], { document: canvasDocument() });
 const D = B.decor;
@@ -17,9 +18,28 @@ function faces(sprite) {
   const out = [];
   for (const [at, colour] of sprite.canvas.filled) {
     if (colour === B.COLORS.outline) continue;
-    out.push({ x: Number(at.split(",")[0]), colour: colour });
+    const [x, y] = at.split(",").map(Number);
+    out.push({ x, y, colour });
   }
   return out;
+}
+
+// Where the ink on one row of string art begins and ends.
+function span(row) {
+  const xs = [...row].flatMap((ch, x) => (ch === INK ? [x] : []));
+  const lo = Math.min(...xs);
+  const hi = Math.max(...xs);
+  return { lo, hi, width: hi - lo + 1 };
+}
+
+// The colours the art paints on each row it paints anything on, top row first.
+function painted(sprite) {
+  const byRow = new Map();
+  for (const p of faces(sprite)) {
+    if (!byRow.has(p.y)) byRow.set(p.y, new Set());
+    byRow.get(p.y).add(p.colour);
+  }
+  return [...byRow].sort(([a], [b]) => a - b);
 }
 
 const brightness = (hex) => B.pixel.parseHex(hex).reduce((sum, channel) => sum + channel, 0);
@@ -40,9 +60,11 @@ describe("decor: sprite and icon", () => {
   it("anchors every decor at its base, where it stands on the tile", () => {
     for (const d of B.DECOR) {
       const s = D.sprite(d.key);
-      assert.ok(s.ox >= 0 && s.ox <= s.canvas.width, `${d.key}: ox ${s.ox}`);
       assert.ok(s.oy > s.canvas.height / 2, `${d.key}: oy ${s.oy} is not below its middle`);
-      assert.ok(s.oy <= s.canvas.height, `${d.key}: oy ${s.oy}`);
+      assert.ok(s.oy < s.canvas.height, `${d.key}: oy ${s.oy} is off the art`);
+      const base = span(rows(s)[s.oy]);
+      assert.equal(s.ox, Math.round((base.lo + base.hi + 1) / 2),
+        `${d.key}: ox ${s.ox} is not the middle of the row it stands on`);
     }
   });
 
@@ -62,6 +84,37 @@ describe("decor: sprite and icon", () => {
     const arts = B.DECOR.map((d) => rows(D.sprite(d.key)).join("\n"));
     assert.equal(new Set(arts).size, B.DECOR.length);
     assert.equal(D.sprite(B.DECOR[0].key), D.sprite(B.DECOR[0].key));
+  });
+
+  it("leans the switch's lever off the plinth it rises from, in the art and in the icon", () => {
+    for (const sprite of both(SWITCH)) {
+      const spans = rows(sprite).filter((row) => row.includes(INK)).map(span);
+      const widest = Math.max(...spans.map((part) => part.width));
+      const lever = spans.slice(0, spans.findIndex((part) => part.width === widest));
+      const foot = spans[spans.length - 1];
+      assert.ok(lever[0].hi < foot.lo, `the lever ends at ${lever[0].hi}, the foot at ${foot.lo}`);
+      assert.ok(lever.some((part, y) => y > 0 && part.width < lever[y - 1].width),
+        "the knob swells out past the shaft it caps");
+    }
+  });
+
+  it("stands the switch on its anchor, at the lowest row its plinth is widest on", () => {
+    const sprite = D.sprite(SWITCH);
+    const spans = rows(sprite).map(span);
+    const widest = Math.max(...spans.map((part) => part.width));
+    assert.equal(spans[sprite.oy].width, widest, "the anchor stands where the plinth is widest");
+    assert.ok(spans[sprite.oy + 1].width < widest, "the base narrows under the anchor's row");
+  });
+
+  it("tips the switch's lever with a knob no part of the plinth is painted in", () => {
+    for (const sprite of both(SWITCH)) {
+      const byRow = painted(sprite);
+      const [, knob] = byRow[0];
+      const shared = byRow
+        .filter(([y]) => y > sprite.canvas.height / 2)
+        .filter(([, colours]) => [...knob].some((colour) => colours.has(colour)));
+      assert.deepEqual(shared.map(([y]) => y), [], "rows under the lever take a knob colour");
+    }
   });
 
   it("refuses a decor it does not know", () => {

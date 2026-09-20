@@ -1,7 +1,7 @@
 /*
- * Blocklayer — decor: the objects that stand on a tile (a chest, a rock and
- * three crystals) as string-art sprites anchored at the centre of their
- * footprint, plus a 16x16 rendition of each for a toolbar button.
+ * Blocklayer — decor: the objects that stand on a tile (a chest, a rock,
+ * three crystals and a switch) as string-art sprites anchored at the centre of
+ * their footprint, plus a 16x16 rendition of each for a toolbar button.
  */
 (function () {
   "use strict";
@@ -17,6 +17,8 @@
   var BLUE = "#7fd0ff";
   var YELLOW = "#f6d048";
   var RED = "#f25c7a";
+  var RED_DARK = "#b83e5a";
+  var STEEL = "#8d9bb0";
 
   // l: the lit face, m: the left (mid) face, d: the right (dark) face,
   // h: a highlight, #: outline.
@@ -240,6 +242,48 @@
         "#mmdd#.####mmdd#",
         "##md##....##md##",
         ".####......####."
+      ]
+    },
+    "switch": {
+      palette: facets(STEEL, { "r": RED, "R": RED_DARK }),
+      ox: 9, oy: 14,
+      rows: [
+        ".####.............",
+        "#rrRR#............",
+        "#rrRR#............",
+        ".####.............",
+        ".#lm#.............",
+        "..#lm#............",
+        "...#lm#...........",
+        "....#lm#..........",
+        ".....#lm##........",
+        "......#lm###......",
+        "....##l#lm#l##....",
+        "..##hhllllllll##..",
+        "..#m##llllll##d#..",
+        "..#mmm##ll##ddd#..",
+        "..#mmmmm##ddddd#..",
+        "....##mmm#dd##....",
+        "......##m###......",
+        "........##........"
+      ],
+      icon: [
+        "................",
+        ".####...........",
+        "#rrRR#..........",
+        "#rrRR#..........",
+        ".####...........",
+        ".#lm#...........",
+        "..#lm#..........",
+        "...#lm#.........",
+        "....#lm###......",
+        "....##lm#l##....",
+        "..##hh#lm#ll##..",
+        "..#m##llll##d#..",
+        "..#mmm####ddd#..",
+        "....##mm#d##....",
+        "......####......",
+        "................"
       ]
     }
   };

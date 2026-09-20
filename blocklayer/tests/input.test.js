@@ -737,7 +737,7 @@ const SHIFT = { shiftKey: true };
 
 // Every key that acts on the selected tile, as [key, event props].
 const TILE_KEYS = [
-  "a", "d", "b", "r", "t", "1", "2", "3", "4", "5", "p", "l", "x",
+  "a", "d", "b", "r", "t", "1", "2", "3", "4", "5", "6", "p", "l", "x",
   "y", "u", "i", "h", "j", "k", "n", "m", ","
 ].map((key) => [key, {}]);
 
@@ -762,9 +762,14 @@ describe("input: keys on the selected tile", () => {
     assert.deepEqual(r.calls, ["block", "ramp", "stairs"].map((shape) => ["setShape", shape]));
   });
 
-  it("1 to 5 toggle the decor in toolbar order", () => {
-    const r = pressOnSelected(["1", "2", "3", "4", "5"].map((key) => [key]));
+  it("1 to 6 toggle the decor in toolbar order", () => {
+    const r = pressOnSelected(["1", "2", "3", "4", "5", "6"].map((key) => [key]));
     assert.deepEqual(r.calls, r.B.DECOR.map((d) => ["setDecor", d.key]));
+  });
+
+  it("6 puts the switch on the selected tile", () => {
+    const r = pressOnSelected([["6"]]);
+    assert.deepEqual(r.calls, [["setDecor", "switch"]]);
   });
 
   it("the rose under the right hand toggles the arrow mark in that compass direction", () => {

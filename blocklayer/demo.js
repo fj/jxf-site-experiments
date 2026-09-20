@@ -48,7 +48,8 @@
     { x: 0, y: 4, decor: "rock" },
     { x: 1, y: 0, decor: "crystal-blue" },
     { x: 5, y: 5, decor: "crystal-yellow" },
-    { x: 2, y: 6, decor: "crystal-red" }
+    { x: 2, y: 6, decor: "crystal-red" },
+    { x: 3, y: 3, decor: "switch" }
   ];
   var MARKS_AT = [
     { x: 1, y: 1, mark: "arrow-e" },

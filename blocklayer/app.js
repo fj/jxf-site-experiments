@@ -140,7 +140,7 @@
   }
 
   function watchSize(stage) {
-    if (window.ResizeObserver) new ResizeObserver(fitCanvas).observe(stage);
+    if (window.ResizeObserver) new window.ResizeObserver(fitCanvas).observe(stage);
     else window.addEventListener("resize", fitCanvas);
     fitCanvas();
   }

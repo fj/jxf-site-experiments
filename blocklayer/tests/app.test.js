@@ -86,6 +86,19 @@ globalThis.FileReader = class {
   }
 };
 
+// A page that can watch a box for a change of its size: it keeps every box it
+// was told to watch, and delivers a change of size to the app on the word of a
+// test.
+function sizeWatcher(window) {
+  const boxes = [];
+  const callbacks = [];
+  window.ResizeObserver = class {
+    constructor(fn) { callbacks.push(fn); }
+    observe(box) { boxes.push(box); }
+  };
+  return { boxes, resized: () => callbacks.forEach((fn) => fn()) };
+}
+
 // The three calls the app makes on the level and the camera, logged on their
 // way through, so a test can say what the wiring asked for as well as what the
 // level became.
@@ -109,12 +122,14 @@ function watchContract(B, calls) {
 
 // The app booted into a mount of its own, on the storage the test hands it —
 // none at all by default — and, with no level there, on a demo of `tiles` at
-// the starting size. `dpr` is the pixel ratio the page reports.
-function boot(tiles = [], storage = null, dpr = DPR) {
+// the starting size. `dpr` is the pixel ratio the page reports, and `watching`
+// whether it can watch a box for a change of its size; an older page cannot.
+function boot(tiles = [], storage = null, dpr = DPR, watching = true) {
   const document = fakeDocument();
   const mount = document.createElement(MOUNT_TAG);
   const window = { document, devicePixelRatio: dpr };
   if (storage) window.localStorage = storage;
+  const watcher = watching ? sizeWatcher(window) : { boxes: [], resized: () => {} };
   // input.js runs the hold that removes a tile on the page's own clock and
   // frames, which a test moves on by hand.
   let now = 0;
@@ -135,6 +150,15 @@ function boot(tiles = [], storage = null, dpr = DPR) {
   const fireDoc = listening(document);
   document.getElementById = () => mount;
 
+  // The page gives a canvas its box the moment the app makes one, so the boot
+  // fits the bitmap to it as a browser would.
+  const makeElement = document.createElement;
+  document.createElement = (tag) => {
+    const el = makeElement(tag);
+    if (tag === "canvas") Object.assign(el, { clientWidth: CANVAS_W, clientHeight: CANVAS_H });
+    return el;
+  };
+
   const B = load(MODULES, window);
   const calls = [];
   watchContract(B, calls);
@@ -152,12 +176,13 @@ function boot(tiles = [], storage = null, dpr = DPR) {
 
   load(["app.js"], window);
 
-  // The canvas takes a size only the page can give it, and the view app.js
-  // boots with, so a test can name the client point a tile sits under.
+  // The bitmap the boot fitted to the canvas's box, which a test then takes
+  // back to the box's own size, so a later fit shows. The view app.js boots
+  // with is read here too, so a test can name the client point a tile sits
+  // under.
   const canvas = descend(mount).find((el) => el.tag === "canvas");
-  Object.assign(canvas, {
-    clientWidth: CANVAS_W, clientHeight: CANVAS_H, width: CANVAS_W, height: CANVAS_H
-  });
+  const bootFit = [canvas.width, canvas.height];
+  Object.assign(canvas, { width: CANVAS_W, height: CANVAS_H });
   const view = B.view.create();
   const scale = view.zoom * dpr;
 
@@ -221,6 +246,12 @@ function boot(tiles = [], storage = null, dpr = DPR) {
       }
     },
     firePage,
+    // The boxes the app asked the page to watch for a change of their size,
+    // and the change of size the page delivers to it.
+    watched() { return watcher.boxes; },
+    resized() { watcher.resized(); },
+    // The bitmap the boot fitted the canvas to.
+    bootFit() { return bootFit; },
     // The reader turns to another tab, and back.
     hide(hidden = true) {
       document.hidden = hidden;
@@ -475,6 +506,9 @@ describe("app: the redraws a flashing highlight asks for", () => {
 
 describe("app: the canvas the board is drawn on", () => {
   const DENSE = 2;                 // device pixels per CSS pixel on a sharp screen
+  const NO_WATCHER = false;        // a page that cannot watch a box for its size
+  const FULL = [CANVAS_W * DENSE, CANVAS_H * DENSE];
+  const bitmap = (r) => [r.canvas.width, r.canvas.height];
 
   it("draws at the page's own pixel ratio, so the picture stays sharp", () => {
     const r = boot([], null, DENSE);
@@ -482,11 +516,25 @@ describe("app: the canvas the board is drawn on", () => {
     assert.equal(r.drawn[0].scale, r.B.ZOOM_DEFAULT * DENSE);
   });
 
-  it("fits the canvas bitmap to its box, in the page's own pixels", () => {
+  it("fits the canvas bitmap to its box on the boot, before any change of size", () => {
+    assert.deepEqual(boot([], null, DENSE).bootFit(), FULL);
+  });
+
+  it("fits the canvas bitmap to the stage it stands in, in the page's own pixels", () => {
     const r = boot([], null, DENSE);
     r.frame();
+    assert.deepEqual(r.watched(), [r.stage()], "the box the canvas grows with");
+    r.resized();
+    assert.deepEqual(bitmap(r), FULL);
+    assert.equal(r.waiting(), 1, "and asks for the frame that fills it");
+  });
+
+  it("fits it on the window's own resize where the page watches no box", () => {
+    const r = boot([], null, DENSE, NO_WATCHER);
+    r.frame();
+    assert.deepEqual(r.watched(), [], "nothing watches the stage");
     r.firePage("resize");
-    assert.deepEqual([r.canvas.width, r.canvas.height], [CANVAS_W * DENSE, CANVAS_H * DENSE]);
+    assert.deepEqual(bitmap(r), FULL);
     assert.equal(r.waiting(), 1, "and asks for the frame that fills it");
   });
 });

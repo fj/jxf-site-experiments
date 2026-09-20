@@ -99,13 +99,14 @@ function sizeWatcher(window) {
   return { boxes, resized: () => callbacks.forEach((fn) => fn()) };
 }
 
-// The three calls the app makes on the level and the camera, logged on their
-// way through, so a test can say what the wiring asked for as well as what the
-// level became.
+// The calls the app makes on the level, the camera and the toolbar, logged on
+// their way through, so a test can say what the wiring asked for as well as
+// what the level became.
 function watchContract(B, calls) {
   const outside = B.level.outside;
   const resize = B.level.resize;
   const clampPan = B.view.clampPan;
+  const build = B.toolbar.build;
   B.level.outside = (level, w, h) => {
     calls.push(["outside", w, h]);
     return outside(level, w, h);
@@ -117,6 +118,17 @@ function watchContract(B, calls) {
   B.view.clampPan = (view, size, frame) => {
     calls.push(["clampPan", size.w, size.h]);
     return clampPan(view, size, frame);
+  };
+  // Every refresh of the interface syncs the toolbar first, so a sync logged
+  // here is a refresh the wiring asked for.
+  B.toolbar.build = (handlers) => {
+    const built = build(handlers);
+    const sync = built.sync;
+    built.sync = (state) => {
+      calls.push(["refresh"]);
+      return sync(state);
+    };
+    return built;
   };
 }
 
@@ -225,6 +237,14 @@ function boot(tiles = [], storage = null, dpr = DPR, watching = true) {
     // already standing there is selected.
     press(x, y, props = {}) {
       canvas.fire("pointerdown", { ...this.over(x, y), button: PRIMARY, ...props });
+    },
+    // The reader sweeps a box from one cell to another, which takes every tile
+    // inside it into the selection.
+    sweep(from, to) {
+      const corner = (cell) => ({ ...this.over(...cell), button: PRIMARY });
+      canvas.fire("pointerdown", { ...corner(from), shiftKey: true });
+      canvas.fire("pointermove", corner(to));
+      canvas.fire("pointerup", corner(to));
     },
     // The reader holds the right button down on the tile at (x, y), which
     // wipes it away, and lets the button go again.
@@ -542,6 +562,10 @@ describe("app: the canvas the board is drawn on", () => {
 // A pair of tiles side by side, for a selection of one or of both.
 const PAIR = [[0, 0], [1, 0]];
 
+// The reader presses the key that raises: the selection, every tile on Shift,
+// or the height a new tile gets while nothing is selected.
+const raise = (r, props = {}) => r.canvas.fire("keydown", { key: "w", ...props });
+
 describe("app: the controls that edit the tiles", () => {
   // The app with the tile at (0, 0) selected, ready for the toolbar.
   const selecting = () => {
@@ -662,7 +686,6 @@ describe("app: the right button held on a tile", () => {
 
 describe("app: the controls that raise and lower", () => {
   const elevOf = (r) => PAIR.map(([x, y]) => r.tileAt(x, y).elev);
-  const raise = (r, props = {}) => r.canvas.fire("keydown", { key: "w", ...props });
 
   it("raises the selected tile and leaves the rest of the level standing", () => {
     const r = boot(PAIR);
@@ -687,6 +710,103 @@ describe("app: the controls that raise and lower", () => {
   });
 });
 
+// An edit that the rules refuse leaves the level as it was, so the app has
+// nothing to write and nothing to redraw.
+describe("app: an edit the rules refuse", () => {
+  const OFF_BOARD = [-1, -1];      // a cell no board of any size holds
+  const turn = (r) => r.canvas.fire("keydown", { key: "d" });
+
+  // The heights those cells stand at, read off the level itself: running a
+  // frame to read them would save what the raises before it left waiting.
+  const heightsOf = (r, cells) => cells.map(([x, y]) => r.B.level.get(r.level, x, y).elev);
+
+  // The presses that carry those cells from where they stand to the top.
+  const toTheTop = (r, cells) => r.B.ELEV_MAX - Math.max(...heightsOf(r, cells));
+
+  // The app on a storage of its own, drawn once, with nothing left to save.
+  const settled = (tiles = PAIR) => {
+    const r = boot(tiles, storing());
+    r.frame();
+    assert.deepEqual(r.saved(), [], "the boot saves nothing of its own");
+    return r;
+  };
+
+  it("saves nothing when the facing key finds no slope in the selection", () => {
+    const r = settled();
+    r.press(0, 0);
+    r.press(1, 0, { ctrlKey: true });
+    assert.deepEqual(r.selected(), PAIR, "two blocks, and not a slope between them");
+    const facings = PAIR.map(([x, y]) => r.tileAt(x, y).facing);
+    turn(r);
+    r.frame();
+    assert.deepEqual(PAIR.map(([x, y]) => r.tileAt(x, y).facing), facings, "nothing turned");
+    assert.deepEqual(r.saved(), []);
+  });
+
+  it("saves nothing when the selected tile is already at the top of the range", () => {
+    const r = settled([PAIR[0]]);
+    const one = [PAIR[0]];
+    r.press(...PAIR[0]);
+    for (let i = toTheTop(r, one); i > 0; i--) raise(r);
+    r.frame();
+    assert.deepEqual(heightsOf(r, one), [r.B.ELEV_MAX], "the tile climbed to the top");
+    assert.equal(r.saved().length, 1, "and the raises that took were written");
+    raise(r);
+    r.frame();
+    assert.deepEqual(heightsOf(r, one), [r.B.ELEV_MAX], "it is still at the top");
+    assert.equal(r.saved().length, 1, "and nothing more was written");
+  });
+
+  it("saves nothing when the level as a whole is already at the top", () => {
+    const r = settled();
+    const capped = new Array(PAIR.length).fill(r.B.ELEV_MAX);
+    for (let i = toTheTop(r, PAIR); i > 0; i--) raise(r, { shiftKey: true });
+    r.frame();
+    assert.deepEqual(heightsOf(r, PAIR), capped, "every tile climbed to the top");
+    assert.equal(r.saved().length, 1);
+    raise(r, { shiftKey: true });
+    r.frame();
+    assert.deepEqual(heightsOf(r, PAIR), capped);
+    assert.equal(r.saved().length, 1);
+  });
+
+  it("saves nothing when the reader clicks past the board's edge", () => {
+    const r = settled([]);
+    r.press(...OFF_BOARD);
+    r.frame();
+    assert.deepEqual(r.cells(), [], "no tile was laid");
+    assert.deepEqual(r.saved(), []);
+    r.press(0, 0);
+    r.frame();
+    assert.equal(r.saved().length, 1, "and a click on the board does save");
+  });
+
+  // The height a new tile gets is no part of the level, so moving it saves
+  // nothing, and a move it cannot make draws nothing either.
+  it("asks for no redraw when the height a new tile gets is at the top", () => {
+    const r = settled([]);
+    for (let i = r.B.ELEV_MAX - r.frame().newElev; i > 0; i--) {
+      raise(r);
+      r.frame();
+    }
+    assert.equal(r.waiting(), 0, "every move of the height has been drawn");
+    assert.deepEqual(r.saved(), [], "and none of them was written");
+    raise(r);
+    assert.equal(r.waiting(), 0, "a height that cannot move asks for nothing");
+    assert.equal(r.frame().newElev, r.B.ELEV_MAX);
+  });
+
+  it("refreshes nothing when a sweep takes in no cell the selection lacks", () => {
+    const r = settled();
+    r.sweep(...PAIR);
+    assert.deepEqual(r.selected(), PAIR);
+    const refreshed = r.of("refresh").length;
+    r.sweep(...PAIR);
+    assert.deepEqual(r.selected(), PAIR, "the same two cells as before");
+    assert.equal(r.of("refresh").length, refreshed);
+  });
+});
+
 describe("app: the controls that change the selection", () => {
   it("selects a tile, takes another in and out with Ctrl, and drops the lot on Escape", () => {
     const r = boot(PAIR);
@@ -708,6 +828,17 @@ describe("app: the controls that change the selection", () => {
     r.canvas.fire("pointerup", { ...r.over(1, 0), button: PRIMARY });
     assert.equal(r.frame().box, null, "which goes when the sweep ends");
     assert.deepEqual(r.selected(), PAIR);
+  });
+
+  // A canvas with no box gives no client point a meaning, so the sweep has no
+  // rectangle to draw and no tile to find.
+  it("sweeps nothing while the canvas has no size", () => {
+    const r = boot(PAIR);
+    r.frame();
+    Object.assign(r.canvas, { clientWidth: 0, clientHeight: 0 });
+    r.sweep(...PAIR);
+    assert.equal(r.frame().box, null);
+    assert.deepEqual(r.selected(), []);
   });
 
   // A sweep that goes nowhere is a click, and follows the plane the rest of
@@ -953,6 +1084,19 @@ describe("app: the controls that move the view", () => {
       y: home.y - DRAG / scale
     }, "the view moved by the pointer's own travel");
     assert.equal(r.frame().hover.tile, r.tileAt(...HELD), "and the tile is still under it");
+  });
+
+  // Mounted in a collapsed container the canvas has no box, so no client point
+  // stands for anything, and a drag has nowhere to carry the scene.
+  it("pans nothing while the canvas has no size", () => {
+    const r = boot();
+    const from = r.over(0, 0);
+    const home = { ...r.frame().view.pan };
+    const clamps = r.of("clampPan").length;
+    Object.assign(r.canvas, { clientWidth: 0, clientHeight: 0 });
+    dragBy(r, from, DRAG, -DRAG);
+    assert.deepEqual({ ...r.frame().view.pan }, home);
+    assert.equal(r.of("clampPan").length, clamps, "and asks the camera for nothing");
   });
 
   it("keeps some of the board on screen however far a drag carries it", () => {

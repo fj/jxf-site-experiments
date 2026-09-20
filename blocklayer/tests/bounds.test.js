@@ -141,6 +141,9 @@ describe("bounds: the size row", () => {
 });
 
 describe("bounds: the modal a lossy shrink opens", () => {
+  // The sentence the modal puts the count in.
+  const warning = (r) => descend(r.built.modal).find((el) => el.tag === "p").textContent;
+
   // A modal opened on a resize that would drop LOST tiles.
   const asking = () => {
     const r = rig();
@@ -173,8 +176,7 @@ describe("bounds: the modal a lossy shrink opens", () => {
   it("counts one lost tile in the singular", () => {
     const r = rig();
     r.built.sync(state({ pending: { ...PENDING, lost: 1 } }));
-    const text = descend(r.built.modal).find((el) => el.tag === "p");
-    assert.equal(text.textContent, "1 tile falls outside the new board.");
+    assert.equal(warning(r), "1 tile falls outside the new board.");
   });
 
   it("offers going ahead and cancelling, each hooked and worded", () => {
@@ -238,10 +240,26 @@ describe("bounds: the modal a lossy shrink opens", () => {
     assert.equal(page.activeElement, r.ctl("height"));
   });
 
+  // The keyboard is on the canvas for most of a session, and an ordinary sync
+  // has no business taking it off there.
   it("does not move the focus while nothing is pending", () => {
     const r = rig();
-    r.ctl("width").focus();
+    const canvas = page.createElement("canvas");
+    canvas.focus();
     r.built.sync(state());
-    assert.equal(page.activeElement, r.ctl("width"));
+    assert.equal(page.activeElement, canvas);
+  });
+
+  // The reader tabs to the cancel and then changes the other box: Enter has to
+  // stay the answer their finger is on.
+  it("leaves the focus where the reader took it while it goes on asking", () => {
+    const r = asking();
+    r.built.modal.fire("keydown", { key: "Tab" });
+    assert.equal(page.activeElement, r.ctl("cancel"), "the reader tabbed off the go-ahead");
+    const taller = { ...PENDING, h: PENDING.h + 1, lost: LOST - 1 };
+    r.built.sync(state({ pending: taller }));
+    assert.equal(page.activeElement, r.ctl("cancel"));
+    assert.equal(warning(r), `${taller.lost} tiles fall outside the new board.`,
+      "and the sentence still follows the count");
   });
 });

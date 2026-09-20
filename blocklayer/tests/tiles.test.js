@@ -360,6 +360,8 @@ describe("tiles: outline", () => {
     assert.deepEqual(colours(hover), new Set([B.COLORS.hover]));
     assert.deepEqual(colours(pulse), new Set([B.COLORS.pulse]));
     assert.ok(select.canvas.filled.size > hover.canvas.filled.size);
+    assert.equal(new Set([B.COLORS.select, B.COLORS.hover, B.COLORS.pulse]).size, RINGS.length,
+      "and no two rings share an ink, so the flash shows on either of them");
   });
 
   // The flash reads as the same ring in another colour, so nothing about the

@@ -60,9 +60,11 @@ describe("decor: sprite and icon", () => {
   it("anchors every decor at its base, where it stands on the tile", () => {
     for (const d of B.DECOR) {
       const s = D.sprite(d.key);
-      assert.ok(s.ox >= 0 && s.ox <= s.canvas.width, `${d.key}: ox ${s.ox}`);
       assert.ok(s.oy > s.canvas.height / 2, `${d.key}: oy ${s.oy} is not below its middle`);
-      assert.ok(s.oy <= s.canvas.height, `${d.key}: oy ${s.oy}`);
+      assert.ok(s.oy < s.canvas.height, `${d.key}: oy ${s.oy} is off the art`);
+      const base = span(rows(s)[s.oy]);
+      assert.equal(s.ox, Math.round((base.lo + base.hi + 1) / 2),
+        `${d.key}: ox ${s.ox} is not the middle of the row it stands on`);
     }
   });
 

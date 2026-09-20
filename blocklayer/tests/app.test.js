@@ -565,6 +565,23 @@ describe("app: the controls that change the selection", () => {
     assert.equal(r.frame().box, null, "which goes when the sweep ends");
     assert.deepEqual(r.selected(), PAIR);
   });
+
+  // A sweep that goes nowhere is a click, and follows the plane the rest of
+  // the clicks read: no column in front answers for the cell.
+  it("reads a sweep of no size on the floor plane once the level is see-through", () => {
+    const r = boot([[1, 1]]);
+    const shiftClick = () => {
+      const at = { ...r.onFloor(0, 0), button: PRIMARY };
+      r.canvas.fire("pointerdown", { ...at, shiftKey: true });
+      r.canvas.fire("pointerup", at);
+    };
+    shiftClick();
+    assert.deepEqual(r.selected(), [[1, 1]], "the ray meets the column in front");
+    r.canvas.fire("keydown", { key: "Escape" });
+    r.find("opaque", "").fire("click");
+    shiftClick();
+    assert.deepEqual(r.selected(), [], "and the cell under the pointer holds no tile");
+  });
 });
 
 describe("app: what the pointer is over", () => {

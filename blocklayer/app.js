@@ -347,11 +347,13 @@
     toggleSelect: function (x, y) {
       selectCells(B.selection.toggle(state.selection, x, y));
     },
-    // A sweep's two client corners: every tile inside joins the selection.
+    // A sweep's two client corners: every tile inside joins the selection. A
+    // sweep of no size is a click, and reads the floor plane as one.
     selectBox: function (x0, y0, x1, y1) {
       var box = baseBox(x0, y0, x1, y1);
       if (!box) return;
-      selectCells(B.selection.add(state.selection, B.view.within(state.view, state.level, box)));
+      var inside = B.view.within(state.view, state.level, box, !state.opaque);
+      selectCells(B.selection.add(state.selection, inside));
     },
     // The rectangle the sweep is drawing, for the renderer; box(null) ends it.
     box: function (x0, y0, x1, y1) {

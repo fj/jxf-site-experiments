@@ -866,6 +866,19 @@ describe("view: within a box of no size", () => {
     assert.deepEqual(V.within(V.create(), L.create(), pinned(p)), []);
   });
 
+  // The click a sweep of no size makes reads the floor plane with the rest of
+  // them, so a shift-click and a plain click name the same thing.
+  it("reads that click on the floor plane while the flag is set", () => {
+    const { view, level } = scene();
+    const front = L.add(level, 1, 1, B.ELEV_MAX);
+    const standing = L.add(level, 0, 0, B.NEW_TILE_ELEV);
+    const p = V.project(view, 0, 0, B.FLOOR);
+    assert.deepEqual(V.within(view, level, pinned(p)), [front], "the ray meets the column");
+    assert.deepEqual(V.within(view, level, pinned(p), true), [standing]);
+    const empty = V.project(view, 2, 0, B.FLOOR);
+    assert.deepEqual(V.within(view, level, pinned(empty), true), [], "and nothing over a cell");
+  });
+
   it("is a box, not a click, when only one side has no length", () => {
     const view = V.create();
     const level = L.create();

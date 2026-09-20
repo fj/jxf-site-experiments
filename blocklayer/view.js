@@ -141,11 +141,11 @@
   // The tiles a swept box holds: those whose top face's centre lies in it, in
   // the level's own order. The box is in the space project() answers, and its
   // corners come in either order. A box of no size is a click, so it takes the
-  // tile under its corner however the ray reaches it, which a box that caught
-  // only top faces would miss.
-  function within(view, level, box) {
+  // tile under its corner the way pick() reads that point, `flat` and all,
+  // which a box that caught only top faces would miss.
+  function within(view, level, box, flat) {
     if (box.x0 === box.x1 && box.y0 === box.y1) {
-      var hit = pick(view, level, box.x0, box.y0);
+      var hit = pick(view, level, box.x0, box.y0, flat);
       return hit.tile ? [hit.tile] : [];
     }
     var left = Math.min(box.x0, box.x1);

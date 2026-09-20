@@ -155,9 +155,11 @@
     return B.view.basePoint(canvas, scale(), clientX, clientY);
   }
 
+  // A see-through level reads the floor plane, so the pointer always addresses
+  // the cell it is over.
   function pick(clientX, clientY) {
     var p = at(clientX, clientY);
-    return p && B.view.pick(state.view, state.level, p.x, p.y);
+    return p && B.view.pick(state.view, state.level, p.x, p.y, !state.opaque);
   }
 
   // Two client corners as a rectangle in the same space, in the order swept:

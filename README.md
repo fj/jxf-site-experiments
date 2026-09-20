@@ -224,7 +224,10 @@ compass arrows, a teleport, a rope, a jump). The view turns in
 quarter turns, zooms at whole-number factors, pans in the four compass
 directions, hides or shows the elevation labels, the marks and the decor, and
 draws the tiles solid or see-through, and never so far past the board's edge
-that none of it is in sight. A light grey grid rules the board's floor, inside
+that none of it is in sight. A see-through level changes what the pointer
+addresses as well: it reads the floor plane, so the cell the pointer is over
+answers, and no column in front takes the hover, the click or the removal
+instead. A light grey grid rules the board's floor, inside
 an outline that shows where the level ends; tiles live only on it. Editing
 happens on the canvas: hover shows where a tile would go, `Alt` with the
 pointer reads a tile out — elevation, colour, shape, decor —

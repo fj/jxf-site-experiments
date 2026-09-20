@@ -489,12 +489,33 @@ describe("app: the controls that change the selection", () => {
 });
 
 describe("app: what the pointer is over", () => {
+  // A column one cell toward the eye, which covers the floor of (0, 0): what
+  // the ray meets over that floor while the level is solid.
+  const IN_FRONT = [[1, 1]];
+
   it("hands the renderer the tile under the pointer, and none once it leaves", () => {
     const r = boot(PAIR);
     r.canvas.fire("pointermove", r.over(0, 0));
     assert.equal(r.frame().hover.tile, r.tileAt(0, 0));
     r.canvas.fire("pointerleave", r.over(0, 0));
     assert.equal(r.frame().hover, null);
+  });
+
+  it("hovers the cell on the floor plane once the level is see-through", () => {
+    const r = boot(IN_FRONT);
+    r.canvas.fire("pointermove", r.over(0, 0));
+    assert.equal(r.frame().hover.tile, r.tileAt(1, 1), "the ray meets the column in front");
+    r.find("opaque", "").fire("click");
+    r.canvas.fire("pointermove", r.over(0, 0));
+    assert.deepEqual(r.frame().hover.cell, { x: 0, y: 0 });
+  });
+
+  it("lays a tile on that cell rather than selecting the column in front", () => {
+    const r = boot(IN_FRONT);
+    r.find("opaque", "").fire("click");
+    r.press(0, 0);
+    assert.deepEqual(r.cells(), [[0, 0], [1, 1]]);
+    assert.deepEqual(r.selected(), [], "and it selects nothing");
   });
 });
 
